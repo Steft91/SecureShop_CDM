@@ -329,11 +329,13 @@ CREATE TABLE files (
   mime         text NOT NULL,                   -- 'unknown' si la firma no coincidió
   size         int  NOT NULL,
   sha256       bytea NOT NULL,                  -- del archivo original
+  clean_sha256 bytea,                           -- de los bytes sanitizados que se publican (§9.5, paso 5)
   status       text NOT NULL CHECK (status IN ('clean','quarantined','rejected','released','deleted')),
   verdict      jsonb NOT NULL,                  -- motivo y métricas del análisis
   created_at   timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX ON files (session_id, created_at);
+CREATE INDEX ON files (clean_sha256) WHERE clean_sha256 IS NOT NULL;
 ```
 
 ### 7.5 BD `audit`
@@ -481,7 +483,7 @@ Todos los servicios exponen además `GET /health` sin token (`{"status": "ok"}` 
 2. **Firma (magic bytes)** contra `FORMATS`. Se ignoran la extensión y el `Content-Type` del cliente. Si no coincide → `rejected (type)`.
 3. **Validación con Pillow:** como máximo `MAX_IMAGE_PIXELS` = 20 MP, el formato decodificado debe coincidir con la firma, `verify()` y luego `load()`. Si falla → `rejected (invalid)`.
 4. **ClamAV** INSTREAM. Si encuentra algo → `rejected (malware)` y auditoría **critical**. Si no responde → **falla cerrado**: 503 y `clamav.unavailable`.
-5. **Estegoanálisis** (§12) en un `ProcessPoolExecutor` con timeout de 10 s. Un timeout cuenta como sospechoso.
+5. **Estegoanálisis** (§12) en un `ProcessPoolExecutor` con timeout de 10 s. Un timeout cuenta como sospechoso. **Excepción:** si el `sha256` del archivo coincide con el `clean_sha256` de un archivo ya publicado, se omite el análisis. Son bytes que generó el propio sistema; por ejemplo, una imagen descargada del chat y vuelta a subir. La sanitización aleatoriza el plano LSB, así que el chi² la marcaría como sospechosa. Cualquier modificación cambia el hash y fuerza el análisis completo.
 6. **Política:**
    - Sospechoso → se guarda en `/data/quarantine/<uuid>`, `status=quarantined`, auditoría warning `file.quarantined` con el veredicto. El usuario recibe "archivo retenido para revisión" y **el archivo no se publica**.
    - Rechazado → no se guarda el archivo; se registran `sha256`, `mime` y motivo en `files` y en auditoría.
@@ -618,6 +620,7 @@ Se necesitan ≥ 30 imágenes limpias reales (fotos de celular y capturas de pan
 ### 12.5 Sanitización (CDR) de todo archivo aceptado o liberado
 - **PNG:** se decodifica (se conserva el canal alfa si existe), se **reemplaza el plano LSB por bits aleatorios** (imperceptible; destruye payloads LSB-1 aunque no se detecten) y se recodifica sin chunks auxiliares. Recodificar sin tocar los píxeles **no** basta, porque PNG es sin pérdida.
 - **JPEG:** se aplica la orientación EXIF y se recodifica a RGB con calidad 90, sin EXIF, ICC ni comentarios.
+- Se guarda el `clean_sha256` de la salida. Una imagen con el plano LSB aleatorio es estadísticamente idéntica a una con LSB embebido al 100 %, así que el sistema reconoce sus propias salidas por hash (§9.5, paso 5) y no las vuelve a analizar. El prototipo del 2026-10-13 lo confirmó: también fallan las alternativas de poner el LSB en cero (lo marca RS), recodificar como JPEG o redimensionar (lo marca chi²).
 
 ### 12.6 Agregar formatos en el futuro
 Audio WAV: LSB sobre las muestras PCM (chi² y RS se adaptan a 16 bits); sanitización aleatorizando el LSB de las muestras. PDF y video: firma + ClamAV + política de rechazo hasta definir un análisis específico.
