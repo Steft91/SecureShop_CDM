@@ -2,11 +2,11 @@
 
 | | |
 |---|---|
-| **Fecha** | 2026-10-12 · **Revisión 2:** 2026-10-13 (arquitectura de microservicios; reemplaza el monolito modular de la revisión 1) · **Revisión 3:** 2026-10-19 (cuenta de usuario obligatoria; archivos de cualquier categoría con estegoanálisis por formato) |
+| **Fecha** | 2026-10-12 · **Revisión 2:** 2026-10-13 (arquitectura de microservicios; reemplaza el monolito modular de la revisión 1) · **Revisión 3:** 2026-10-19 (cuenta de usuario obligatoria; archivos de cualquier categoría con estegoanálisis por formato) · **Revisión 4:** 2026-10-20 (cuenta con correo verificado y alias; canal general y membresías; reanálisis de la versión sanitizada; requisitos de la Actividad 3) |
 | **Autores** | Zaith Alejandro Manangón Vinueza, Stefany Maricela Díaz Antun, Andrés Isaias Cedeño Cuenca |
 | **Asignatura** | Software Seguro — Proyecto Integrador |
-| **Estado** | Aprobado (diseño, rev. 2). La rev. 3 incorpora indicaciones del docente y los planes de `docs/plans/` ya están actualizados a ella (cada archivo del plan abre con una nota de qué cambió) |
-| **Fuente de requisitos** | `Documentación/Tarea 2/Actividad2_SGSI_Proyecto_Integrador.md` (enunciado + Tablas 1–4 de riesgos) + indicaciones posteriores del docente (rev. 3) |
+| **Estado** | Aprobado (diseño, rev. 2). Las rev. 3 y 4 incorporan indicaciones del docente, decisiones del equipo y los requisitos de la Actividad 3; los planes de `docs/plans/` ya están actualizados a la rev. 4 (cada archivo del plan abre con una nota de qué cambió) |
+| **Fuente de requisitos** | `Documentación/Tarea 2/Actividad2_SGSI_Proyecto_Integrador.md` (enunciado + Tablas 1–4 de riesgos) + indicaciones posteriores del docente (rev. 3) + Actividad 3 (requisitos RF-01…RF-21, RNF-01…RNF-19 y RS-01…RS-39; rev. 4, §21) |
 | **Plazo** | ~3 semanas: 13 oct – 2 nov 2026 |
 
 ---
@@ -17,11 +17,12 @@ Construir la aplicación de **salas de chat seguras** del proyecto integrador co
 
 **Criterios de éxito (definición de "terminado"):**
 1. Un admin con usuario + contraseña + TOTP crea salas con ID único, clave, cupo y tipo (texto / multimedia / ambos).
-2. Para participar es **obligatorio crear una cuenta** (usuario + contraseña): sin sesión de usuario no se entra a ninguna sala. Dos o más usuarios intercambian mensajes cifrados en una sala desde sus navegadores. Una cuenta no puede estar activa desde dos dispositivos.
-3. Las salas multimedia aceptan imágenes, audio, video, documentos y texto de la lista blanca (§12.1). Un archivo con información oculta (LSB en una imagen o en un WAV, datos anexados o segmentos ocultos en MP3, MP4, PDF o DOCX, caracteres invisibles en un TXT) termina en **cuarentena**, genera una alerta y queda en auditoría. Un archivo limpio se entrega sanitizado.
+2. Para participar es **obligatorio crear una cuenta** con correo y contraseña, activarla con el código que llega por correo y elegir un **alias** en el primer ingreso: sin sesión de usuario no se entra a ninguna sala. Todas las cuentas ven el **canal general**; a las salas del admin se unen una sola vez con código y clave. Dos o más usuarios intercambian mensajes cifrados desde sus navegadores. Una cuenta no puede estar activa desde dos dispositivos.
+3. Las salas multimedia aceptan imágenes, audio, video, documentos y texto de la lista blanca (§12.1). Un archivo con información oculta (LSB en una imagen o en un WAV, datos anexados o segmentos ocultos en MP3, MP4, PDF o DOCX, caracteres invisibles en un TXT) termina en **cuarentena**, genera una alerta y queda en auditoría. Un archivo limpio se entrega sanitizado, y solo si la versión sanitizada supera una segunda inspección estructural.
 4. **Microservicios:** un gateway como único punto de entrada y 5 servicios (`auth`, `rooms`, `chat`, `media`, `audit`). Cada servicio tiene su propia BD, su propia imagen y su propio job de migración, y se despliega por separado (`docker compose up -d --build <servicio>`).
 5. Los **17 riesgos** (R1–R15 de la Tarea 2 + R16 y R17) tienen al menos un test automatizado en verde, mapeado en `docs/trazabilidad-riesgos.md`.
 6. Todo el sistema corre con un comando en local y en un VPS con certificado válido.
+7. Los requisitos no funcionales y de desarrollo seguro de la Actividad 3 tienen su prueba o su evidencia (§21, `docs/evidencias-rnf.md`).
 
 ---
 
@@ -36,7 +37,9 @@ Construir la aplicación de **salas de chat seguras** del proyecto integrador co
 | Confidencialidad, integridad y autenticidad; justificar algoritmos, protocolos y gestión de claves | TLS 1.3 hasta el gateway + **cifrado por conexión en capa de aplicación** entre navegador y `chat` (ECDH P-256 con *hello* firmado → HKDF-SHA256 → AES-256-GCM con AAD) + envelope encryption en reposo (DEK por sala, KEK propia de `chat`) |
 | Análisis de archivos y estegoanálisis con alertas, auditoría y política | Servicio `media`: firma → validación → ClamAV → estegoanálisis **por formato** → **cuarentena** / rechazo / sanitización (CDR). Alertas en el servicio `audit` |
 | *(Docente)* Microservicios como en SecureShop | Gateway Nginx + 5 servicios por dominio + 5 BD (una por servicio, roles aislados) |
-| *(Docente)* Crear una cuenta es obligatorio | Registro abierto con usuario + contraseña (Argon2id), sin correo ni otros datos personales. El alias visible en el chat es el nombre de usuario. Cuentas de usuario y de admin en tablas, cookies y verificaciones distintas (§7.1, §9.2) |
+| *(Docente)* Crear una cuenta es obligatorio | Registro con **correo + contraseña** (Argon2id); la cuenta se activa con un código de 6 dígitos enviado por correo; en el primer ingreso se elige un **alias** visible, único y del alfabeto latino. Cuentas de usuario y de admin en tablas, cookies y verificaciones distintas (§7.1, §9.2) |
+| *(Equipo, rev. 4)* Canal general y salas por invitación | Toda cuenta entra al **canal general** (sin clave). El admin crea salas y reparte código + clave; unirse crea una **membresía permanente**, así que después se entra sin la clave. La sala persiste hasta que el admin la elimina; la cuenta puede abandonarla (§9.3) |
+| *(Actividad 3)* Requisitos funcionales, no funcionales y de seguridad | Correlación, registros JSON, métricas y alertas de consumo; reanálisis de la versión sanitizada; cierre de sesión que corta la sala; cobertura ≥ 80 %, complejidad ≤ 10, detección de secretos y rama protegida; modelo de amenazas; respaldos cifrados; pruebas de carga y de tiempo por formato (§21) |
 | *(Docente)* Estegoanálisis para cualquier tipo de archivo (mp3, mp4, documentos, texto, imagen) | Lista blanca de 9 formatos en 5 categorías (§12.1), cada uno con validación, estegoanálisis y sanitización propios |
 
 **Decisiones de contexto tomadas con el equipo:**
@@ -52,7 +55,7 @@ Construir la aplicación de **salas de chat seguras** del proyecto integrador co
 
 ## 3. Alcance, fuera de alcance y limitaciones conocidas
 
-**Dentro:** todo lo de la sección 2, las cuentas de usuario (registro, login, sesión única por dispositivo), el panel de admin (salas, cuarentena, auditoría), las pruebas por servicio y e2e, CI, el despliegue local y en el VPS, y el contexto para Claude Code.
+**Dentro:** todo lo de la sección 2, las cuentas de usuario (registro con correo verificado, alias, login, sesión única por dispositivo), el canal general y las membresías, el panel de admin (salas, cuarentena, auditoría, estado), las pruebas por servicio y e2e, CI, el despliegue local y en el VPS, los respaldos, las pruebas de carga y el contexto para Claude Code.
 
 **Fuera (YAGNI, con el disparador que justificaría agregarlo):**
 | Omitido | Agregar cuando |
@@ -65,13 +68,14 @@ Construir la aplicación de **salas de chat seguras** del proyecto integrador co
 | Formatos fuera de la lista blanca (WebP, HEIC, MOV, WebM, FLAC, OGG, XLSX, PPTX, ODT, ZIP…) | El docente los pida (§12.11) |
 | Recodificar el video (H.264) al sanitizar | Haya procesamiento en segundo plano: recodificar tarda más que el timeout de una subida. Hoy el MP4 se remultiplexa (§12.9) |
 | MFA para cuentas de usuario | Lo pida el docente (el admin sí tiene TOTP obligatorio) |
-| Cambio y recuperación de contraseña, correo electrónico | Se integre un servicio de correo; hoy la cuenta no guarda datos de contacto |
-| Gestión de cuentas desde el panel (listar, desactivar) | Haya abuso real o lo pida el docente |
+| Cambio y recuperación de contraseña, cambio de correo o de alias | Lo pida el docente: el correo ya está verificado, así que la recuperación sería un código más (§9.2) |
+| Gestión de cuentas y de miembros desde el panel (listar, desactivar, expulsar de una sala) | Haya abuso real o lo pida el docente; hoy el admin corta el acceso eliminando la sala |
+| Métricas con Prometheus/Grafana | Haya más de una réplica o un equipo de operación; hoy cada servicio expone sus métricas al panel (§21.1) |
 | `.mcp.json` | Usen GitHub Issues/Projects u otra integración externa |
 
 **Limitaciones conocidas (se declaran en el informe):**
 1. `chat` ve el texto plano de los mensajes por diseño (para validar, persistir y auditar) y `media` ve los archivos (para analizarlos). La confianza en esos servicios es un supuesto explícito.
-2. **Registro abierto:** cualquiera puede crear cuentas (con rate limit por dispositivo e IP). Quien conoce la clave de una sala puede entrar con **otra cuenta** desde otro dispositivo; para el sistema es otro participante, limitado por el cupo. Cada cuenta, en cambio, está en un solo dispositivo a la vez.
+2. **Registro abierto:** cualquiera con un correo puede crear cuentas (con rate limit por dispositivo e IP). Quien conoce la clave de una sala puede unirse con **otra cuenta**; para el sistema es otro participante, limitado por el cupo. Cada cuenta, en cambio, está en un solo dispositivo a la vez. Cambiar la clave de una sala no expulsa a quienes ya son miembros: para cortar el acceso, el admin elimina la sala.
 3. **Tramo interno en HTTP plano.** TLS termina en el gateway; las llamadas gateway→servicio y servicio→servicio viajan en HTTP dentro de redes Docker internas.
    - Los **mensajes** siguen protegidos en ese tramo por el cifrado de aplicación, y el *hello* firmado impide un MITM activo (§10.1).
    - Los **tokens de servicio y los archivos subidos** viajan en claro dentro de la red interna.
@@ -86,6 +90,7 @@ Construir la aplicación de **salas de chat seguras** del proyecto integrador co
    La **sanitización** (§12.9) destruye igual la mayoría de esos canales: aleatoriza los LSB (PNG, WAV), recodifica (JPEG, GIF, MP3) y reconstruye los contenedores (MP4, PDF, DOCX, TXT). Sobreviven a ella los payloads dentro del flujo de video (el MP4 se remultiplexa, no se recodifica), los homoglifos de un TXT (se detectan, pero no se corrigen) y el contenido visible de un documento.
 6. `audit` es un punto único de falla para las operaciones que otorgan acceso (fallan cerradas con 503 si `audit` no responde, §14.4). Es una decisión deliberada a favor de la trazabilidad.
 7. Si alguien cierra el navegador sin cerrar sesión, su cuenta no puede iniciar sesión desde **otro** dispositivo hasta que esa sesión venza por inactividad (≤ 15 min, §9.2). Es el costo de rechazar el nuevo ingreso: así, quien robe una contraseña no puede desplazar al dueño de una sesión activa.
+8. **Correo:** si el proveedor SMTP no entrega, nadie puede activar su cuenta (el registro responde igual y queda `mail.unavailable` en auditoría). En local, Mailpit guarda los correos sin enviarlos.
 
 ---
 
@@ -106,26 +111,27 @@ Navegador (React SPA + WebCrypto)
   auth        rooms ◄─────► chat ◄─────── media ─────► clamav (red scan)
     │           │            │             │
     └───────────┴─────┬──────┴─────────────┴──── POST /internal/events ──► audit
-                      ▼  (red data)
-          PostgreSQL 17: BD auth · rooms · chat · media · audit
+    │                 ▼  (red data)
+    │     PostgreSQL 17: BD auth · rooms · chat · media · audit
+    └── SMTP (red mail) ──► mailer (Mailpit; en el VPS reenvía al proveedor)
 ```
 
 ### 4.2 Servicios
 | Servicio | Responsabilidad | BD (tablas) | Riesgos |
 |---|---|---|---|
 | **gateway** | Único punto de entrada: TLS, cabeceras de seguridad, rate limit perimetral, enrutamiento, autenticación delegada (`auth_request`), SPA estática | — | 7, 10, 16 |
-| **auth** | **Cuentas de usuario** (registro, login, sesión única por cuenta atada al dispositivo, `verify-user`) y **admins** (login, TOTP, sesiones, `verify-admin`, CLI `create_admin`); bloqueo; rotación de su KEK | `auth`: `admins`, `admin_sessions`, `users`, `user_sessions`, `failed_attempts` | 4, 5, 13, 17 |
-| **rooms** | CRUD de salas, cookie de dispositivo, ingreso (con cuenta), cupo atómico, una sesión de sala activa por usuario, ciclo de vida de sesiones (salida, barrido); `verify-session` | `rooms`: `rooms`, `room_sessions`, `failed_attempts` | 1, 5, 8, 13, 15 |
+| **auth** | **Cuentas de usuario** (registro con correo y código, alias, login, sesión única por cuenta atada al dispositivo, logout que corta la sala, `verify-user`) y **admins** (login, TOTP, sesiones, `verify-admin`, CLI `create_admin`); bloqueo; rotación de su KEK | `auth`: `admins`, `admin_sessions`, `users`, `user_sessions`, `failed_attempts` | 4, 5, 13, 17 |
+| **rooms** | CRUD de salas, **canal general**, **membresías**, cookie de dispositivo, unirse (código + clave), entrar (cupo atómico, una sesión de sala activa por usuario), ciclo de vida de sesiones (salida, barrido, fin por logout); `verify-session` | `rooms`: `rooms`, `room_members`, `room_sessions`, `failed_attempts` | 1, 5, 8, 13, 15 |
 | **chat** | WebSocket, handshake ECDH firmado, cifrado de tramas, limpieza de caracteres invisibles en los mensajes, mensajes cifrados en reposo (DEK por sala), historial, eventos de archivo, inactividad, heartbeat de sesiones | `chat`: `room_keys`, `messages` | 2, 6, 7, 10, 14 |
-| **media** | Subida, firma, validación y estegoanálisis **por formato** (9 formatos, §12), ClamAV, sanitización (CDR), cuarentena, descarga con URL firmada, panel de cuarentena | `media`: `files` + volumen de archivos | 6, 9, 12 |
+| **media** | Subida, firma, validación y estegoanálisis **por formato** (9 formatos, §12), ClamAV, sanitización (CDR) con **reanálisis estructural** de la salida, cuarentena, descarga con URL firmada, panel de cuarentena | `media`: `files` + volumen de archivos | 6, 9, 12 |
 | **audit** | Recepción de eventos de todos los servicios, cadena de hash, consulta y verificación para el admin | `audit`: `audit_log` | 3 |
 
-Cada servicio es un proyecto Python independiente (`services/<svc>/`, paquete `<svc>_svc`) que comparte una librería común (`services/shared/`, paquete `shared`) y una única plantilla de `Dockerfile` (argumento `SERVICE`).
+Cada servicio es un proyecto Python independiente (`services/<svc>/`, paquete `<svc>_svc`) que comparte una librería común (`services/shared/`, paquete `shared`) y una única plantilla de `Dockerfile` (argumento `SERVICE`). Todos exponen además `GET /api/admin/metrics` (§21.1). El contenedor `mailer` (Mailpit) no es un servicio propio: solo recibe el SMTP de auth.
 
 ### 4.3 Modelo de confianza
 1. **Autenticación centralizada en el gateway.** Antes de enrutar, Nginx hace un `auth_request`:
    - rutas de admin → `auth /internal/verify-admin` → `X-Admin-Id`, `X-Admin-User`;
-   - ingreso a una sala → `auth /internal/verify-user` → `X-User-Id`, `X-User-Name`;
+   - salas de la cuenta (listar, unirse, entrar, abandonar) → `auth /internal/verify-user` → `X-User-Id`, `X-User-Name` (alias);
    - rutas de sesión de sala → `rooms /internal/verify-session` → `X-Session-Id`, `X-Room-Id`, `X-User-Id`, `X-Alias`, `X-Room-Mode`.
 
    Si responde 2xx, el gateway copia esa identidad a la petición hacia el servicio. **Toda cabecera de identidad que mande el cliente se sobrescribe o se vacía** en todas las rutas.
@@ -140,7 +146,7 @@ Cada servicio es un proyecto Python independiente (`services/<svc>/`, paquete `<
    | Servicio | Acepta llamadas de |
    |---|---|
    | auth | gateway |
-   | rooms | gateway, chat |
+   | rooms | gateway, chat, auth |
    | chat | gateway, rooms, media |
    | media | gateway |
    | audit | gateway, auth, rooms, chat, media |
@@ -151,8 +157,10 @@ Cada servicio es un proyecto Python independiente (`services/<svc>/`, paquete `<
 | Llamador → receptor | Endpoint | Cuándo | Si el receptor no responde |
 |---|---|---|---|
 | gateway → auth | `GET /internal/verify-admin` | cada `/api/admin/*` | 401 al cliente |
-| gateway → auth | `GET /internal/verify-user` | cada `/api/rooms/join` | 401 al cliente |
+| gateway → auth | `GET /internal/verify-user` | cada `/api/rooms`, `/api/rooms/join`, `/api/rooms/{id}/enter` y `/api/rooms/{id}/membership` | 401 al cliente |
 | gateway → rooms | `GET /internal/verify-session` | cada `/api/rooms/leave`, `/api/media/*`, `/ws` | 401 al cliente |
+| auth → rooms | `POST /internal/users/{user_id}/sessions/end` | logout de la cuenta | La cuenta igual se cierra; queda `user.logout.partial` y la SPA ya llamó a `leave` |
+| auth → mailer | SMTP :1025 | registro y reenvío de código | El registro responde igual; queda `mail.unavailable` |
 | rooms → chat | `POST /internal/sessions/{id}/kick` | salida, barrido, sala eliminada | Se registra y se continúa: la sesión ya terminó en `rooms` y el heartbeat la reconcilia |
 | chat → rooms | `POST /internal/sessions/{id}/end` | cierre limpio, violación, inactividad | Se registra; el barrido de `rooms` la termina tras el período de gracia |
 | chat → rooms | `POST /internal/sessions/heartbeat` | cada 30 s con las sesiones conectadas | Se reintenta en el siguiente ciclo |
@@ -168,8 +176,10 @@ Cada servicio es un proyecto Python independiente (`services/<svc>/`, paquete `<
 | `data` | sí | db, los 5 servicios, los 5 jobs de migración | Acceso a PostgreSQL (el gateway **no** llega a la BD) |
 | `scan` | sí | media, clamav | Solo `media` llega a ClamAV |
 | `clamav-egress` | no | clamav | Actualización de firmas (freshclam) |
+| `mail` | sí | auth, mailer | Solo auth envía correo, y solo al `mailer` |
+| `mail-egress` | no | mailer (solo en el VPS, `docker-compose.vps.yml`) | Reenvío al proveedor SMTP; auth nunca sale a internet |
 
-Servicios Python: usuario no-root (uid 10001), `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]`, `read_only: true` con `tmpfs: /tmp`. `media` monta además el volumen `media_data` en `/data`, lleva ffmpeg en su imagen y su `tmpfs` de `/tmp` tiene 256 MB para los temporales del análisis y la sanitización.
+Servicios Python: usuario no-root (uid 10001), `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]`, `read_only: true` con `tmpfs: /tmp`, `restart: unless-stopped` y límites de recursos (`mem_limit: 512m`, `cpus: 1.0`; el monitor de §21.1 mide contra ellos). `media` monta además el volumen `media_data` en `/data`, lleva ffmpeg en su imagen y su `tmpfs` de `/tmp` tiene 256 MB para los temporales del análisis y la sanitización.
 
 ### 4.6 Límites de escala
 Una réplica por servicio. Escalar `chat` exige mover la difusión a pub/sub (Redis/NATS) y enrutar las conexiones por sesión. Las demás piezas (`auth`, `rooms`, `media`, `audit`) no tienen estado en memoria salvo cachés triviales.
@@ -194,6 +204,7 @@ SecureShop_CDM/
 │   │       ├── identity.py          dependencias require_gateway / require_admin / require_user / require_session
 │   │       ├── text.py              detección y limpieza de caracteres invisibles (TXT en media, mensajes en chat)
 │   │       ├── audit_client.py      emisión de eventos con fallback a stdout
+│   │       ├── observability.py     id de correlación, registros JSON, métricas, alerta de consumo
 │   │       ├── web.py               create_base_app: errores JSON, /health, Origin/CSRF
 │   │       └── testing.py           utilidades de prueba (BD de prueba, migraciones, clientes)
 │   ├── auth/    auth_svc/  migrations/  tests/  pyproject.toml  requirements.lock  alembic.ini
@@ -204,12 +215,16 @@ SecureShop_CDM/
 ├── gateway/
 │   ├── Dockerfile                   build multi-stage de la SPA + nginx
 │   ├── nginx.conf
-│   └── snippets/                    proxy-base.conf, public.conf, admin.conf, user.conf, session.conf, subrequest.conf
+│   ├── snippets/                    proxy-base.conf, public.conf, admin.conf, user.conf, session.conf, subrequest.conf
+│   └── tests/                       prueba de enrutamiento con servicios falsos (run.sh, check_routes.py)
 ├── frontend/                        Vite + React + TS (src/pages, src/lib)
 ├── e2e/                             pytest contra el stack completo vía https://localhost
+├── perf/                            carga.py y docker-compose.perf.yml (RNF-01, RNF-02, RNF-06)
 ├── deploy/
 │   ├── docker-compose.yml
+│   ├── docker-compose.vps.yml       diferencias del VPS (reenvío de correo)
 │   ├── docker-compose.test.yml      Postgres (y ClamAV opcional) para las pruebas por servicio
+│   ├── backup.sh  restore.sh        respaldo cifrado con age y restauración (RNF-16)
 │   ├── postgres/init.sh             crea BDs y roles leyendo /run/secrets
 │   ├── gen_secrets.py               genera deploy/secrets/* y deploy/public/chat-key.json
 │   ├── secrets/   (gitignored)
@@ -218,8 +233,12 @@ SecureShop_CDM/
 ├── docs/
 │   ├── specs/  plans/
 │   ├── crypto-vectors.json          vectores compartidos Python ↔ TypeScript
-│   ├── trazabilidad-riesgos.md      riesgo → control → servicio/archivo → test → estado
+│   ├── trazabilidad-riesgos.md      riesgo → control → control ISO 27001 → servicio/archivo → test → estado
+│   ├── modelo-amenazas.md           STRIDE por componente (RS-30)
+│   ├── evidencias-rnf.md            RNF-01…RNF-19: medición y evidencia
 │   └── despliegue-vps.md
+├── .github/                         ci.yml y pull_request_template.md (RS-37)
+├── .gitleaks.toml                   detección de secretos en la CI (RS-32)
 ├── .github/workflows/ci.yml
 └── Documentación/                   entregables académicos (ya existe)
 ```
@@ -244,7 +263,9 @@ SecureShop_CDM/
 | Front | React 19, Vite, TypeScript estricto, react-router, CSS plano | Sin librería de UI: menos superficie |
 | Cripto en el front | WebCrypto (`crypto.subtle`) | Nativo, claves no extraíbles |
 | Pruebas | pytest, httpx, pytest-timeout; vitest; e2e con httpx + `websockets` | |
-| CI | GitHub Actions: ruff, pytest (matriz por servicio), bandit, pip-audit, npm audit | |
+| Correo | Mailpit `v1.21.8` (contenedor `mailer`): en local guarda los correos; en el VPS los reenvía al proveedor SMTP | auth no sale a internet |
+| Respaldos | `pg_dumpall` + tar del volumen, cifrados con `age` | RNF-16 |
+| CI | GitHub Actions: ruff (con complejidad ≤ 10), pytest con `pytest-cov` (≥ 80 %), bandit, pip-audit, gitleaks, npm audit, `nginx -t` y la prueba de enrutamiento del gateway | RNF-10, RNF-11, RS-32 |
 
 Las versiones exactas quedan en `services/<svc>/requirements.lock` (generado en el plan) y en `frontend/package-lock.json`.
 
@@ -275,10 +296,17 @@ CREATE TABLE admin_sessions (
   ended_at   timestamptz
 );
 CREATE TABLE users (                            -- cuentas de usuario final (nunca admins)
-  id            uuid PRIMARY KEY,
-  username      text UNIQUE NOT NULL CHECK (username ~ '^[a-z0-9_.-]{3,32}$'),  -- también es el alias en el chat
-  password_hash text NOT NULL,                  -- $argon2id$...
-  created_at    timestamptz NOT NULL DEFAULT now()
+  id                uuid PRIMARY KEY,
+  email             text UNIQUE NOT NULL CHECK (email = lower(email) AND length(email) <= 254),
+  password_hash     text NOT NULL,                -- $argon2id$...
+  verified_at       timestamptz,                  -- NULL hasta ingresar el código del correo
+  verify_code_hash  bytea,                        -- HMAC-SHA256(kek_auth, "verify|<id>|<código>")
+  verify_expires_at timestamptz,                  -- 15 min
+  verify_attempts   int NOT NULL DEFAULT 0,       -- 5 fallos invalidan el código
+  alias             text,                         -- visible en el chat; se elige en el primer ingreso
+  alias_key         text UNIQUE,                  -- forma canónica: sin tildes, mayúsculas ni separadores
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  CHECK ((alias IS NULL) = (alias_key IS NULL))
 );
 CREATE TABLE user_sessions (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -294,40 +322,54 @@ CREATE UNIQUE INDEX one_active_session_per_user
   ON user_sessions (user_id) WHERE ended_at IS NULL;                         -- riesgo 13
 CREATE TABLE failed_attempts (
   id         bigserial PRIMARY KEY,
-  key        text NOT NULL,                     -- 'admin:<u>' | 'admin_ip:<ip>' | 'user:<u>' | 'user_ip:<ip>'
+  key        text NOT NULL,                     -- 'admin:<u>' | 'admin_ip:<ip>' | 'user:<correo>' | 'user_ip:<ip>'
                                                 -- | 'register_device:<hash>' | 'register_ip:<ip>'
+                                                -- | 'verify_ip:<ip>' | 'resend:<correo>'
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX ON failed_attempts (key, created_at);
 ```
 - Admins y usuarios llevan contadores separados: los fallos de un aula entera detrás de una misma IP no bloquean el login del admin.
-- Las claves `register_*` cuentan **cada** registro, exitoso o no (§9.2).
+- Las claves `register_*` y `resend:*` cuentan **cada** intento, exitoso o no (§9.2).
+- El correo es el único dato personal que se guarda; en la auditoría, las cuentas aparecen como `user:<id>` y el correo solo como `target` de un intento fallido.
 
 ### 7.2 BD `rooms`
 ```sql
 CREATE TABLE rooms (
   id                   uuid PRIMARY KEY,
   code                 text UNIQUE NOT NULL CHECK (code ~ '^[a-z0-9_-]{3,32}$'),  -- normalizado a minúsculas
-  key_hash             text NOT NULL,           -- $argon2id$...
+  key_hash             text,                    -- $argon2id$...; NULL solo en el canal general
   mode                 text NOT NULL CHECK (mode IN ('text','media','both')),
   max_participants     int  NOT NULL CHECK (max_participants BETWEEN 2 AND 50),
-  current_participants int  NOT NULL DEFAULT 0,
+  current_participants int  NOT NULL DEFAULT 0, -- conectados ahora (no miembros)
   active               boolean NOT NULL DEFAULT true,
-  created_by           uuid NOT NULL,           -- id del admin (vive en la BD auth)
+  is_general           boolean NOT NULL DEFAULT false,
+  created_by           uuid,                    -- id del admin (vive en la BD auth); NULL en el general
   created_at           timestamptz NOT NULL DEFAULT now(),
-  CHECK (current_participants BETWEEN 0 AND max_participants)   -- respaldo del riesgo 15
+  CHECK (current_participants BETWEEN 0 AND max_participants),   -- respaldo del riesgo 15
+  CHECK (is_general OR (key_hash IS NOT NULL AND created_by IS NOT NULL)),
+  CHECK (NOT is_general OR active)              -- el general no se elimina
+);
+CREATE UNIQUE INDEX one_general_room ON rooms (is_general) WHERE is_general;
+-- la migración inserta el canal general: code 'general', modo 'both', cupo 50, sin clave
+CREATE TABLE room_members (                     -- membresía permanente: se crea al unirse con código + clave
+  room_id   uuid NOT NULL REFERENCES rooms(id),
+  user_id   uuid NOT NULL,                      -- cuenta (vive en la BD auth)
+  joined_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (room_id, user_id)
 );
 CREATE TABLE room_sessions (
   id          uuid PRIMARY KEY,
   room_id     uuid NOT NULL REFERENCES rooms(id),
   user_id     uuid NOT NULL,                    -- cuenta (vive en la BD auth)
-  alias       text NOT NULL,                    -- copia del username al ingresar
+  alias       text NOT NULL,                    -- copia del alias de la cuenta al entrar
   device_hash bytea NOT NULL,                   -- SHA-256 de la cookie de dispositivo
   token_hash  bytea UNIQUE NOT NULL,
   last_seen   timestamptz NOT NULL DEFAULT now(),   -- creación o último heartbeat de chat
   created_at  timestamptz NOT NULL DEFAULT now(),
   ended_at    timestamptz,
-  end_reason  text
+  end_reason  text                              -- leave | closed | violation | idle | grace | replaced
+                                                -- | room_deleted | abandon | logout
 );
 CREATE UNIQUE INDEX one_active_session_per_user
   ON room_sessions (user_id) WHERE ended_at IS NULL;      -- riesgo 13: una sala a la vez, desde un dispositivo
@@ -390,11 +432,11 @@ CREATE TABLE audit_log (
   ts        timestamptz NOT NULL,
   service   text NOT NULL,                      -- deducido del token del llamador, nunca del payload
   severity  text NOT NULL CHECK (severity IN ('info','warning','critical')),
-  actor     text NOT NULL,                      -- 'admin:<u>' | 'session:<id>' | 'ip:<ip>' | 'system'
+  actor     text NOT NULL,                      -- 'admin:<u>' | 'user:<id>' | 'session:<id>' | 'ip:<ip>' | 'system'
   action    text NOT NULL,
   target    text,
   ip        inet,
-  details   jsonb NOT NULL DEFAULT '{}',
+  details   jsonb NOT NULL DEFAULT '{}',          -- incluye request_id (§21.1): queda dentro del hash
   prev_hash bytea NOT NULL,
   hash      bytea NOT NULL
 );
@@ -423,15 +465,21 @@ Para cada servicio `<svc>` ∈ {auth, rooms, chat, media, audit}:
 | POST | `/api/auth/logout` | auth | cookie admin | Cierra la sesión del admin |
 | GET | `/api/auth/me` | auth | cookie admin | `{username}` |
 | GET | `/api/device` | rooms | — | Pone la cookie `__Host-device` si no existe (204) |
-| POST | `/api/users/register` | auth | cookie de dispositivo | `{username, password}` → 201 `{username}` · 409 "nombre de usuario no disponible". No abre sesión (§9.2) |
-| POST | `/api/users/login` | auth | cookie de dispositivo | `{username, password}` → cookie `__Host-user` + `{username}` · 409 si la cuenta tiene una sesión activa en otro dispositivo |
-| POST | `/api/users/logout` | auth | cookie de usuario | Cierra la sesión de usuario (204) |
-| GET | `/api/users/me` | auth | cookie de usuario | `{username}`; desliza la inactividad (la SPA lo llama cada 5 min) |
-| POST | `/api/rooms/join` | rooms | usuario (`verify-user`) | `{code, key}` → cookie `__Host-room` + `{session_id, room: {id, code, mode}}`. El alias es el `username` |
+| POST | `/api/users/register` | auth | cookie de dispositivo | `{email, password}` → **siempre** 202 (no revela si el correo tiene cuenta); envía el código. No abre sesión (§9.2) |
+| POST | `/api/users/verify` | auth | — | `{email, code}` → 204 · 400 "código inválido o vencido" |
+| POST | `/api/users/verify/resend` | auth | — | `{email}` → 202 (nuevo código si la cuenta está pendiente) |
+| POST | `/api/users/login` | auth | cookie de dispositivo | `{email, password}` → cookie `__Host-user` + `{alias}` (`null` si falta elegirlo) · 403 cuenta sin verificar · 409 si la cuenta tiene una sesión activa en otro dispositivo |
+| POST | `/api/users/alias` | auth | cookie de usuario | `{alias}` → `{alias}`; una sola vez · 409 ya elegido o no disponible |
+| POST | `/api/users/logout` | auth | cookie de usuario | Cierra la sesión de usuario y la de sala (204) |
+| GET | `/api/users/me` | auth | cookie de usuario | `{email, alias}`; desliza la inactividad (la SPA lo llama cada 5 min) |
+| GET | `/api/rooms` | rooms | usuario (`verify-user`) | `[{id, code, mode, general, connected, max}]`: el general y las salas de la cuenta |
+| POST | `/api/rooms/join` | rooms | usuario | `{code, key}` → `{room: {id, code, mode}}`: crea la membresía (idempotente) |
+| POST | `/api/rooms/{id}/enter` | rooms | usuario | → cookie `__Host-room` + `{session_id, room}`. Solo miembros (o el general); el alias es el de la cuenta |
+| DELETE | `/api/rooms/{id}/membership` | rooms | usuario | Abandona la sala (204); el general no se abandona (409) |
 | POST | `/api/rooms/leave` | rooms | sesión | Termina la sesión (204) |
 | GET / POST | `/api/admin/rooms` | rooms | admin | Listar / crear `{code, key, max_participants, mode}` |
 | PATCH | `/api/admin/rooms/{id}` | rooms | admin | Cambiar `key`, `max_participants` (≥ participantes actuales) o `mode` |
-| DELETE | `/api/admin/rooms/{id}` | rooms | admin | `active=false`; termina y expulsa sus sesiones |
+| DELETE | `/api/admin/rooms/{id}` | rooms | admin | `active=false`; termina y expulsa sus sesiones (el general → 409) |
 | POST | `/api/media/files` | media | sesión | multipart `file` → `{file_id, status}` |
 | GET | `/api/media/files/{id}?exp=&sig=` | media | sesión | Descarga de un archivo `clean` o `released` |
 | GET | `/api/admin/quarantine` | media | admin | Archivos en cuarentena con su `verdict` |
@@ -441,6 +489,8 @@ Para cada servicio `<svc>` ∈ {auth, rooms, chat, media, audit}:
 | GET | `/api/admin/audit/verify` | audit | admin | Recorre la cadena → `{ok, broken_at}` |
 | WS | `/ws` | chat | sesión | Canal de chat (§9.5, §10) |
 | GET | `/chat-key.json` | gateway (estático) | — | `{"kid": "v1", "pub": "<b64url 65 B>"}` clave pública ECDSA del chat |
+| GET | `/api/admin/metrics/{svc}` | cada servicio | admin | Métricas del servicio (§21.1) |
+| GET | `/api/status` | chat (`/health`) | — | `{"status":"ok"}` para el monitor de disponibilidad (RNF-04) |
 
 **Cookies:** `__Host-admin`, `__Host-user`, `__Host-room` y `__Host-device`, todas con prefijo `__Host-` (Secure, Path=/, sin Domain), `HttpOnly` y `SameSite=Strict`. Ningún token es accesible desde JavaScript. `__Host-device` es persistente (1 año) para reconocer el mismo dispositivo; las demás son de sesión del navegador.
 
@@ -449,8 +499,10 @@ Para cada servicio `<svc>` ∈ {auth, rooms, chat, media, audit}:
 **Validaciones de entrada:**
 - `code`: se normaliza a minúsculas; `^[a-z0-9_-]{3,32}$`.
 - Clave de sala: ≥ 12 caracteres, al menos 3 de 4 clases (minúsculas, mayúsculas, dígitos, símbolos) y distinta del `code`.
-- `username` (admin y usuario): se normaliza a minúsculas; `^[a-z0-9_.-]{3,32}$`. Solo ASCII, así que no hay homoglifos para suplantar a otro participante. En el registro de usuarios se rechazan nombres reservados (`admin`, `administrador`, `root`, `system`, `sistema`, `soporte`).
-- Contraseñas de admin y de usuario: misma política que la clave de sala y distintas del `username`.
+- `username` del admin: se normaliza a minúsculas; `^[a-z0-9_.-]{3,32}$`.
+- Correo: se normaliza a minúsculas; ASCII, ≤ 254 caracteres, `local@dominio.tld`.
+- Alias: NFC, 3–24 caracteres del alfabeto latino (con tildes y ñ), dígitos, espacios simples, `_`, `.` y `-`. Único por su forma canónica (sin tildes, mayúsculas ni separadores: `Ana.Pérez` = `ana perez`); sin cirílico ni griego no hay homoglifos. Se rechazan los reservados (`admin`, `administrador`, `root`, `system`, `sistema`, `soporte`, `moderador`, `general`).
+- Contraseñas de admin y de usuario: misma política que la clave de sala, distintas del `username` (admin) o del correo y su parte local (usuario).
 - Mensaje: primero se eliminan los caracteres invisibles (§12.8); luego 1–2000 caracteres y sin caracteres de control salvo `\n` y `\t`.
 - `max_participants`: 2–50.
 - Archivo: formato, tamaño y contenido según §12.1.
@@ -459,9 +511,10 @@ Para cada servicio `<svc>` ∈ {auth, rooms, chat, media, audit}:
 | Servicio | Método y ruta | Llamadores | Contrato |
 |---|---|---|---|
 | auth | `GET /internal/verify-admin` | gateway | Lee la cookie `__Host-admin` (sesión `full` vigente; desliza `last_seen`) → `204` + `X-Admin-Id`, `X-Admin-User` · `401` |
-| auth | `GET /internal/verify-user` | gateway | Lee `__Host-user` + `__Host-device` (sesión vigente y del mismo dispositivo; desliza `last_seen`) → `204` + `X-User-Id`, `X-User-Name` · `401` |
+| auth | `GET /internal/verify-user` | gateway | Lee `__Host-user` + `__Host-device` (sesión vigente y del mismo dispositivo; desliza `last_seen`) → `204` + `X-User-Id`, `X-User-Name` (alias *percent-encoded*) · `401` · `403` si falta elegir el alias |
 | rooms | `GET /internal/verify-session` | gateway | Lee `__Host-room` + `__Host-device` → `204` + `X-Session-Id`, `X-Room-Id`, `X-User-Id`, `X-Alias` (UTF-8 *percent-encoded*), `X-Room-Mode` · `401` |
 | rooms | `POST /internal/sessions/{id}/end` | chat | `{reason}` → termina la sesión (idempotente) y libera cupo · `204` |
+| rooms | `POST /internal/users/{user_id}/sessions/end` | auth | Termina la sesión de sala de la cuenta (`reason='logout'`) y pide `kick(4401)` · `204` |
 | rooms | `POST /internal/sessions/heartbeat` | chat | `{session_ids: [...]}` → `last_seen = now()` en las activas · `200 {ended: [...]}` con las de la lista que ya no están activas |
 | chat | `POST /internal/sessions/{id}/kick` | rooms | `{code}` → cierra el WS si existe y avisa `leave` a la sala · `204` |
 | chat | `POST /internal/rooms/{room_id}/files` | media | `{file_id, session_id, alias, mime, size}` → guarda el evento cifrado y lo difunde · `204` |
@@ -485,17 +538,22 @@ Todos los servicios exponen además `GET /health` sin token (`{"status": "ok"}` 
 7. Bootstrap: `docker compose exec auth python -m auth_svc.create_admin <usuario>` pide la contraseña (o la lee con `--password-stdin`) e imprime el QR de TOTP y el secreto.
 
 ### 9.2 Cuenta de usuario (riesgos 13 y 17)
-Crear una cuenta es **obligatorio**: sin sesión de usuario, `POST /api/rooms/join` no pasa el gateway. Todo el flujo vive en `auth`, separado del de admin.
+Crear una cuenta es **obligatorio**: sin sesión de usuario, ninguna ruta de salas pasa el gateway. Todo el flujo vive en `auth`, separado del de admin.
 
-1. **Registro:** `POST /api/users/register {username, password}`. Exige la cookie de dispositivo.
+1. **Registro:** `POST /api/users/register {email, password}`. Exige la cookie de dispositivo.
    1. Rate limit: ≥ 3 registros en 60 min por `register_device` o ≥ 30 por `register_ip` → `429` y auditoría `user.register.ratelimited`. Cuenta cada intento, exitoso o no. El tope por IP es alto porque un aula entera puede salir por la misma IP.
-   2. Valida `username` (§8.1, con nombres reservados) y la política de contraseña. Si falla → `422`.
-   3. Argon2id e `INSERT` en `users`. Si el nombre ya existe → `409 "nombre de usuario no disponible"` y auditoría `user.register.taken`. Ese 409 revela que el nombre existe; es inherente a un registro con nombre elegido y lo acota el rate limit. El login no revela nada.
-   4. Auditoría `user.register` (obligatoria). **No abre sesión**: la SPA llama luego a login, así la sesión siempre nace en un único lugar.
-2. **Login:** `POST /api/users/login {username, password}`. Exige la cookie de dispositivo.
-   1. Bloqueo: ≥ 5 fallos en 15 min con `user:<u>` **o** ≥ 20 con `user_ip:<ip>` → `429` + `Retry-After` y auditoría `user.login.locked`.
-   2. Argon2id verify, con hash dummy si el usuario no existe. Si falla → registra el fallo, retraso progresivo `min(0.25·2^(n−1), 4)` s, `401 "credenciales inválidas"` y auditoría `user.login.fail`.
-   3. **Transacción única (riesgo 13):**
+   2. Valida el correo (§8.1) y la política de contraseña (distinta del correo y de su parte local). Si falla → `422`.
+   3. Argon2id siempre (mismo tiempo en todos los casos) y, en una transacción:
+      - correo nuevo → `INSERT` sin verificar, código nuevo y auditoría `user.register` (obligatoria);
+      - correo con cuenta **sin verificar** → se renueva con la contraseña nueva y un código nuevo (`user.register.renewed`, obligatoria). Así nadie bloquea un correo ajeno: solo su dueño recibe el código;
+      - correo con cuenta **verificada** → no se toca nada; se le envía el aviso "ya tienes una cuenta" (`user.register.existing`).
+   4. Responde **siempre** `202 {status, message}`: el registro no revela qué correos tienen cuenta. Si el correo no sale, la respuesta es la misma y se audita `mail.unavailable`. **No abre sesión.**
+2. **Código de verificación:** 6 dígitos de `secrets`, guardado como HMAC-SHA256 con la KEK de auth (una copia de la BD no alcanza para probar los 10⁶ valores), 15 minutos de vigencia y 5 intentos; además, ≥ 20 fallos por IP en 15 min → `429`. `POST /api/users/verify {email, code}` → `204` y `user.verify.ok` (obligatoria), o `400 "código inválido o vencido"` y `user.verify.fail`. `POST /api/users/verify/resend {email}` → `202` siempre (≥ 3 por correo y hora → `429`, exista o no la cuenta); si la cuenta está pendiente, el código anterior deja de servir.
+3. **Login:** `POST /api/users/login {email, password}`. Exige la cookie de dispositivo.
+   1. Bloqueo: ≥ 5 fallos en 15 min con `user:<correo>` **o** ≥ 20 con `user_ip:<ip>` → `429` + `Retry-After` y auditoría `user.login.locked`.
+   2. Argon2id verify, con hash dummy si la cuenta no existe. Si falla → registra el fallo, retraso progresivo `min(0.25·2^(n−1), 4)` s, `401 "credenciales inválidas"` y auditoría `user.login.fail`.
+   3. Contraseña correcta pero cuenta sin verificar → `403 "cuenta sin verificar: revisa tu correo"` (`user.login.unverified`). Solo lo sabe quien ya probó la contraseña.
+   4. **Transacción única (riesgo 13):**
       ```sql
       UPDATE user_sessions SET ended_at = now(), end_reason = 'expired'
        WHERE user_id = :u AND ended_at IS NULL
@@ -508,49 +566,55 @@ Crear una cuenta es **obligatorio**: sin sesión de usuario, `POST /api/rooms/jo
       - Si es del **mismo** dispositivo → se termina (`end_reason='replaced'`) y se crea la nueva.
       - Si dos logins compiten, el índice único hace fallar al segundo `INSERT` → 409.
       - En la misma transacción se emite `user.login.ok` (obligatorio).
-   4. Responde con la cookie `__Host-user` (token de 256 bits; en BD solo su SHA-256). La sesión vence a los 15 min de inactividad (`USER_IDLE_MIN`) o a las 12 h (`USER_ABS_HOURS`).
-3. **Presencia:** mientras está abierta, la SPA llama `GET /api/users/me` cada 5 min; así, la inactividad mide si el dispositivo sigue presente. Si se cierra el navegador sin cerrar sesión, la cuenta queda libre para otro dispositivo en ≤ 15 min (limitación 7, §3).
-4. **Logout:** `POST /api/users/logout` → `end_reason='logout'`, borra la cookie y audita `user.logout`. Si está en una sala, la SPA llama antes a `/api/rooms/leave`.
-5. **`verify-user`** (lo usa el gateway en `/api/rooms/join`): busca la sesión por `token_hash` y exige `ended_at IS NULL`, que no haya vencido (absoluta ni por inactividad) y que `device_hash` coincida con la cookie de dispositivo. Desliza `last_seen`. Si algo falla → `401` y auditoría `gateway.reject.user`.
-6. **Separación de privilegios:** usuarios y admins viven en tablas distintas, con cookies distintas (`__Host-user` / `__Host-admin`) y verificaciones distintas (`verify-user` / `verify-admin`). Registrarse nunca crea un admin, y una cookie de usuario en `/api/admin/*` → 401.
+   5. Responde con la cookie `__Host-user` (token de 256 bits; en BD solo su SHA-256) y `{alias}`. La sesión vence a los 15 min de inactividad (`USER_IDLE_MIN`) o a las 12 h (`USER_ABS_HOURS`).
+4. **Alias (primer ingreso):** si `alias` es `null`, la SPA pide elegirlo. `POST /api/users/alias {alias}` valida (§8.1), guarda `alias` y `alias_key` (únicos) y audita `user.alias.set` (obligatoria). Se elige una sola vez; un alias tomado o casi igual a otro → `409 "alias no disponible"`. Mientras no haya alias, `verify-user` responde `403` y no se entra a ninguna sala.
+5. **Presencia:** mientras está abierta, la SPA llama `GET /api/users/me` cada 5 min; así, la inactividad mide si el dispositivo sigue presente. Si se cierra el navegador sin cerrar sesión, la cuenta queda libre para otro dispositivo en ≤ 15 min (limitación 7, §3).
+6. **Logout:** `POST /api/users/logout` → `end_reason='logout'`, borra la cookie y audita `user.logout`. Además, auth pide a rooms `POST /internal/users/{user_id}/sessions/end`, que termina la sesión de sala y cierra el WebSocket (RS-07), aunque la SPA no haya llamado a `leave`. Si rooms no responde, la cuenta igual queda cerrada y se audita `user.logout.partial`.
+7. **`verify-user`** (lo usa el gateway en las rutas de salas de la cuenta): busca la sesión por `token_hash` y exige `ended_at IS NULL`, que no haya vencido (absoluta ni por inactividad) y que `device_hash` coincida con la cookie de dispositivo. Desliza `last_seen`. Si algo falla → `401` y auditoría `gateway.reject.user`; si falta el alias → `403`.
+8. **Separación de privilegios:** usuarios y admins viven en tablas distintas, con cookies distintas (`__Host-user` / `__Host-admin`) y verificaciones distintas (`verify-user` / `verify-admin`). Registrarse nunca crea un admin, y una cookie de usuario en `/api/admin/*` → 401.
 
-### 9.3 Ingreso a sala (riesgos 1, 8, 13 y 15)
-1. La SPA llama `GET /api/device` al cargar: cookie de dispositivo de 128 bits aleatorios, **sin fingerprinting**. La necesitan el registro, el login y el ingreso.
-2. `POST /api/rooms/join {code, key}`: el gateway exige una sesión de usuario (`verify-user`) y pasa `X-User-Id` y `X-User-Name`. En `rooms`:
+### 9.3 Salas de la cuenta: canal general, unirse y entrar (riesgos 1, 8, 13 y 15)
+1. La SPA llama `GET /api/device` al cargar: cookie de dispositivo de 128 bits aleatorios, **sin fingerprinting**. La necesitan el registro, el login y la entrada a una sala.
+2. **Salas de la cuenta:** `GET /api/rooms` devuelve el **canal general** (siempre, sin clave) y las salas activas de las que la cuenta es miembro, con su ocupación.
+3. **Unirse** (una vez por sala): `POST /api/rooms/join {code, key}`. El gateway exige una sesión de usuario con alias (`verify-user`) y pasa `X-User-Id` y `X-User-Name`. En `rooms`:
    1. Rate limit: ≥ 5 fallos en 10 min por `user`, ≥ 5 por `ip`, ≥ 10 por `device` o ≥ 20 por `room` → `429` y auditoría.
-   2. Busca la sala activa por `code` y hace Argon2id verify (dummy si no existe). Si falla → registra el fallo en las cuatro claves y responde `401 "sala o clave inválida"`.
-   3. **Transacción única:**
-      ```sql
-      SELECT id, room_id, device_hash FROM room_sessions
-       WHERE user_id = :user AND ended_at IS NULL FOR UPDATE;
-      -- otro dispositivo → 409; mismo dispositivo → end_session(reason='replaced')
-      UPDATE rooms SET current_participants = current_participants + 1
-       WHERE id = :room AND active AND current_participants < max_participants
-      RETURNING id;                      -- 0 filas → 409 "sala llena"
-      INSERT INTO room_sessions (...);   -- violación del índice único (carrera) → rollback → 409
-      ```
-      - Si el usuario ya tiene una sesión de sala activa desde **otro** dispositivo → `409 "usuario conectado desde otro dispositivo"` y auditoría `room.join.device_conflict`. Cubre el caso de una sesión de usuario vencida mientras se chatea (ver §9.4).
-      - Si es del **mismo** dispositivo (recarga o cambio de sala), la anterior se termina **antes** del incremento, para que el usuario no ocupe dos cupos. Si es de otra sala, las dos filas de `rooms` se bloquean en orden de `id` (`SELECT … FOR UPDATE ORDER BY id`), para que dos cambios de sala cruzados no se bloqueen mutuamente. Tras el commit, `chat kick(code=4401)` cierra su WS.
-      - En la misma transacción se emite `room.join.ok` (obligatorio; si `audit` falla, el ingreso falla con 503).
-   4. Responde con la cookie `__Host-room` (token de 256 bits; en BD solo su SHA-256) y `{session_id, room: {id, code, mode}}`. El alias de la sesión es `X-User-Name`.
-3. `verify-session` busca la sesión activa por `token_hash` **y** comprueba que `device_hash` coincida con la cookie de dispositivo. Un token copiado a otro equipo no pasa el gateway.
+   2. Busca la sala activa (que no sea el general) por `code` y hace Argon2id verify (dummy si no existe). Si falla → registra el fallo en las cuatro claves y responde `401 "sala o clave inválida"`: la misma respuesta para clave mala, sala inexistente, cerrada o el general (RS-35).
+   3. `INSERT INTO room_members … ON CONFLICT DO NOTHING` y, si es nueva, auditoría `room.member.join` (obligatoria). Responde `{room: {id, code, mode}}`. Cambiar la clave después no afecta a quienes ya son miembros (limitación 2).
+4. **Entrar a conversar:** `POST /api/rooms/{id}/enter` (también con `verify-user`). Solo miembros activos o el canal general; si no → `404 "sala no encontrada"` (ajena, cerrada o inexistente dan lo mismo). **Transacción única:**
+   ```sql
+   SELECT id, room_id, device_hash FROM room_sessions
+    WHERE user_id = :user AND ended_at IS NULL FOR UPDATE;
+   -- otro dispositivo → 409; mismo dispositivo → end_session(reason='replaced')
+   UPDATE rooms SET current_participants = current_participants + 1
+    WHERE id = :room AND active AND current_participants < max_participants
+   RETURNING id;                      -- 0 filas → 409 "sala llena"
+   INSERT INTO room_sessions (...);   -- violación del índice único (carrera) → rollback → 409
+   ```
+   - Si el usuario ya tiene una sesión de sala activa desde **otro** dispositivo → `409 "usuario conectado desde otro dispositivo"` y auditoría `room.enter.device_conflict`. Cubre el caso de una sesión de usuario vencida mientras se chatea (ver §9.4).
+   - Si es del **mismo** dispositivo (recarga o cambio de sala), la anterior se termina **antes** del incremento, para que el usuario no ocupe dos cupos. Si es de otra sala, las dos filas de `rooms` se bloquean en orden de `id` (`SELECT … FOR UPDATE ORDER BY id`), para que dos cambios de sala cruzados no se bloqueen mutuamente. Tras el commit, `chat kick(code=4401)` cierra su WS.
+   - En la misma transacción se emite `room.enter.ok` (obligatorio; si `audit` falla, la entrada falla con 503).
+   - Responde con la cookie `__Host-room` (token de 256 bits; en BD solo su SHA-256) y `{session_id, room: {id, code, mode}}`. El alias de la sesión es el de la cuenta.
+5. **Abandonar:** `DELETE /api/rooms/{id}/membership` borra la membresía y, si la cuenta estaba conectada ahí, termina su sesión (`reason='abandon'`) y pide `kick(4401)`. Para volver hace falta otra vez código y clave. El canal general no se abandona (`409`).
+6. `verify-session` busca la sesión activa por `token_hash` **y** comprueba que `device_hash` coincida con la cookie de dispositivo. Un token copiado a otro equipo no pasa el gateway.
 
 ### 9.4 Ciclo de vida de una sesión de sala
 | Evento | Quién lo detecta | Qué ocurre |
 |---|---|---|
 | Botón "salir" | rooms (`/api/rooms/leave`) | `end_session(reason='leave')` → `chat kick(code=1000)` |
-| Nuevo ingreso del mismo usuario desde el mismo dispositivo | rooms (`/api/rooms/join`) | `end_session(reason='replaced')` → `chat kick(code=4401)` |
+| Nueva entrada del mismo usuario desde el mismo dispositivo | rooms (`/api/rooms/{id}/enter`) | `end_session(reason='replaced')` → `chat kick(code=4401)` |
 | Cierre limpio del WS (1000/1001: cerrar o recargar la pestaña) | chat | `rooms end(reason='closed')` + aviso `leave` a la sala |
 | Violación de protocolo (4400/4403/4408/4413/4429) | chat | Cierra el WS, `rooms end(reason='violation')` y audita |
 | Inactividad: 15 min sin mensajes del usuario | chat (en memoria) | Cierra con 4410 y `rooms end(reason='idle')` |
 | Caída anormal del WS | — | `chat` deja de incluir la sesión en el heartbeat. Si no reconecta en 2 min, el barrido de `rooms` la termina (`reason='grace'`) |
-| Sala eliminada por el admin | rooms | Termina todas sus sesiones (`reason='room_deleted'`) → `chat kick(code=4401)` por cada una |
+| Sala eliminada por el admin | rooms | Termina todas sus sesiones (`reason='room_deleted'`) → `chat kick(code=4401)` por cada una. Las membresías quedan, pero la sala desaparece de las listas |
+| La cuenta cierra sesión | auth → rooms (`/internal/users/{id}/sessions/end`) | `end_session(reason='logout')` → `chat kick(code=4401)` (RS-07) |
+| La cuenta abandona la sala | rooms (`DELETE …/membership`) | Borra la membresía y `end_session(reason='abandon')` → `chat kick(code=4401)` |
 | `chat` se reinicia | clientes | Reconectan y hacen un handshake nuevo; la sesión de `rooms` sigue viva si vuelven dentro del período de gracia |
 | `rooms` se reinicia | — | Nada: las sesiones viven en su BD |
 
 - `end_session` es idempotente: `UPDATE … SET ended_at = now() WHERE id = :s AND ended_at IS NULL RETURNING room_id`. Si devuelve una fila, decrementa `current_participants` en la misma transacción.
 - **Reconciliación:** la respuesta del heartbeat (`ended`) le dice a `chat` qué conexiones cerrar con 4401, aunque se haya perdido un `kick`.
-- Recargar la pestaña equivale a volver a entrar a la sala: la SPA no persiste la sesión de sala (la de usuario sigue en su cookie).
+- Recargar la pestaña equivale a volver a entrar a la sala desde *Tus salas* (sin clave: la membresía es permanente): la SPA no persiste la sesión de sala (la de usuario sigue en su cookie).
 - Una vez creada, la sesión de sala no depende de la de usuario. Si la de usuario vence por inactividad mientras se chatea, la de sala sigue viva (la mantiene el heartbeat de `chat`) y su índice único sigue impidiendo un segundo dispositivo.
 
 ### 9.5 Chat por WebSocket (riesgos 6, 7, 10 y 14)
@@ -576,7 +640,7 @@ Crear una cuenta es **obligatorio**: sin sesión de usuario, `POST /api/rooms/jo
    - Contenido activo (JavaScript, acciones automáticas o adjuntos en un PDF; macros, objetos OLE/ActiveX, paquetes incrustados o relaciones externas en un DOCX) → `rejected (active)`.
    - Sospechoso → se guarda en `/data/quarantine/<uuid>`, `status=quarantined`, auditoría warning `file.quarantined` con el veredicto. El usuario recibe "archivo retenido para revisión" y **el archivo no se publica**.
    - Rechazado (por cualquier motivo) → no se guarda el archivo; se registran `sha256`, `mime` y motivo en `files` y en auditoría.
-   - Limpio → **sanitización** (§12.9; si falla o vence `SANITIZE_TIMEOUT_S` → `rejected (invalid)`) → `/data/media/<uuid>`, `status=clean` → publicación (§9.7).
+   - Limpio → **sanitización** (§12.9; si falla o vence `SANITIZE_TIMEOUT_S` → `rejected (invalid)`) → **reanálisis estructural de la versión sanitizada** (§12.9; si encuentra algo → `rejected (recheck)`, no se guarda nada) → `/data/media/<uuid>`, `status=clean` → publicación (§9.7).
 7. Archivos con permisos `0640`, dueño uid 10001. Solo `media` monta el volumen.
 
 ### 9.7 Publicación y descarga (riesgo 12)
@@ -595,7 +659,7 @@ Crear una cuenta es **obligatorio**: sin sesión de usuario, `POST /api/rooms/jo
 
 ### 9.8 Cuarentena (admin)
 - `GET /api/admin/quarantine` → lista con `room_id`, `alias`, `mime`, `size`, `sha256` y `verdict`.
-- **Liberar:** lee el original de `/data/quarantine`, lo **sanitiza**, lo guarda en `/data/media`, borra el original, `status=released`, auditoría `file.released` (obligatoria) y publicación (§9.7). Si la sanitización falla → `422` y el archivo sigue en cuarentena.
+- **Liberar:** lee el original de `/data/quarantine`, lo **sanitiza**, **reanaliza la versión sanitizada** (§12.9), la guarda en `/data/media`, borra el original, `status=released`, auditoría `file.released` (obligatoria) y publicación (§9.7). Si la sanitización falla → `422 "no se pudo sanitizar el archivo"`; si la versión sanitizada no supera el reanálisis → `422 "la versión sanitizada no superó el reanálisis"` y `file.release.failed`. En ambos casos el archivo sigue en cuarentena (RS-19, RS-36).
 - **Eliminar:** borra el archivo, `status=deleted`, auditoría `file.deleted`.
 
 ---
@@ -716,6 +780,7 @@ FORMATS: dict[str, Format] = {
 # el orden del dict es el orden de detección: TXT siempre al final
 ```
 - Cada formato vive en su módulo (`formats/png.py`, `formats/mp3.py`, …) y expone `FORMAT`. `validate`, `analyze` y `sanitize` son funciones de módulo que reciben los bytes y la configuración (`Settings.format_config`: umbrales, límites y timeouts), porque las ejecuta el `ProcessPoolExecutor` en otro proceso.
+- `format_config["statistical"]` (por defecto `True`): con `False`, los analizadores omiten los estadísticos del LSB (chi², RS y entropía en PNG; SPA y entropía en WAV; paleta en GIF) y aplican solo las reglas estructurales. Es el modo del reanálisis de §12.9.
 - El tope de tamaño sale de la categoría: `Settings.max_bytes(category)` (§19).
 - **Veredicto** (`files.verdict`): `{"format", "suspicious", "active", "reasons": [...], "metrics": {...}}`. `reasons` son textos cortos en español (por ejemplo, "datos después de IEND"). Las métricas que no se pueden calcular (por ejemplo, NaN) se guardan como `null`, porque el veredicto debe serializarse en `jsonb`.
 - Agregar un formato = una entrada, su módulo, sus fixtures y sus tests (§12.11).
@@ -805,6 +870,7 @@ La detección y la limpieza viven en `shared.text`, porque las usan `media` (arc
 | TXT | UTF-8 sin BOM y saltos de línea `\n`, sin caracteres invisibles, selectores sobrantes ni espacios finales | Ancho cero, bidi, etiquetas, SNOW. Los homoglifos **no** se corrigen |
 
 - Se guarda el `clean_sha256` de la salida. Una imagen o un WAV con el plano LSB aleatorio es estadísticamente idéntico a uno con LSB embebido al 100 %, así que el sistema reconoce sus propias salidas por hash (§9.6, paso 5) y no las vuelve a analizar. El prototipo del 2026-10-13 lo confirmó en PNG: también fallan las alternativas de poner el LSB en cero (lo marca RS), recodificar como JPEG o redimensionar (lo marca chi²).
+- **Reanálisis de la versión sanitizada (RS-36):** antes de publicar, al subir y al liberar desde la cuarentena, la salida de la sanitización se vuelve a validar con su formato y se analiza con `statistical = False`. Los estadísticos se omiten porque la sanitización de PNG y WAV aleatoriza el LSB a propósito y la marcarían siempre. Si quedara cualquier hallazgo estructural (por ejemplo, un defecto del sanitizador que deje datos anexados), el archivo no se publica: `rejected (recheck)` al subir, o `422` y sigue en cuarentena al liberar.
 - **ffmpeg y ffprobe** son parsers grandes que reciben entrada no confiable. Se ejecutan sin shell, con el demuxer forzado (`-f mp3` / `-f mp4`, nunca autodetección), `-protocol_whitelist file` (sin red ni listas de reproducción), `-nostdin`, límites de CPU y memoria (`prlimit` en Linux: 2 GiB de memoria virtual y 120 s de CPU por proceso) y timeout. Entrada y salida por archivos temporales en `/tmp`.
 
 ### 12.10 Calibración y fixtures
@@ -839,10 +905,12 @@ Para el informe se prueban también herramientas reales: OpenStego (PNG), steghi
   |---|---|---|---|
   | `= /api/auth/login`, `= /api/auth/totp` | auth | — | zona `login` 1 r/s, ráfaga 5 |
   | `/api/auth/` | auth | — | zona `api` 10 r/s, ráfaga 20 |
-  | `= /api/users/register`, `= /api/users/login` | auth | — | `login` |
+  | `= /api/users/register`, `= /api/users/login`, `= /api/users/verify`, `= /api/users/verify/resend` | auth | — | `login` |
   | `/api/users/` | auth | — | `api` |
   | `= /api/device` | rooms | — | `api` |
+  | `= /api/rooms` | rooms | usuario | `api` |
   | `= /api/rooms/join` | rooms | usuario | `login` |
+  | `~ ^/api/rooms/<uuid>/(enter\|membership)$` | rooms | usuario | `api` |
   | `= /api/rooms/leave` | rooms | sesión | `api` |
   | `/api/admin/rooms` | rooms | admin | `api` |
   | `/api/admin/quarantine` | media | admin | `api` |
@@ -850,10 +918,13 @@ Para el informe se prueban también herramientas reales: OpenStego (PNG), steghi
   | `= /api/media/files` | media | sesión | `api`, `client_max_body_size 25m` |
   | `/api/media/` | media | sesión | `api` |
   | `= /ws` | chat | sesión | `limit_conn` 20 por IP, `proxy_read_timeout 75s` |
+  | `~ ^/api/admin/metrics/(auth\|rooms\|chat\|media\|audit)$` | ese servicio (`/api/admin/metrics`) | admin | `api` |
+  | `= /api/status` | chat (`/health`) | — | `api` |
   | `= /chat-key.json` | archivo estático montado | — | — |
   | `/` | SPA (`try_files $uri /index.html`) | — | — |
   | cualquier otra `/api/…` o `/internal/…` | — | — | `404` JSON |
-- **`auth_request`:** usa ubicaciones `internal` (`/_auth/admin` → `auth /internal/verify-admin`, `/_auth/user` → `auth /internal/verify-user`, `/_auth/session` → `rooms /internal/verify-session`) con `proxy_pass_request_body off` y `X-Original-URI`. La identidad se toma con `auth_request_set $x $upstream_http_x_…`.
+- **`auth_request`:** usa ubicaciones `internal` (`/_auth/admin` → `auth /internal/verify-admin`, `/_auth/user` → `auth /internal/verify-user`, `/_auth/session` → `rooms /internal/verify-session`) con `proxy_pass_request_body off` y `X-Original-URI`. La identidad se toma con `auth_request_set $x $upstream_http_x_…`. **La subpetición comparte las variables de la petición original**: esas ubicaciones usan `$verifier` y nunca `$upstream`, o la petición terminaría en el servicio que verifica. Lo comprueba `gateway/tests/check_routes.py` con servicios falsos (también en la CI).
+- **Correlación y registros (RNF-19):** `proxy-base.conf` envía `X-Request-ID $request_id` (sobrescribe el del cliente) y oculta el que devuelve el servicio; el `server` lo agrega una sola vez a cada respuesta. El registro de acceso es JSON con `ts`, `service`, `level`, `request_id`, `msg`, `status` y `ms`, sin query string (las URL firmadas no quedan registradas).
 - **Snippets de proxy** (en cada `location` se incluye exactamente uno, porque `proxy_set_header` no se hereda cuando una `location` declara los suyos). Las cabeceras de identidad son 8: `X-Admin-Id`, `X-Admin-User`, `X-User-Id`, `X-User-Name`, `X-Session-Id`, `X-Room-Id`, `X-Alias` y `X-Room-Mode`.
   - `proxy-base.conf`: `Host`, `X-Real-IP $remote_addr`, `X-Forwarded-For $remote_addr` (sobrescribe, no concatena), `X-Forwarded-Proto https` y el token del gateway (`include /run/secrets/gateway_token_conf`). Nunca se incluye solo.
   - `public.conf`: base + **vacía** las 8 cabeceras de identidad.
@@ -861,7 +932,7 @@ Para el informe se prueban también herramientas reales: OpenStego (PNG), steghi
   - `user.conf`: `auth_request` de usuario + base + `X-User-Id` y `X-User-Name`, y vacía las demás.
   - `session.conf`: `auth_request` de sesión + base + `X-Session-Id`, `X-Room-Id`, `X-User-Id`, `X-Alias` y `X-Room-Mode`, y vacía las demás.
   - `subrequest.conf`: para las ubicaciones `/_auth/*`: sin cuerpo, con `X-Original-URI`, e incluye `public.conf`.
-- **Errores en JSON:** `error_page 401 403 404 413 429 502 503` → `{"error":"…"}` con `default_type application/json`.
+- **Errores en JSON:** `error_page 401 403 404 413 429 500 502 503 504` → `{"error":"…"}` con `default_type application/json`. Un servicio caído (502) llega al cliente como `503 {"error":"servicio no disponible"}` (RNF-05).
 - `client_max_body_size` es 16k por defecto y 25m solo en la subida. `client_body_timeout 10s`.
 - **Verificación manual** (evidencia para el informe): `curl --tlsv1.2 --tls-max 1.2 https://localhost/` debe fallar; `curl -I http://localhost/ws` → 301; `curl https://localhost/internal/verify-admin` → 404.
 
@@ -879,27 +950,28 @@ Para el informe se prueban también herramientas reales: OpenStego (PNG), steghi
 ### 14.2 Eventos
 | Servicio | info | warning | critical |
 |---|---|---|---|
-| auth | `admin.create`, `admin.login.ok`, `admin.logout`, `user.register`, `user.login.ok`, `user.logout`, `key.rotate.auth` | `admin.login.fail`, `admin.login.locked`, `admin.totp.fail`, `gateway.reject.admin`, `user.register.taken`, `user.register.ratelimited`, `user.login.fail`, `user.login.locked`, `user.login.device_conflict`, `gateway.reject.user` | — |
-| rooms | `room.create`, `room.update`, `room.delete`, `room.join.ok`, `session.end` | `room.join.fail`, `room.join.ratelimited`, `room.join.full`, `room.join.device_conflict`, `gateway.reject.session` | — |
+| auth | `admin.create`, `admin.login.ok`, `admin.logout`, `user.register`, `user.register.renewed`, `user.register.existing`, `user.verify.ok`, `user.login.ok`, `user.alias.set`, `user.logout`, `user.seed`, `key.rotate.auth` | `admin.login.fail`, `admin.login.locked`, `admin.totp.fail`, `gateway.reject.admin`, `user.register.ratelimited`, `user.verify.fail`, `user.login.fail`, `user.login.locked`, `user.login.unverified`, `user.login.device_conflict`, `user.logout.partial`, `mail.unavailable`, `gateway.reject.user` | — |
+| rooms | `room.create`, `room.update`, `room.delete`, `room.member.join`, `room.member.leave`, `room.enter.ok`, `session.end` | `room.join.fail`, `room.join.ratelimited`, `room.enter.full`, `room.enter.device_conflict`, `gateway.reject.session` | — |
 | chat | `key.rotate.chat` | `ws.reject.{origin,handshake,replay,rate,size,forbidden,malformed}`, `msg.sanitized` | `ws.tamper` |
-| media | `file.accepted`, `file.released`, `file.deleted` | `file.quarantined`, `file.rejected.{type,invalid,size,forbidden,active}`, `file.download.denied`, `clamav.unavailable` | `file.rejected.malware` |
-| todos | — | `http.reject.origin`, `svc.reject.token` (token ausente o inválido, o llamador fuera de la allowlist) | — |
+| media | `file.accepted`, `file.released`, `file.deleted` | `file.quarantined`, `file.rejected.{type,invalid,size,forbidden,active,recheck}`, `file.release.failed`, `file.download.denied`, `clamav.unavailable` | `file.rejected.malware` |
+| todos | — | `http.reject.origin`, `svc.reject.token` (token ausente o inválido, o llamador fuera de la allowlist), `resource.high` (CPU o memoria ≥ 80 % durante 5 min, §21.1) | — |
 | audit | — | — | `audit.chain.broken` |
 
-`audit` registra sus propios `svc.reject.token` escribiendo directamente en su BD.
+`audit` registra sus propios `svc.reject.token` escribiendo directamente en su BD. Cada evento lleva en `details.request_id` el id de correlación de la petición que lo causó (§21.1), dentro del hash de la cadena.
 
 ### 14.3 Consulta
 El dashboard pide `GET /api/admin/audit?min_severity=warning&after_id=<último>` cada 10 s (alertas) y la vista completa con `min_severity=info`.
 
 ### 14.4 Si `audit` no responde
 `AuditClient.emit(..., required=…)` usa un timeout de 2 s y un reintento:
-- **`required=True`** (eventos que otorgan algo: `admin.login.ok`, `user.register`, `user.login.ok`, `room.join.ok`, `room.create/update/delete`, `file.accepted`, `file.released`, `key.rotate.*`): se emite **dentro** de la transacción, antes del commit. Si falla, la operación se revierte y responde 503.
+- **`required=True`** (eventos que otorgan algo: `admin.login.ok`, `user.register`, `user.register.renewed`, `user.verify.ok`, `user.login.ok`, `user.alias.set`, `user.seed`, `room.member.join`, `room.enter.ok`, `room.create/update/delete`, `file.accepted`, `file.released`, `key.rotate.*`): se emite **dentro** de la transacción, antes del commit. Si falla, la operación se revierte y responde 503.
 - **Resto** (rechazos y avisos): se escribe en stdout con la marca `AUDIT_FALLBACK` y el JSON del evento, y la operación continúa (un rechazo sigue siendo rechazo).
 
 ---
 
 ## 15. Manejo de errores
-- El cliente siempre recibe mensajes **genéricos** en JSON `{"error": "…"}` ("credenciales inválidas", "sala o clave inválida", "archivo no permitido" para cualquier rechazo de archivo, "archivo retenido para revisión", 404 en descargas negadas). El detalle va a auditoría. Los 409 de dispositivo solo se muestran después de validar la contraseña o la clave, así que no revelan nada a quien no las tiene.
+- El cliente siempre recibe mensajes **genéricos** en JSON `{"error": "…"}` ("credenciales inválidas", "sala o clave inválida", "código inválido o vencido", "archivo no permitido" para cualquier rechazo de archivo, "archivo retenido para revisión", 404 en descargas negadas o salas ajenas). El detalle va a auditoría. Los 403 de cuenta sin verificar y los 409 de dispositivo solo se muestran después de validar la contraseña o la clave, así que no revelan nada a quien no las tiene.
+- Toda respuesta lleva `X-Request-ID`. En un 5xx la SPA muestra "(ref. …)" con ese id, que permite encontrar la petición en los registros de cada servicio y en la auditoría (RNF-19).
 - Excepciones no controladas: handler global → `500 {"error":"error interno"}` + log en stdout sin datos sensibles. FastAPI sin docs ni OpenAPI públicos (`docs_url=None`, `openapi_url=None`).
 - Errores de validación: `422 {"error":"datos inválidos"}`, sin repetir la entrada.
 - **Fallar cerrado:** secreto ausente → el servicio no arranca; ClamAV, BD o `audit` (en otorgamientos) caídos → 503; el `auth_request` del gateway falla → 401.
@@ -919,8 +991,9 @@ El dashboard pide `GET /api/admin/audit?min_severity=warning&after_id=<último>`
 
 ### 16.2 End-to-end (`e2e/`)
 pytest + httpx + `websockets` contra el stack completo vía `https://localhost`, verificando TLS con la CA de mkcert. Crea su admin con `create_admin --password-stdin` y registra sus usuarios por la API. Cubre lo que cruza servicios:
-- Registro y login de dos usuarios; chat entre ellos con *hello* firmado verificado.
-- Sin sesión de usuario, `/api/rooms/join` → 401. La misma cuenta desde un segundo dispositivo → 409.
+- Registro con el código leído de Mailpit, alias y login de varios usuarios; chat entre ellos con *hello* firmado verificado; canal general para todas las cuentas; volver a entrar a una sala sin la clave.
+- Sin sesión de usuario, `/api/rooms` y `/api/rooms/join` → 401. La misma cuenta desde un segundo dispositivo → 409. Cerrar sesión cierra el WebSocket con 4401.
+- `X-Request-ID` en cada respuesta y en la auditoría; métricas de los cinco servicios.
 - Imagen limpia → publicada y descargable; imagen con LSB → cuarentena y alerta visible en `GET /api/admin/audit`. Un MP3 con datos anexados y un TXT con caracteres de ancho cero → cuarentena.
 - Gateway: `/internal/*` → 404; `X-Admin-Id`/`X-User-Id`/`X-Session-Id` enviados por el cliente se ignoran; una cookie de sala o de usuario en `/api/admin/*` → 401; `http://` → 301.
 
@@ -928,9 +1001,9 @@ Se ejecuta en local antes de cada hito.
 
 ### 16.3 Riesgos nuevos R16 y R17
 - **R16 — "Suplantación entre microservicios":** un proceso con presencia en la red interna (o un servicio comprometido) invoca endpoints internos o inyecta cabeceras de identidad haciéndose pasar por el gateway u otro servicio. La vulnerabilidad que habría sin tratamiento es que los servicios confíen en cualquier petición de la red interna. Valoración propuesta: **P=3, I=5 → 15 (Alto)**; residual estimado 5 (Medio). Tratamiento: §4.3–4.5 y §13.
-- **R17 — "Acceso no autorizado a cuentas de usuario mediante ataques automatizados de contraseñas"** (fuerza bruta o *credential stuffing*). Lo introduce la cuenta obligatoria. La vulnerabilidad que habría sin tratamiento es un login de usuarios con intentos ilimitados y contraseñas débiles. Valoración propuesta: **P=4, I=3 → 12 (Medio-alto)**; residual estimado 6 (Medio). Tratamiento: §9.2 (Argon2id, bloqueo por cuenta y por IP con retraso progresivo, política de contraseñas, error genérico y hash dummy, rate limit de registro, sesión única por cuenta).
+- **R17 — "Acceso no autorizado a cuentas de usuario mediante ataques automatizados de contraseñas"** (fuerza bruta o *credential stuffing*). Lo introduce la cuenta obligatoria. La vulnerabilidad que habría sin tratamiento es un login de usuarios con intentos ilimitados y contraseñas débiles. Valoración propuesta: **P=4, I=3 → 12 (Medio-alto)**; residual estimado 6 (Medio). Tratamiento: §9.2 (Argon2id, bloqueo por cuenta y por IP con retraso progresivo, política de contraseñas, error genérico y hash dummy, correo verificado con código de un solo uso, rate limit de registro, sesión única por cuenta).
 
-**Recomendación:** agregar R16 y R17 a las Tablas 1–4 del documento SGSI de la Tarea 2, y ampliar el activo y el riesgo 6 de "imágenes" a "archivos", porque ahora el estegoanálisis cubre todas las categorías (§12).
+**Estado en los documentos del curso:** la Actividad 3 ya incluye R16 y R17 en su matriz de trazabilidad y amplía R6 a "archivos". Falta, si el equipo lo decide, agregarlos a las Tablas 1–4 de la Tarea 2 (`Documentación/`, que no se edita sin acordarlo); la propuesta completa está en el plan E2E-3.
 
 ### 16.4 Tests mínimos por riesgo
 | R | Servicio | Tests |
@@ -940,24 +1013,27 @@ Se ejecuta en local antes de cada hito.
 | 03 | audit | `audit_app` no puede `UPDATE/DELETE/TRUNCATE`; una alteración hecha con el owner la detecta `verify`; `service` sale del token aunque el payload diga otra cosa |
 | 04 | auth | Bloqueo tras 5 fallos; sin TOTP no hay acceso; código TOTP reusado rechazado; el token cambia al pasar a `full` |
 | 05 | rooms, media, audit (+e2e) | Rutas de admin sin `X-Admin-Id` del gateway → 401; e2e: una cookie de sala o de usuario en `/api/admin/*` → 401 |
-| 06 | media, chat (+e2e) | PNG y WAV con LSB al 10 % → cuarentena; PNG limpio → aceptado; datos anexados a cada uno de los 8 formatos binarios → cuarentena; GIF con comentario de más de 1 KB, MP3 con frame `GEOB`, MP4 con bytes no referenciados en el `mdat`, PDF con objetos huérfanos y DOCX con parte suelta o texto oculto → cuarentena; TXT con ancho cero, selectores de variación o SNOW → cuarentena; tras sanitizar, el plano LSB cambia y cada formato sanitizado ya no tiene hallazgos estructurales; mensaje de chat con caracteres invisibles → se entrega sin ellos y se audita `msg.sanitized` |
+| 06 | media, chat (+e2e) | PNG y WAV con LSB al 10 % → cuarentena; PNG limpio → aceptado; una versión sanitizada con un hallazgo estructural no se publica ni se libera (RS-36); datos anexados a cada uno de los 8 formatos binarios → cuarentena; GIF con comentario de más de 1 KB, MP3 con frame `GEOB`, MP4 con bytes no referenciados en el `mdat`, PDF con objetos huérfanos y DOCX con parte suelta o texto oculto → cuarentena; TXT con ancho cero, selectores de variación o SNOW → cuarentena; tras sanitizar, el plano LSB cambia y cada formato sanitizado ya no tiene hallazgos estructurales; mensaje de chat con caracteres invisibles → se entrega sin ellos y se audita `msg.sanitized` |
 | 07 | chat (+e2e) | WS con `Origin` ajeno → 4403; trama alterada → 4400 + auditoría critical; *hello* firmado verificable; vectores; e2e: 301 en http |
-| 08 | rooms | Rate limit de ingreso por usuario, IP, dispositivo y sala; clave débil rechazada al crear la sala |
+| 08 | rooms | Rate limit al unirse por usuario, IP, dispositivo y sala; respuesta igual para clave mala, sala inexistente, cerrada o el general; clave débil rechazada al crear la sala |
 | 09 | media | Firma que no coincide, archivo sobre el tope de su categoría, decompression bomb, GIF con más de 300 cuadros, zip bomb o ruta con `..` en un DOCX, TXT con bytes binarios → rechazo; PDF con JavaScript o adjuntos y DOCX con macros u OLE → `rejected (active)`; ClamAV caído → 503; EICAR → rechazo (`clamav`) |
 | 10 | chat | Rate de mensajes → 4429; trama mayor a 16 KB → 4413; sin `hello` en 10 s → 4400 |
 | 11 | todos | `<svc>_app` no puede `CREATE TABLE`/`DROP` ni conectarse a otra BD |
 | 12 | media | Firma inválida, vencida, de otra sesión o de otra sala → 404; archivo en cuarentena no descargable |
-| 13 | auth, rooms (+e2e) | Login de una cuenta con sesión activa en otro dispositivo → 409; desde el mismo dispositivo → reemplaza la anterior; dos logins concurrentes → solo uno gana (índice único); la sesión vencida por inactividad libera la cuenta; `verify-user` y `verify-session` con otra cookie de dispositivo → 401; ingreso a una sala con una sesión de sala activa en otro dispositivo → 409; el cupo queda libre tras `leave` |
+| 13 | auth, rooms (+e2e) | Login de una cuenta con sesión activa en otro dispositivo → 409; el logout corta la sesión de sala y el WebSocket; desde el mismo dispositivo → reemplaza la anterior; dos logins concurrentes → solo uno gana (índice único); la sesión vencida por inactividad libera la cuenta; `verify-user` y `verify-session` con otra cookie de dispositivo → 401; ingreso a una sala con una sesión de sala activa en otro dispositivo → 409; el cupo queda libre tras `leave` |
 | 14 | chat | El `from` del payload se ignora; AAD de otra sala → 4400; `seq` repetido → 4408 |
-| 15 | rooms | 20 ingresos concurrentes con cupo 5 → exactamente 5 aceptados; el `CHECK` impide superar el máximo |
+| 15 | rooms | 20 entradas concurrentes con cupo 5 → exactamente 5 aceptadas; el `CHECK` impide superar el máximo |
 | 16 | shared y cada servicio (+e2e) | Sin token → 401; token de un llamador fuera de la allowlist → 403; cabeceras de identidad (incluidas `X-User-*`) sin el token del gateway → ignoradas (401); e2e: `/internal/*` → 404 y cabeceras falsificadas ignoradas |
-| 17 | auth (+e2e) | `password_hash` empieza con `$argon2id$` y la contraseña en claro no aparece en ninguna columna; bloqueo tras 5 fallos por cuenta y tras 20 por IP; mismo error y tiempo para un usuario inexistente; contraseña débil o igual al `username` y nombre reservado → 422; rate limit de registro por dispositivo e IP; una cookie de usuario no sirve en `/api/admin/*` y una de admin no sirve para ingresar a una sala; e2e: sin cuenta no se ingresa |
+| 17 | auth (+e2e) | `password_hash` empieza con `$argon2id$` y ni la contraseña ni el código aparecen en ninguna columna; bloqueo tras 5 fallos por cuenta y tras 20 por IP; mismo error para una cuenta inexistente; contraseña débil o igual al correo → 422; registro que no revela cuentas y que no permite secuestrar un correo; sin verificar no hay sesión; código con vencimiento, 5 intentos y límite por IP; alias único por forma canónica y sin homoglifos; rate limit de registro por dispositivo e IP; una cookie de usuario no sirve en `/api/admin/*` y una de admin no sirve para ingresar a una sala; e2e: sin cuenta no se ingresa |
 
 `docs/trazabilidad-riesgos.md` tiene la tabla `Riesgo | Control | Servicio/Archivo(s) | Test(s) | Estado`. Se actualiza con cada cambio de seguridad (comando `/risk-check`) y se copia al informe final.
 
 ### 16.5 CI (`.github/workflows/ci.yml`)
-- Job `services`, en matriz `[shared, auth, rooms, chat, media, audit]` con servicio `postgres:17`: `ruff check`, `ruff format --check`, `pytest -m "not clamav"`, `bandit -q -r <paquete>` y `pip-audit -r requirements.lock`. La entrada `media` instala antes ffmpeg (`apt-get install ffmpeg`).
-- Job `frontend`: `npm ci`, `npx vitest run`, `npm run build`, `npm audit --audit-level=high`.
+- Job `services`, en matriz `[shared, auth, rooms, chat, media, audit]` con servicio `postgres:17`: `ruff check` (incluye complejidad ciclomática ≤ 10, `C90`), `ruff format --check`, `pytest -m "not clamav" --cov=<paquete> --cov-fail-under=80`, `bandit -q -ll -r <paquete>` y `pip-audit`. La entrada `media` instala antes ffmpeg (`apt-get install ffmpeg`).
+- Job `secrets`: gitleaks sobre todo el historial con `.gitleaks.toml` (las pruebas usan valores fijos documentados).
+- Job `frontend`: `npm ci`, `npx vitest run` (incluye el contraste de RNF-09), `npm run build`, `npm audit --audit-level=high`.
+- Job `gateway`: `nginx -t` y `gateway/tests/run.sh` (enrutamiento con servicios falsos).
+- La rama `main` exige *pull request* con una aprobación, la plantilla de verificación de seguridad (`.github/pull_request_template.md`) y los cuatro jobs en verde (RS-37).
 - El e2e no corre en CI (ClamAV es demasiado pesado).
 
 ---
@@ -987,11 +1063,11 @@ Roles: **A** = auth + rooms + gateway; **B** = librería compartida + audit + ch
 | Semana | A | B | C | Hito verificable |
 |---|---|---|---|---|
 | **S1** 13–19 oct | *Días 1–2, todos:* `.claude/` + `CLAUDE.md`, librería compartida, `Dockerfile` único, Postgres con 5 BD + `gen_secrets` + mkcert, esqueleto del gateway, CI. Luego A: `auth` completo + `auth_request` de admin | Servicio `audit` + vectores cripto (con firma) | SPA + `crypto.ts` (vectores) + login de admin | El admin entra vía gateway con TOTP y el evento aparece en `audit` |
-| **S2** 20–26 oct | Cuentas de usuario en `auth` (registro, login, `verify-user`) + `rooms` completo (CRUD, ingreso con cuenta, `verify-session`, barrido, `kick`) | `chat` completo (handshake firmado, tramas, limpieza de mensajes, historial, inactividad, heartbeat) | UI de registro, login, ingreso y chat; dashboard (salas, auditoría) | Dos usuarios registrados chatean vía gateway desde dos navegadores; e2e de chat en verde |
-| **S3** 27 oct–2 nov | Hardening del gateway, test de roles por servicio (R11), rotación de claves, VPS + Let's Encrypt | Con C: publicación de archivos en `chat`, URLs firmadas; formatos de audio y video (MP3, WAV, MP4) | `media`: pipeline, imágenes, documentos y texto, sanitización y cuarentena + UI de archivos y cuarentena | Demo en el VPS; 17/17 riesgos con test; trazabilidad completa |
+| **S2** 20–26 oct | Cuentas de usuario en `auth` (correo verificado, alias, login, `verify-user`) + GW-2 + `rooms` completo (CRUD, canal general, membresías, entrada con cupo, `verify-session`, barrido, `kick`) | FND-9 (correlación, métricas) + AUD-4 + `chat` completo (handshake firmado, tramas, limpieza de mensajes, historial en orden, inactividad, heartbeat) | FND-10 (CI y modelo de amenazas) + UI de registro, verificación, alias, salas y chat; dashboard (salas, auditoría, estado) | Dos usuarios con correo verificado chatean vía gateway desde dos navegadores, en el general y en una sala; e2e de chat en verde |
+| **S3** 27 oct–2 nov | Hardening del gateway, test de roles por servicio (R11), rotación de claves, VPS + Let's Encrypt + reenvío de correo, respaldos y monitor de disponibilidad | Con C: publicación de archivos en `chat`, URLs firmadas; formatos de audio y video (MP3, WAV, MP4); prueba de carga | `media`: pipeline con reanálisis, imágenes, documentos y texto, sanitización y cuarentena + UI de archivos y cuarentena; tiempos por formato, pruebas con personas, Lighthouse y navegadores | Demo en el VPS; 17/17 riesgos con test; trazabilidad completa; `docs/evidencias-rnf.md` |
 
 **Orden de recorte si hay atraso:** chi² DCT de JPEG y detector de MP3Stego (*stretch*) → GIF → análisis RS (quedan chi² + entropía + estructura) → WAV (el audio queda en MP3) → DOCX (los documentos quedan en PDF) → historial → `rotate room` → UI de verificación de la cadena → e2e reducido al camino feliz + reglas del gateway.
-**No se recorta nunca:** MFA del admin, cuenta obligatoria con sesión única por dispositivo, solo TLS 1.3, *hello* firmado, tokens de servicio, Argon2id, cuarentena, sanitización, auditoría encadenada, los tests por riesgo, ni al menos un formato por categoría (imagen, audio, video, documento y texto) con validación, análisis y sanitización.
+**No se recorta nunca:** MFA del admin, cuenta obligatoria con correo verificado y sesión única por dispositivo, reanálisis de la versión sanitizada, cobertura y complejidad en la CI, solo TLS 1.3, *hello* firmado, tokens de servicio, Argon2id, cuarentena, sanitización, auditoría encadenada, los tests por riesgo, ni al menos un formato por categoría (imagen, audio, video, documento y texto) con validación, análisis y sanitización.
 
 ---
 
@@ -1007,6 +1083,9 @@ Roles: **A** = auth + rooms + gateway; **B** = librería compartida + audit + ch
 | `USER_IDLE_MIN` / `USER_ABS_HOURS` | auth | `15` / `12` |
 | `USER_LOGIN_MAX_FAILS` / `USER_LOGIN_MAX_FAILS_IP` | auth | `5` / `20` |
 | `REGISTER_MAX_PER_DEVICE` / `REGISTER_MAX_PER_IP` / `REGISTER_WINDOW_MIN` | auth | `3` / `30` / `60` |
+| `VERIFY_CODE_TTL_MIN` / `VERIFY_MAX_ATTEMPTS` / `VERIFY_MAX_FAILS_IP` | auth | `15` / `5` / `20` |
+| `RESEND_MAX_PER_WINDOW` / `RESEND_WINDOW_MIN` | auth | `3` / `60` |
+| `SMTP_HOST` / `SMTP_PORT` / `MAIL_FROM` / `ROOMS_URL` | auth | `mailer` / `1025` / `Chat seguro <no-responder@chat-seguro.local>` / `http://rooms:8000` |
 | `JOIN_MAX_FAILS_USER` / `_IP` / `_DEVICE` / `_ROOM` / `JOIN_WINDOW_MIN` | rooms | `5` / `5` / `10` / `20` / `10` |
 | `ROOM_SESSION_GRACE_S` / `SWEEP_INTERVAL_S` | rooms | `120` / `30` |
 | `ROOM_SESSION_IDLE_MIN` / `HEARTBEAT_INTERVAL_S` / `HANDSHAKE_TIMEOUT_S` | chat | `15` / `30` / `10` |
@@ -1017,6 +1096,8 @@ Roles: **A** = auth + rooms + gateway; **B** = librería compartida + audit + ch
 | `STEGO_CHI2_P` / `STEGO_RS_RATE` / `STEGO_WAV_RATE` / `STEGO_ENTROPY_TRIGGER` / `STEGO_GIF_PALETTE_TRIGGER` / `STEGO_TXT_TRAILING` | media | `0.95` / `0.08` / `0.08` / `off` / `off` / `64` |
 | `STEGO_TIMEOUT_S` / `SANITIZE_TIMEOUT_S` / `MEDIA_WORKERS` | media | `10` / `30` / `2` |
 | `CLAMAV_HOST` / `CLAMAV_PORT` / `MEDIA_DIR` | media | `clamav` / `3310` / `/data` |
+| `LOG_FORMAT` | todos | `json` en la imagen Docker (sin definir en las pruebas) |
+| `RESOURCE_ALERT_PCT` / `RESOURCE_ALERT_MIN` / `RESOURCE_SAMPLE_S` | todos | `80` / `5` / `30` |
 
 **Desarrollo del frontend:** `npm run dev` (Vite en `https://localhost:5173` con los certificados de mkcert) con `server.proxy` de `/api`, `/ws` y `/chat-key.json` hacia `https://localhost` (el gateway). Las cookies `__Host-` exigen https también en desarrollo.
 
@@ -1034,5 +1115,63 @@ Roles: **A** = auth + rooms + gateway; **B** = librería compartida + audit + ch
 | ClamAV usa ~1.5–3 GB de RAM y tarda minutos en cargar firmas | VPS con ≥ 4 GB; healthcheck de clamd con `start_period`; en ARM usar `clamav/clamav-debian` (variable `CLAMAV_IMAGE`); `StreamMaxLength 30M` para el video |
 | `jpegio` puede no tener wheels para Python 3.13 | Es *stretch*; JPEG queda cubierto por estructura + recodificación |
 | Falsos positivos del estegoanálisis en fotos y grabaciones reales | Calibración con ≥ 30 imágenes y ≥ 20 WAV; la cuarentena (no el rechazo) permite que el admin libere |
-| R16 y R17 no están en el documento SGSI, y su riesgo 6 habla solo de imágenes | El equipo agrega R16 y R17 a las Tablas 1–4 de la Tarea 2 y amplía el riesgo 6 a archivos (§16.3) |
+| R16 y R17 no están en el documento SGSI de la Tarea 2 | La Actividad 3 ya los incluye; el equipo decide si actualiza la Tarea 2 (§16.3) |
+| El correo no llega (proveedor, spam, cuota) | Mailpit reenvía con STARTTLS a un proveedor con dominio verificado; reenvío de código con límite; el registro responde igual y queda `mail.unavailable` |
+| Mailpit como reenviador en el VPS | Su bandeja web no se publica; solo `mailer` sale a internet; alternativa: reemplazarlo por un relay Postfix sin cambiar `auth` |
+| Pruebas de carga desde una sola máquina | El gateway admite 20 WebSocket por IP: cada cliente de carga corre en su propio contenedor (§21.2) |
 | Proveedor del VPS sin definir | Oracle Cloud Free (ARM, 24 GB) o DigitalOcean/AWS; el Compose es idéntico |
+
+---
+
+## 21. Requisitos no funcionales y de desarrollo seguro (Actividad 3)
+
+La Actividad 3 especifica 21 RF, 19 RNF y 39 RS. Los RF y la mayoría de los RS ya estaban cubiertos por el diseño; esta sección agrega lo que faltaba y deja el mapa completo de dónde se cumple y cómo se demuestra cada uno.
+
+### 21.1 Monitoreo y correlación (RNF-18, RNF-19, RS-20)
+- **Id de correlación:** el gateway genera `X-Request-ID` (`$request_id`) y sobrescribe el del cliente. Cada servicio lo toma (o crea uno si falta), lo pone en sus registros, lo reenvía a los servicios que llama (`ServiceClient`) y lo manda a audit, que lo guarda en `details.request_id` dentro del hash de la cadena. Vuelve una sola vez en la respuesta.
+- **Registros:** con `LOG_FORMAT=json`, una línea JSON por registro con `ts`, `service`, `level`, `request_id`, `logger` y `msg`, y una línea por petición con `status` y `ms`, **sin query string**. uvicorn corre con `--no-access-log`. El gateway escribe el mismo formato.
+- **Métricas:** cada servicio expone `GET /api/admin/metrics` (solo admin; el gateway la publica como `/api/admin/metrics/<svc>`): `uptime_s`, peticiones, respuestas por estado, rechazos (4xx), latencia p50/p95 de las últimas 1000 peticiones, CPU y memoria, y las propias (`chat`: conexiones abiertas; `rooms`: ocupación de cada sala). El panel las muestra en la pestaña *Estado* cada 10 s.
+- **Alerta de consumo:** cada servicio lee CPU y memoria de cgroup v2 cada 30 s, contra sus límites del compose. Si alguna pasa el 80 % durante 5 minutos seguidos, emite una advertencia `resource.high`, que el panel muestra en ≤ 10 s; se rearma cuando baja.
+- **Disponibilidad (RNF-04):** `GET /api/status` (chat y su BD) para un monitor externo cada 60 s.
+
+### 21.2 Rendimiento y escala (RNF-01, RNF-02, RNF-03, RNF-06, RNF-07, RNF-14)
+- `perf/carga.py`: N participantes por proceso (≤ 20 por la regla de R10) inician sesión, se unen, **entran en paralelo** (p95 ≤ 2 s, RNF-02) y conversan midiendo la latencia de extremo a extremo con cifrado incluido (p95 ≤ 500 ms, RNF-01). Para 500 conexiones se lanzan 25 contenedores, cada uno con su IP (RNF-06); las cuentas salen de `python -m auth_svc.seed_users`. Unirse con clave ocurre una vez por cuenta y queda fuera de la medición (el gateway lo limita a 1 por segundo por IP).
+- `services/media/tools/bench_formats.py`: percentil 95 por formato con muestras del tamaño máximo; objetivo: análisis ≤ `STEGO_TIMEOUT_S` (10 s) y sanitización ≤ `SANITIZE_TIMEOUT_S` (30 s) (RNF-03).
+- Pruebas dentro de los servicios: consulta de auditoría con 100 000 eventos ≤ 2 s (RNF-07) y tres participantes con 90 mensajes intercalados que llegan a todos sin pérdidas, sin duplicados y en el mismo orden que el historial (RNF-14; `chat` guarda y difunde bajo un candado por sala).
+
+### 21.3 Calidad y control de cambios (RNF-10, RNF-11, RS-30, RS-32, RS-33, RS-34, RS-37)
+- Cobertura de líneas ≥ 80 % por servicio y complejidad ciclomática ≤ 10 por función, exigidas por la CI (§16.5).
+- gitleaks en todo el historial; bandit y pip-audit.
+- `main` protegida: PR con una aprobación, plantilla con lista de verificación de seguridad y los jobs en verde.
+- `docs/modelo-amenazas.md` (STRIDE por componente y límites de confianza), elaborado antes de implementar y revisado ante cambios.
+- `docs/trazabilidad-riesgos.md` suma la columna *Control ISO/IEC 27001:2022*; cada control de aplicación (ISO/IEC 27034) remite a su prueba. Es referencia de diseño, no certificación.
+
+### 21.4 Recuperación (RNF-15, RNF-16, RNF-17)
+- Las salas, membresías e historial viven en PostgreSQL: sobreviven a reinicios (RNF-15).
+- `deploy/backup.sh`: `pg_dumpall` + volumen de archivos, cifrados con `age` para claves públicas (la privada no vive en el servidor), diarios y con 14 días de retención; `deploy/restore.sh` los restaura en un entorno con los mismos secretos. Objetivo: pérdida ≤ 24 h y restauración ≤ 1 h; después, la cadena de auditoría verifica y el historial se descifra con la KEK (RNF-16). Los secretos se respaldan aparte y fuera de línea.
+- `restart: unless-stopped`: un servicio que termina vuelve a `healthy` en ≤ 60 s; los cupos de las sesiones caídas se liberan con el barrido (RNF-17).
+
+### 21.5 Mapa Actividad 3 → spec → prueba
+
+| Requisitos | Dónde | Prueba o evidencia |
+|---|---|---|
+| RF-01, RF-02…RF-09 (admin y salas) | §8.1, §9.1, §9.4, §14.3 | `services/auth/tests/test_r04_*`, `services/rooms/tests/test_r01_*`, `test_r05_admin.py`, `services/audit/tests/test_r05_admin.py` |
+| RF-10 (cuarentena) | §9.8, §12.9 | `services/media/tests/test_cuarentena.py` (incluye el reanálisis) |
+| RF-11, RF-12, RF-13 (ingreso, salida, cierre automático) | §9.3, §9.4 | `services/rooms/tests/test_join.py`, `test_enter.py`, `test_ciclo_de_vida.py`; `services/chat/tests/test_ciclo.py` |
+| RF-14…RF-16 (mensajería y tipo de sala) | §9.5, §8.1 | `services/chat/tests/test_r10_limites.py`, `test_historial.py`, `test_r06_mensajes.py`, `test_archivos.py` |
+| RF-17…RF-19 (archivos) | §9.6, §9.7, §12 | `services/media/tests/test_r06_*`, `test_r09_*`, `test_r12_descarga.py` |
+| RF-20, RF-21 (registro, login y logout) | §9.2 | `services/auth/tests/test_r17_cuentas.py`, `test_correo_y_alias.py`, `test_r13_sesion_unica.py`; `e2e/test_chat.py::test_rs07_*` |
+| RNF-01, RNF-02, RNF-06 | §21.2 | `perf/carga.py` (E2E-4) |
+| RNF-03 | §21.2 | `tools/bench_formats.py` (MED-10, E2E-4) |
+| RNF-04, RNF-12, RNF-15, RNF-16, RNF-17 | §21.1, §21.4 | E2E-4 (monitor externo, despliegue cronometrado, reinicios, simulacro de restauración) |
+| RNF-05 | §9.6, §13 | `test_r09_clamav_caido_responde_503`; el gateway responde 503 si `media` cae |
+| RNF-07, RNF-14 | §21.2 | `services/audit/tests/test_rnf07_rnf19.py`, `services/chat/tests/test_rnf14_orden.py` |
+| RNF-08, RNF-09, RNF-13 | §21.2, plan FE-2 | prueba con 5 personas, Lighthouse ≥ 90 y navegadores (E2E-4); `frontend/src/lib/contrast.test.ts` |
+| RNF-10, RNF-11 | §16.5, §21.3 | CI (cobertura y `C90`) |
+| RNF-18, RNF-19 | §21.1 | `services/shared/tests/test_observabilidad.py`, `test_rnf18_*` de rooms y chat, `gateway/tests/check_routes.py`, `e2e/test_gateway.py::test_rnf*` |
+| RS-01…RS-29, RS-31, RS-35 | §4.3, §9–§15 (riesgos R1–R17) | `docs/trazabilidad-riesgos.md` |
+| RS-07 (cierre de sesión revoca las conexiones) | §9.2, §9.4 | `test_logout_libera_la_cuenta_y_corta_la_sala`, `test_logout_de_la_cuenta_corta_la_sala`, `e2e/test_chat.py::test_rs07_*` |
+| RS-12 (en reposo) | §3, §11.2 | mensajes cifrados (`test_r02_store.py`); los archivos no se cifran en reposo (fuera de alcance, §3) |
+| RS-19, RS-36 (liberación y reanálisis) | §9.6, §9.8, §12.9 | `test_rs36_*` en `services/media/tests/` |
+| RS-30, RS-32, RS-33, RS-34, RS-37 | §16.5, §21.3 | CI, `docs/modelo-amenazas.md`, trazabilidad con ISO 27001, reglas de la rama |
+| RS-38, RS-39 (cuentas y autorización por cuenta) | §9.2, §9.3 | pruebas de R13 y R17; `test_solo_los_miembros_entran`, `test_el_alias_es_el_de_la_cuenta_aunque_el_cliente_mande_otro` |

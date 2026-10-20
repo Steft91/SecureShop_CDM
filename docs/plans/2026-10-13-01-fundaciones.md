@@ -19,6 +19,8 @@
 > - FND-8, nueva: `shared.text`.
 >
 > Si ya ejecutaste esas tareas, aplica solo las diferencias y vuelve a correr `pytest services/shared`.
+>
+> **Revisión 4 (2026-10-20, spec rev. 4).** FND-1…FND-8 no cambian. Se agregan dos tareas con los requisitos de la Actividad 3: **FND-9** (id de correlación, registros JSON, métricas por servicio, alerta de CPU y memoria, y el alias en `UserIdentity`) y **FND-10** (cobertura ≥ 80 % y complejidad ≤ 10 en la CI, gitleaks, plantilla de PR y rama protegida, modelo de amenazas y columna ISO/IEC 27001 en la trazabilidad).
 
 ## Global Constraints
 
@@ -40,6 +42,8 @@ Ninguno de los casos del índice cae en este archivo, pero las utilidades que se
 - `natural_image`/`embed_lsb` para los tests de imágenes; `natural_audio`/`wav_bytes`/`mp3_bytes` para los de audio, sin ffmpeg.
 - `session_headers` codifica alias con tildes y, como `user_headers`, lleva la cuenta (`X-User-Id`) que verificó el gateway.
 - `shared.text.clean` no toca los emojis compuestos (👨‍👩‍👧, ❤️): lo prueba `test_texto_normal_sin_hallazgos` (FND-8).
+- El middleware de correlación es el más externo: también un 401 por falta de token lleva `X-Request-ID` (`test_rnf19_id_ausente_o_raro_se_reemplaza`, FND-9).
+- `configure_logging` no toca el logging fuera de Docker (`LOG_FORMAT` sin definir): así pytest conserva sus handlers.
 
 ---
 
@@ -297,7 +301,7 @@ Fuente: spec §2–§15 y Tabla 3 de la Tarea 2. Si un cambio rompe una de estas
 
 1. **Transporte:** el cliente solo habla TLS 1.3 con el gateway. Nunca `ws://` ni `http://` hacia el navegador. El WS va por `wss://${location.host}/ws`.
 2. **Secretos:** solo se leen con `shared.secrets` desde `/run/secrets`. Nunca en el código, en variables de entorno ni en logs. Los valores de prueba viven en `tests/` o en `shared/testing.py` y lo dicen en un comentario.
-3. **Identidad:** el remitente, la cuenta, la sala y el admin salen de la identidad verificada (`require_admin`, `require_user`, `require_session`, `session_from_headers`). Nunca del cuerpo de la petición ni de la trama: el alias en el chat es el nombre de la cuenta.
+3. **Identidad:** el remitente, la cuenta, la sala y el admin salen de la identidad verificada (`require_admin`, `require_user`, `require_session`, `session_from_headers`). Nunca del cuerpo de la petición ni de la trama: el alias en el chat es el de la cuenta (elegido en el primer ingreso).
 4. **SQL:** siempre `text()` con parámetros nombrados. Prohibido interpolar datos con f-strings.
 5. **Contraseñas y claves de sala:** Argon2id (`shared.passwords`), con verificación contra un hash dummy cuando el usuario, el admin o la sala no existen.
 6. **Errores:** el cliente recibe `{"error": "..."}` genérico; el detalle va a auditoría. Todo rechazo de seguridad se audita (`audit.emit(...)`).
@@ -3277,6 +3281,1300 @@ git commit -m "feat(shared): detección y limpieza de caracteres invisibles en t
 ```
 
 Al cerrar este archivo, marca `[x] 01 Fundaciones` en la sección *Estado actual* de `CLAUDE.md`.
+
+---
+
+### Task FND-9: Correlación, registros JSON, métricas y alerta de consumo (RNF-18, RNF-19)
+
+> **Rev. 4.** Tarea nueva: implementa los requisitos no funcionales de monitoreo de la Actividad 3 (spec §21.1) y el alias en la identidad del usuario. Va antes de los servicios; si ya los tienes, después de esta tarea corre sus pruebas (las de auth y rooms se actualizan en ATH-5 y ROOM-1…ROOM-4).
+
+**Files:**
+- Create: `services/shared/shared/observability.py`
+- Modify: `services/shared/shared/web.py`, `services/shared/shared/audit_client.py`, `services/shared/shared/service_auth.py`, `services/shared/shared/identity.py` (se reemplazan completos), `services/shared/shared/testing.py` (`user_headers`)
+- Modify: `services/Dockerfile` (`LOG_FORMAT=json`, `--no-access-log`), `deploy/docker-compose.yml` (límites de CPU y memoria en `x-python-service`)
+- Test: `services/shared/tests/test_observabilidad.py`, `services/shared/tests/test_r16_service_auth.py` (se reemplaza: el alias viaja codificado)
+
+**Interfaces:**
+- Consumes: `shared.secrets.env` (FND-2), `shared.identity.require_admin` (FND-4).
+- Produces:
+  - `shared.observability`: `REQUEST_HEADER = "X-Request-ID"`, `REQUEST_ID` (`ContextVar`), `JsonFormatter`, `configure_logging(service)` (solo con `LOG_FORMAT=json`), `Metrics`, `RequestContextMiddleware`, `CgroupReader` y `ResourceMonitor(audit, reader, *, threshold_pct=80, sustain_s=300)`;
+  - `create_base_app` agrega el middleware de correlación (el más externo), `app.state.metrics`, `app.state.extra_metrics` (cada servicio puede registrar `async (app) -> dict`), `app.state.monitor` (corre en el ciclo de vida cada `RESOURCE_SAMPLE_S`, 30 s) y `GET /api/admin/metrics` (solo admin);
+  - `ServiceClient.post` reenvía `X-Request-ID`; `AuditClient.emit` manda `request_id` y audit lo guarda en `details` (AUD-4);
+  - `UserIdentity(user_id, alias)`: `X-User-Name` lleva el alias *percent-encoded*; `testing.user_headers(user_id=USER_ID, alias="ana")`;
+  - variables: `LOG_FORMAT`, `RESOURCE_ALERT_PCT` (80), `RESOURCE_ALERT_MIN` (5), `RESOURCE_SAMPLE_S` (30).
+
+- [ ] **Step 1: Tests (fallan)**
+
+`services/shared/tests/test_observabilidad.py`:
+```python
+import json
+import logging
+from types import SimpleNamespace
+
+import pytest
+from fastapi import APIRouter, Depends, Request
+from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import create_async_engine
+
+from shared import testing
+from shared.audit_client import AuditClient
+from shared.identity import require_gateway
+from shared.observability import (
+    REQUEST_HEADER,
+    CgroupReader,
+    JsonFormatter,
+    ResourceMonitor,
+)
+from shared.service_auth import ServiceClient
+from shared.web import create_base_app
+
+
+def build_app(recorder: testing.Recorder):
+    auth = testing.service_auth("rooms", ("gateway",))
+    peers = ServiceClient(
+        auth, {"audit": "http://audit:8000", "chat": "http://chat:8000"}, recorder.transport
+    )
+    app = create_base_app(
+        title="rooms",
+        settings=SimpleNamespace(allowed_origins=frozenset({testing.ORIGIN})),
+        engine=create_async_engine("postgresql+asyncpg://nadie@127.0.0.1:1/nada"),  # no se usa
+        service_auth=auth,
+        audit=AuditClient(peers),
+    )
+    router = APIRouter()
+
+    @router.get("/api/eco", dependencies=[Depends(require_gateway)])
+    async def eco(request: Request) -> dict:
+        await request.app.state.audit.emit("info", "prueba.eco", actor="system")
+        await peers.post("chat", "/internal/algo", json={})
+        return {"ok": True}
+
+    app.include_router(router)
+    return app
+
+
+@pytest.fixture
+def recorder():
+    return testing.Recorder()
+
+
+@pytest.fixture
+def client(recorder):
+    return TestClient(build_app(recorder), base_url=testing.ORIGIN)
+
+
+def test_rnf19_id_de_correlacion_viaja_a_otros_servicios_y_a_la_auditoria(client, recorder):
+    r = client.get(
+        "/api/eco", headers={**testing.gateway_headers(), REQUEST_HEADER: "abcd1234-req"}
+    )
+    assert r.headers[REQUEST_HEADER] == "abcd1234-req"
+    [event] = recorder.events("prueba.eco")
+    assert event["request_id"] == "abcd1234-req"
+    assert [c.path for c in recorder.calls] == ["/internal/events", "/internal/algo"]
+
+
+def test_rnf19_id_ausente_o_raro_se_reemplaza(client):
+    nuevo = client.get("/api/eco", headers=testing.gateway_headers()).headers[REQUEST_HEADER]
+    raro = client.get(
+        "/api/eco", headers={**testing.gateway_headers(), REQUEST_HEADER: "corto"}
+    ).headers[REQUEST_HEADER]
+    assert len(nuevo) == len(raro) == 32 and nuevo != raro
+    assert client.get("/api/eco").headers[REQUEST_HEADER]  # también en un rechazo (sin token)
+
+
+def test_rnf19_registro_json_con_campos_comunes():
+    record = logging.LogRecord("http", logging.INFO, __file__, 1, "GET %s", ("/api/x",), None)
+    line = json.loads(JsonFormatter("chat").format(record))
+    assert {k: line[k] for k in ("service", "level", "msg")} == {
+        "service": "chat",
+        "level": "info",
+        "msg": "GET /api/x",
+    }
+    assert line["ts"].endswith("+00:00") and "request_id" in line
+
+
+def test_rnf19_la_linea_de_acceso_no_lleva_la_query(client, caplog):
+    with caplog.at_level(logging.INFO, logger="http"):
+        client.get("/api/eco?exp=1&sig=secreta", headers=testing.gateway_headers())
+    assert "/api/eco" in caplog.text and "secreta" not in caplog.text
+
+
+def test_rnf18_metricas_solo_para_el_admin(client):
+    client.get("/api/eco", headers=testing.gateway_headers())
+    client.get("/api/eco")  # 401 sin token
+    assert client.get("/api/admin/metrics", headers=testing.gateway_headers()).status_code == 401
+    body = client.get("/api/admin/metrics", headers=testing.admin_headers()).json()
+    assert body["service"] == "rooms"
+    assert body["statuses"]["200"] == 1 and body["rejections"] >= 2
+    assert body["latency_ms"]["p95"] is not None
+    assert set(body["resources"]) == {"cpu_pct", "memory_pct"}
+
+
+def test_rnf18_metricas_propias_del_servicio(recorder):
+    app = build_app(recorder)
+
+    async def extra(app) -> dict:
+        return {"connections": 3}
+
+    app.state.extra_metrics = extra
+    body = TestClient(app, base_url=testing.ORIGIN).get(
+        "/api/admin/metrics", headers=testing.admin_headers()
+    )
+    assert body.json()["extra"] == {"connections": 3}
+
+
+def test_rnf18_lectura_de_cgroup(tmp_path, monkeypatch):
+    (tmp_path / "cpu.max").write_text("50000 100000\n")  # medio CPU
+    (tmp_path / "memory.current").write_text("858993459\n")
+    (tmp_path / "memory.max").write_text("1073741824\n")
+    reader = CgroupReader(tmp_path)
+    ticks = iter([100.0, 110.0])
+    monkeypatch.setattr("shared.observability.time.monotonic", lambda: next(ticks))
+    (tmp_path / "cpu.stat").write_text("usage_usec 1000000\nuser_usec 1\n")
+    assert reader.sample() == {"cpu_pct": None, "memory_pct": 80.0}  # la CPU necesita dos lecturas
+    (tmp_path / "cpu.stat").write_text("usage_usec 5000000\nuser_usec 1\n")
+    assert reader.sample()["cpu_pct"] == 80.0  # 4 s de CPU en 10 s con medio CPU
+    assert CgroupReader(tmp_path / "no-existe").sample() == {"cpu_pct": None, "memory_pct": None}
+
+
+class FakeAudit:
+    def __init__(self) -> None:
+        self.events: list[tuple[str, str, dict]] = []
+
+    async def emit(self, severity, action, *, actor, details=None, **_) -> None:
+        self.events.append((severity, action, details))
+
+
+def test_rnf18_alerta_tras_5_minutos_seguidos_sobre_el_umbral():
+    audit, now, usage = FakeAudit(), [0.0], {"cpu_pct": 95.0, "memory_pct": 40.0}
+    monitor = ResourceMonitor(
+        audit, lambda: dict(usage), threshold_pct=80, sustain_s=300, clock=lambda: now[0]
+    )
+    for t in (0, 120, 299):
+        now[0] = t
+        testing.run(monitor.check())
+    assert audit.events == []
+    for t in (300, 330):  # avisa una sola vez mientras siga alto
+        now[0] = t
+        testing.run(monitor.check())
+    assert [(s, a) for s, a, _ in audit.events] == [("warning", "resource.high")]
+    assert audit.events[0][2]["cpu_pct"] == 95.0
+    usage["cpu_pct"] = 30.0
+    now[0] = 360
+    testing.run(monitor.check())  # baja: se rearma
+    usage["memory_pct"] = 85.0
+    for t in (400, 700):
+        now[0] = t
+        testing.run(monitor.check())
+    assert len(audit.events) == 2
+```
+
+Reemplazar `services/shared/tests/test_r16_service_auth.py` por:
+```python
+import logging
+from dataclasses import asdict
+from types import SimpleNamespace
+
+import pytest
+from fastapi import APIRouter, Depends, Request, WebSocket
+from fastapi.testclient import TestClient
+from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import create_async_engine
+from starlette.websockets import WebSocketDisconnect
+
+from shared import testing
+from shared.audit_client import AuditClient
+from shared.identity import (
+    AdminIdentity,
+    SessionIdentity,
+    UserIdentity,
+    require_admin,
+    require_gateway,
+    require_session,
+    require_user,
+)
+from shared.service_auth import ServiceClient, allow
+from shared.web import create_base_app
+
+
+class Body(BaseModel):
+    n: int
+
+
+def build_app(recorder: testing.Recorder):
+    auth = testing.service_auth("rooms", ("gateway", "chat"))
+    peers = ServiceClient(auth, {"audit": "http://audit:8000"}, recorder.transport)
+    app = create_base_app(
+        title="prueba",
+        settings=SimpleNamespace(allowed_origins=frozenset({testing.ORIGIN})),
+        engine=create_async_engine("postgresql+asyncpg://nadie@127.0.0.1:1/nada"),  # no se usa
+        service_auth=auth,
+        audit=AuditClient(peers),
+    )
+    router = APIRouter()
+
+    @router.post("/api/publico", dependencies=[Depends(require_gateway)])
+    async def publico(body: Body) -> dict:
+        return {"n": body.n}
+
+    @router.get("/api/admin/x")
+    async def admin(who: AdminIdentity = Depends(require_admin)) -> dict:
+        return {"user": who.username}
+
+    @router.get("/api/sesion")
+    async def sesion(who: SessionIdentity = Depends(require_session)) -> dict:
+        return asdict(who)
+
+    @router.get("/api/usuario")
+    async def usuario(who: UserIdentity = Depends(require_user)) -> dict:
+        return asdict(who)
+
+    @router.post("/internal/solo-chat", dependencies=[Depends(allow("chat"))])
+    async def interno() -> dict:
+        return {"ok": True}
+
+    @router.get("/api/falla", dependencies=[Depends(require_gateway)])
+    async def falla() -> dict:
+        raise RuntimeError("boom")
+
+    @router.get("/api/obligatorio", dependencies=[Depends(require_gateway)])
+    async def obligatorio(request: Request) -> dict:
+        await request.app.state.audit.emit("info", "prueba.ok", actor="system", required=True)
+        return {"ok": True}
+
+    @router.websocket("/ws")
+    async def ws(websocket: WebSocket) -> None:
+        await websocket.accept()
+        await websocket.close()
+
+    app.include_router(router)
+    return app
+
+
+@pytest.fixture
+def recorder():
+    return testing.Recorder()
+
+
+@pytest.fixture
+def client(recorder):
+    return TestClient(build_app(recorder), base_url=testing.ORIGIN, raise_server_exceptions=False)
+
+
+def test_sin_token_401_y_se_audita(client, recorder):
+    r = client.post("/api/publico", json={"n": 1})
+    assert r.status_code == 401
+    assert r.json() == {"error": "no autorizado"}
+    [event] = recorder.events("svc.reject.token")
+    assert event["target"] == "/api/publico"
+    assert recorder.calls[0].token == testing.TOKENS["rooms"]  # rooms se identifica ante audit
+
+
+def test_token_desconocido_401(client):
+    assert client.get("/api/admin/x", headers={"X-Service-Token": "inventado"}).status_code == 401
+
+
+def test_ruta_publica_solo_desde_el_gateway(client, recorder):
+    r = client.post("/api/publico", json={"n": 1}, headers=testing.service_headers("chat"))
+    assert r.status_code == 403
+    assert recorder.events("svc.reject.token")[0]["actor"] == "svc:chat"
+
+
+def test_csrf_exige_origin_permitido(client, recorder):
+    sin_origin = {"X-Service-Token": testing.TOKENS["gateway"]}
+    assert client.post("/api/publico", json={"n": 1}, headers=sin_origin).status_code == 403
+    assert recorder.events("http.reject.origin")
+    ajeno = {**sin_origin, "origin": "https://evil.example"}
+    assert client.post("/api/publico", json={"n": 1}, headers=ajeno).status_code == 403
+    r = client.post("/api/publico", json={"n": 2}, headers=testing.gateway_headers())
+    assert r.json() == {"n": 2}
+
+
+def test_ruta_interna_respeta_la_allowlist(client):
+    assert client.post("/internal/solo-chat", headers=testing.gateway_headers()).status_code == 403
+    assert (
+        client.post("/internal/solo-chat", headers=testing.service_headers("chat")).status_code
+        == 200
+    )
+
+
+def test_identidad_solo_vale_si_la_trae_el_gateway(client):
+    assert client.get("/api/admin/x", headers=testing.gateway_headers()).status_code == 401
+    assert client.get("/api/admin/x", headers=testing.admin_headers()).json() == {"user": "root"}
+    impostor = {**testing.service_headers("chat"), "X-Admin-Id": "x", "X-Admin-User": "root"}
+    assert client.get("/api/admin/x", headers=impostor).status_code == 403
+
+
+def test_alias_con_tildes_viaja_codificado(client):
+    headers = testing.session_headers("s1", "r1", "José Ñúñez", "text")
+    assert client.get("/api/sesion", headers=headers).json() == {
+        "session_id": "s1",
+        "room_id": "r1",
+        "alias": "José Ñúñez",
+        "mode": "text",
+        "user_id": testing.USER_ID,
+    }
+
+
+def test_identidad_de_usuario_solo_desde_el_gateway(client):
+    assert client.get("/api/usuario", headers=testing.gateway_headers()).status_code == 401
+    assert client.get("/api/usuario", headers=testing.user_headers()).json() == {
+        "user_id": testing.USER_ID,
+        "alias": "ana",
+    }
+    con_tildes = testing.user_headers(alias="José Ñúñez")
+    assert client.get("/api/usuario", headers=con_tildes).json()["alias"] == "José Ñúñez"
+    impostor = {**testing.service_headers("chat"), "X-User-Id": "x", "X-User-Name": "ana"}
+    assert client.get("/api/usuario", headers=impostor).status_code == 403
+    sin_cuenta = {
+        k: v for k, v in testing.session_headers("s1", "r1", "ana").items() if k != "X-User-Id"
+    }
+    assert client.get("/api/sesion", headers=sin_cuenta).status_code == 401
+
+
+def test_errores_genericos(client):
+    assert client.get("/api/falla", headers=testing.gateway_headers()).json() == {
+        "error": "error interno"
+    }
+    r = client.post("/api/publico", json={"n": "x"}, headers=testing.gateway_headers())
+    assert (r.status_code, r.json()) == (422, {"error": "datos inválidos"})
+
+
+def test_evento_obligatorio_sin_audit_da_503():
+    client = TestClient(
+        build_app(testing.Recorder({"/internal/events": "down"})), base_url=testing.ORIGIN
+    )
+    r = client.get("/api/obligatorio", headers=testing.gateway_headers())
+    assert (r.status_code, r.json()) == (503, {"error": "servicio no disponible"})
+
+
+def test_evento_no_obligatorio_cae_a_stdout(caplog):
+    client = TestClient(
+        build_app(testing.Recorder({"/internal/events": "down"})), base_url=testing.ORIGIN
+    )
+    with caplog.at_level(logging.WARNING, logger="audit"):
+        assert client.get("/api/admin/x").status_code == 401  # sin token → evento de rechazo
+    assert "AUDIT_FALLBACK" in caplog.text
+
+
+def test_websocket_sin_token_se_cierra_con_4401(client):
+    with pytest.raises(WebSocketDisconnect) as closed:
+        with client.websocket_connect("/ws"):
+            pass
+    assert closed.value.code == 4401
+```
+
+Run: `pytest services/shared -q`
+Expected: FAIL — `ModuleNotFoundError: No module named 'shared.observability'`
+
+- [ ] **Step 2: `observability.py`**
+
+Decisiones:
+- El id de correlación lo genera el gateway (`$request_id`, GW-2). Un servicio acepta el que llega si tiene el formato esperado; si no, crea uno. Viaja en `X-Request-ID` a los demás servicios y queda en cada evento de auditoría.
+- Una línea JSON por registro (`ts`, `service`, `level`, `request_id`, `logger`, `msg` y campos extra) y una línea por petición **sin la query**: las URL de descarga llevan su firma ahí.
+- CPU y memoria se leen de cgroup v2 dentro del contenedor (sin socket de Docker). Si alguna pasa el 80 % durante 5 minutos seguidos, se emite **una** advertencia `resource.high`, que el panel muestra en ≤ 10 s; se rearma cuando el consumo baja.
+
+`services/shared/shared/observability.py`:
+```python
+"""Correlación, registros estructurados, métricas y alerta de consumo (spec §21; RNF-18 y RNF-19)."""
+
+import asyncio
+import json
+import logging
+import os
+import re
+import sys
+import time
+from collections import Counter, deque
+from collections.abc import Callable
+from contextvars import ContextVar
+from datetime import UTC, datetime
+from pathlib import Path
+from uuid import uuid4
+
+from starlette.datastructures import Headers, MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+REQUEST_HEADER = "X-Request-ID"
+REQUEST_ID: ContextVar[str | None] = ContextVar("request_id", default=None)
+VALID_ID = re.compile(r"[A-Za-z0-9-]{8,64}")
+log = logging.getLogger("http")
+
+
+def incoming_id(scope: Scope) -> str:
+    """El id que puso el gateway ($request_id) o uno nuevo si falta o tiene un formato raro."""
+    presented = Headers(scope=scope).get(REQUEST_HEADER)
+    return presented if presented and VALID_ID.fullmatch(presented) else uuid4().hex
+
+
+class JsonFormatter(logging.Formatter):
+    """Una línea JSON por registro, con el mismo formato en todos los servicios (RNF-19)."""
+
+    def __init__(self, service: str) -> None:
+        super().__init__()
+        self.service = service
+
+    def format(self, record: logging.LogRecord) -> str:
+        line = {
+            "ts": datetime.fromtimestamp(record.created, UTC).isoformat(timespec="milliseconds"),
+            "service": self.service,
+            "level": record.levelname.lower(),
+            "request_id": REQUEST_ID.get(),
+            "logger": record.name,
+            "msg": record.getMessage(),
+        }
+        line.update(getattr(record, "fields", {}))
+        if record.exc_info:
+            line["exc"] = self.formatException(record.exc_info)
+        return json.dumps(line, ensure_ascii=False, default=str)
+
+
+def configure_logging(service: str) -> None:
+    """Con LOG_FORMAT=json (lo pone el Dockerfile) todo sale por stdout como JSON. En las pruebas
+    no se toca el logging, para no quitarle sus handlers a pytest."""
+    if os.environ.get("LOG_FORMAT") != "json":
+        return
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(JsonFormatter(service))
+    root = logging.getLogger()
+    root.handlers = [handler]
+    root.setLevel(logging.INFO)
+    for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+        logging.getLogger(name).handlers = []
+        logging.getLogger(name).propagate = True
+
+
+class Metrics:
+    """Contadores en memoria del proceso; se reinician con el servicio."""
+
+    def __init__(self, window: int = 1000) -> None:
+        self.started = time.time()
+        self.requests = 0
+        self.statuses: Counter[str] = Counter()
+        self.latencies: deque[float] = deque(maxlen=window)
+
+    def observe(self, status: int, seconds: float) -> None:
+        self.requests += 1
+        self.statuses[str(status)] += 1
+        self.latencies.append(seconds)
+
+    def snapshot(self) -> dict:
+        ordered = sorted(self.latencies)
+
+        def percentile(q: float) -> float | None:
+            if not ordered:
+                return None
+            return round(ordered[min(len(ordered) - 1, int(q * len(ordered)))] * 1000, 2)
+
+        rejected = sum(n for status, n in self.statuses.items() if status.startswith("4"))
+        return {
+            "uptime_s": int(time.time() - self.started),
+            "requests": self.requests,
+            "statuses": dict(self.statuses),
+            "rejections": rejected,
+            "latency_ms": {"p50": percentile(0.50), "p95": percentile(0.95)},
+        }
+
+
+class RequestContextMiddleware:
+    """Fija el id de correlación, lo devuelve en la respuesta, mide la latencia y deja una línea de
+    registro por petición (sin la query: las URLs firmadas no deben quedar en los logs)."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
+        request_id = incoming_id(scope)
+        token = REQUEST_ID.set(request_id)
+        started, status = time.perf_counter(), 500
+
+        async def send_with_id(message: Message) -> None:
+            nonlocal status
+            if message["type"] == "http.response.start":
+                status = message["status"]
+                MutableHeaders(scope=message)[REQUEST_HEADER] = request_id
+            elif message["type"] == "websocket.accept":
+                status = 101
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_with_id)
+        finally:
+            elapsed = time.perf_counter() - started
+            if scope["path"] != "/health":
+                if scope["type"] == "http":
+                    scope["app"].state.metrics.observe(status, elapsed)
+                log.info(
+                    "%s %s %s",
+                    scope.get("method", "WS"),
+                    scope["path"],
+                    status,
+                    extra={"fields": {"status": status, "ms": round(elapsed * 1000, 2)}},
+                )
+            REQUEST_ID.reset(token)
+
+
+class CgroupReader:
+    """CPU y memoria del contenedor desde cgroup v2 (sin privilegios ni socket de Docker)."""
+
+    def __init__(self, root: Path = Path("/sys/fs/cgroup")) -> None:
+        self.root = root
+        self.last: tuple[float, int] | None = None
+
+    def read(self, name: str) -> str | None:
+        try:
+            return (self.root / name).read_text(encoding="utf-8").strip()
+        except OSError:
+            return None
+
+    def cpus(self) -> float:
+        quota = (self.read("cpu.max") or "max").split()
+        if quota[0] == "max":
+            return float(os.cpu_count() or 1)
+        return int(quota[0]) / int(quota[1])
+
+    def sample(self) -> dict:
+        """{"cpu_pct", "memory_pct"}; None en lo que no se puede medir (por ejemplo, fuera de Docker)."""
+        cpu_pct = memory_pct = None
+        stat = self.read("cpu.stat")
+        if stat:
+            usage = int(dict(line.split() for line in stat.splitlines())["usage_usec"])
+            now = time.monotonic()
+            if self.last is not None and now > self.last[0]:
+                used = (usage - self.last[1]) / 1e6
+                cpu_pct = round(100 * used / ((now - self.last[0]) * self.cpus()), 1)
+            self.last = (now, usage)
+        current, limit = self.read("memory.current"), self.read("memory.max")
+        if current and limit and limit != "max":
+            memory_pct = round(100 * int(current) / int(limit), 1)
+        return {"cpu_pct": cpu_pct, "memory_pct": memory_pct}
+
+
+class ResourceMonitor:
+    """Avisa una vez (warning `resource.high`) cuando la CPU o la memoria pasan el umbral durante
+    `sustain_s` seguidos; vuelve a armarse cuando el consumo baja (RNF-18)."""
+
+    def __init__(
+        self,
+        audit,
+        reader: Callable[[], dict],
+        *,
+        threshold_pct: float = 80.0,
+        sustain_s: float = 300.0,
+        clock: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self.audit, self.reader, self.clock = audit, reader, clock
+        self.threshold_pct, self.sustain_s = threshold_pct, sustain_s
+        self.high_since: float | None = None
+        self.alerted = False
+        self.latest: dict = {"cpu_pct": None, "memory_pct": None}
+
+    async def check(self) -> None:
+        self.latest = self.reader()
+        high = [k for k, v in self.latest.items() if v is not None and v >= self.threshold_pct]
+        if not high:
+            self.high_since, self.alerted = None, False
+            return
+        now = self.clock()
+        if self.high_since is None:
+            self.high_since = now
+        if not self.alerted and now - self.high_since >= self.sustain_s:
+            self.alerted = True
+            await self.audit.emit(
+                "warning",
+                "resource.high",
+                actor="system",
+                details={**self.latest, "threshold_pct": self.threshold_pct},
+            )
+
+    async def run(self, interval_s: float) -> None:
+        while True:
+            try:
+                await self.check()
+            except Exception:  # medir nunca debe tumbar el servicio
+                logging.getLogger("resources").exception("falló la medición de recursos")
+            await asyncio.sleep(interval_s)
+```
+
+- [ ] **Step 3: Base web, auditoría, cliente interno e identidad**
+
+Reemplazar `services/shared/shared/web.py` por:
+```python
+"""Base común de los servicios (spec §4.3, §15, §21): token de servicio, errores JSON genéricos,
+/health, correlación y métricas."""
+
+import asyncio
+import logging
+from contextlib import asynccontextmanager, suppress
+
+from fastapi import Depends, FastAPI, Request, Response
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from shared.audit_client import AuditUnavailable
+from shared.identity import require_admin
+from shared.observability import (
+    CgroupReader,
+    Metrics,
+    RequestContextMiddleware,
+    ResourceMonitor,
+    configure_logging,
+)
+from shared.secrets import env
+from shared.service_auth import ServiceTokenMiddleware
+
+log = logging.getLogger("web")
+
+ADMIN_COOKIE = "__Host-admin"
+USER_COOKIE = "__Host-user"
+ROOM_COOKIE = "__Host-room"
+DEVICE_COOKIE = "__Host-device"
+
+
+def set_cookie(response: Response, name: str, value: str, max_age: int | None = None) -> None:
+    response.set_cookie(
+        name, value, max_age=max_age, path="/", secure=True, httponly=True, samesite="strict"
+    )
+
+
+def clear_cookie(response: Response, name: str) -> None:
+    response.delete_cookie(name, path="/", secure=True, httponly=True, samesite="strict")
+
+
+def with_monitor(lifespan):
+    """Agrega al ciclo de vida del servicio la medición periódica de CPU y memoria (RNF-18)."""
+
+    @asynccontextmanager
+    async def combined(app: FastAPI):
+        task = asyncio.create_task(app.state.monitor.run(env("RESOURCE_SAMPLE_S", 30.0)))
+        try:
+            if lifespan is None:
+                yield
+            else:
+                async with lifespan(app):
+                    yield
+        finally:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
+    return combined
+
+
+def create_base_app(*, title: str, settings, engine, service_auth, audit, lifespan=None) -> FastAPI:
+    configure_logging(title)
+    app = FastAPI(
+        title=title,
+        docs_url=None,
+        redoc_url=None,
+        openapi_url=None,
+        lifespan=with_monitor(lifespan),
+    )
+    app.state.settings = settings
+    app.state.engine = engine
+    app.state.service_auth = service_auth
+    app.state.audit = audit
+    app.state.metrics = Metrics()
+    app.state.extra_metrics = None  # async (app) -> dict: lo propio de cada servicio
+    app.state.monitor = ResourceMonitor(
+        audit,
+        CgroupReader().sample,
+        threshold_pct=env("RESOURCE_ALERT_PCT", 80.0),
+        sustain_s=env("RESOURCE_ALERT_MIN", 5) * 60,
+    )
+    app.add_middleware(ServiceTokenMiddleware)
+    app.add_middleware(RequestContextMiddleware)  # la última agregada es la más externa
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_error(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        detail = exc.detail if isinstance(exc.detail, str) else "error"
+        return JSONResponse({"error": detail}, status_code=exc.status_code, headers=exc.headers)
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid(request: Request, exc: RequestValidationError) -> JSONResponse:
+        return JSONResponse({"error": "datos inválidos"}, status_code=422)
+
+    @app.exception_handler(AuditUnavailable)
+    async def audit_down(request: Request, exc: AuditUnavailable) -> JSONResponse:
+        log.error("auditoría no disponible para el evento obligatorio %s", exc)
+        return JSONResponse({"error": "servicio no disponible"}, status_code=503)
+
+    @app.exception_handler(Exception)
+    async def unhandled(request: Request, exc: Exception) -> JSONResponse:
+        log.exception("error no controlado en %s", request.url.path)
+        return JSONResponse({"error": "error interno"}, status_code=500)
+
+    @app.get("/health")
+    async def health() -> JSONResponse:
+        try:
+            async with engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+        except Exception:  # la BD no responde: el healthcheck de Docker lo verá
+            return JSONResponse({"error": "bd no disponible"}, status_code=503)
+        return JSONResponse({"status": "ok"})
+
+    @app.get("/api/admin/metrics", dependencies=[Depends(require_admin)])
+    async def metrics(request: Request) -> dict:
+        own = request.app.state.extra_metrics  # métricas propias del servicio, si registró alguna
+        return {
+            "service": title,
+            **request.app.state.metrics.snapshot(),
+            "resources": request.app.state.monitor.latest,
+            **({"extra": await own(request.app)} if own else {}),
+        }
+
+    return app
+```
+
+Reemplazar `services/shared/shared/audit_client.py` por:
+```python
+"""Emisión de eventos al servicio audit con fallback a stdout (spec §14.4)."""
+
+import json
+import logging
+
+import httpx
+
+from shared.observability import REQUEST_ID
+from shared.service_auth import ServiceClient
+
+log = logging.getLogger("audit")
+
+
+class AuditUnavailable(Exception):
+    """audit no respondió a un evento obligatorio: la operación debe revertirse (→ 503)."""
+
+
+class AuditClient:
+    def __init__(self, client: ServiceClient) -> None:
+        self.client = client
+
+    async def emit(
+        self,
+        severity: str,
+        action: str,
+        *,
+        actor: str,
+        target: str | None = None,
+        ip: str | None = None,
+        details: dict | None = None,
+        required: bool = False,
+    ) -> None:
+        event = {
+            "severity": severity,
+            "action": action,
+            "actor": actor,
+            "target": target,
+            "ip": ip,
+            "details": details or {},
+            # audit lo guarda en details: el evento se sigue hasta los registros de cada servicio
+            "request_id": REQUEST_ID.get(),
+        }
+        for _ in range(2):  # dos intentos de 2 s
+            try:
+                response = await self.client.post(
+                    "audit", "/internal/events", json=event, timeout=2.0
+                )
+            except httpx.HTTPError:
+                continue
+            if response.status_code == 201:
+                return
+        if required:
+            raise AuditUnavailable(action)
+        log.warning("AUDIT_FALLBACK %s", json.dumps(event, ensure_ascii=False, default=str))
+```
+
+Reemplazar `services/shared/shared/service_auth.py` por:
+```python
+"""Autenticación servicio a servicio (R16, spec §4.3): X-Service-Token + allowlist por ruta."""
+
+import hmac
+from dataclasses import dataclass
+
+import httpx
+from fastapi import HTTPException, Request
+from starlette.datastructures import Headers
+from starlette.responses import JSONResponse
+from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.websockets import WebSocket
+
+from shared.crypto import sha256
+from shared.identity import client_ip
+from shared.observability import REQUEST_HEADER, REQUEST_ID
+from shared.secrets import read_secret, secrets_dir
+
+TOKEN_HEADER = "X-Service-Token"  # noqa: S105 — es el nombre de la cabecera, no un secreto
+
+
+@dataclass(frozen=True)
+class ServiceAuth:
+    name: str  # servicio dueño
+    token: str | None  # token propio, para llamar a otros (audit no llama a nadie)
+    callers: dict[str, bytes]  # nombre → SHA-256 del token de cada llamador permitido
+
+    @classmethod
+    def from_secrets(cls, name: str, *, needs_token: bool) -> "ServiceAuth":
+        callers = {
+            path.name.removeprefix("svc_hash_"): bytes.fromhex(
+                path.read_text(encoding="utf-8").strip()
+            )
+            for path in secrets_dir().glob("svc_hash_*")
+        }
+        if not callers:
+            raise RuntimeError("secreto requerido ausente: svc_hash_* (llamadores permitidos)")
+        return cls(name, read_secret(f"svc_token_{name}") if needs_token else None, callers)
+
+    def identify(self, presented: str | None) -> str | None:
+        """Nombre del llamador cuyo hash coincide (comparación en tiempo constante) o None."""
+        if not presented:
+            return None
+        digest = sha256(presented.encode())
+        found = None
+        for name, expected in self.callers.items():
+            if hmac.compare_digest(digest, expected):
+                found = name
+        return found
+
+
+class ServiceTokenMiddleware:
+    """Exige X-Service-Token válido en toda petición HTTP y WebSocket salvo /health."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] not in ("http", "websocket") or scope["path"] == "/health":
+            await self.app(scope, receive, send)
+            return
+        service_app = scope["app"]
+        caller = service_app.state.service_auth.identify(Headers(scope=scope).get(TOKEN_HEADER))
+        if caller is None:
+            client = scope.get("client")
+            await service_app.state.audit.emit(
+                "warning",
+                "svc.reject.token",
+                actor="svc:desconocido",
+                target=scope["path"],
+                ip=client[0] if client else None,
+            )
+            if scope["type"] == "websocket":
+                await WebSocket(scope, receive, send).close(4401)
+            else:
+                await JSONResponse({"error": "no autorizado"}, status_code=401)(
+                    scope, receive, send
+                )
+            return
+        scope.setdefault("state", {})["caller"] = caller
+        await self.app(scope, receive, send)
+
+
+def allow(*callers: str):
+    """Dependencia de ruta interna: el llamador verificado debe estar en la allowlist."""
+
+    async def dependency(request: Request) -> str:
+        caller = request.state.caller
+        if caller not in callers:
+            await request.app.state.audit.emit(
+                "warning",
+                "svc.reject.token",
+                actor=f"svc:{caller}",
+                target=request.url.path,
+                ip=client_ip(request),
+            )
+            raise HTTPException(403, "no autorizado")
+        return caller
+
+    return dependency
+
+
+class ServiceClient:
+    """Cliente HTTP interno: agrega el token propio y resuelve el destino por nombre de servicio."""
+
+    def __init__(
+        self,
+        auth: ServiceAuth,
+        urls: dict[str, str],
+        transport: httpx.AsyncBaseTransport | None = None,
+    ):
+        self.auth, self.urls, self.transport = auth, urls, transport
+
+    async def post(
+        self, service: str, path: str, *, json: dict, timeout: float = 3.0
+    ) -> httpx.Response:
+        headers = {TOKEN_HEADER: self.auth.token or ""}
+        if REQUEST_ID.get():  # la misma petición se sigue de un servicio a otro (RNF-19)
+            headers[REQUEST_HEADER] = REQUEST_ID.get()
+        # ponytail: un AsyncClient por llamada (sin pool compartido); basta en una red interna a esta escala.
+        async with httpx.AsyncClient(transport=self.transport, timeout=timeout) as client:
+            return await client.post(self.urls[service] + path, json=json, headers=headers)
+```
+
+Reemplazar `services/shared/shared/identity.py` por:
+```python
+"""Identidad propagada por el gateway (spec §4.3). Solo se lee si el llamador verificado es 'gateway'."""
+
+from dataclasses import dataclass
+from urllib.parse import quote, unquote
+
+from fastapi import HTTPException, Request
+from starlette.requests import HTTPConnection
+
+UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+@dataclass(frozen=True)
+class AdminIdentity:
+    admin_id: str
+    username: str
+
+
+@dataclass(frozen=True)
+class UserIdentity:
+    user_id: str
+    alias: str  # nombre visible elegido en el primer ingreso (spec §9.2)
+
+
+@dataclass(frozen=True)
+class SessionIdentity:
+    session_id: str
+    room_id: str
+    alias: str  # el alias de la cuenta (spec §9.3)
+    mode: str
+    user_id: str
+
+
+def client_ip(conn: HTTPConnection) -> str | None:
+    """IP del cliente original: uvicorn la toma de X-Forwarded-For, que el gateway sobrescribe."""
+    return conn.client.host if conn.client else None
+
+
+def encode_alias(alias: str) -> str:
+    """Las cabeceras HTTP son latin-1: el alias (UTF-8) viaja percent-encoded."""
+    return quote(alias, safe="")
+
+
+async def require_gateway(request: Request) -> None:
+    """Rutas públicas: solo el gateway puede llamarlas, y las que cambian estado exigen Origin permitido (CSRF)."""
+    audit, ip = request.app.state.audit, client_ip(request)
+    if request.state.caller != "gateway":
+        await audit.emit(
+            "warning",
+            "svc.reject.token",
+            actor=f"svc:{request.state.caller}",
+            target=request.url.path,
+            ip=ip,
+        )
+        raise HTTPException(403, "no autorizado")
+    origin = request.headers.get("origin")
+    if (
+        request.method in UNSAFE_METHODS
+        and origin not in request.app.state.settings.allowed_origins
+    ):
+        await audit.emit(
+            "warning",
+            "http.reject.origin",
+            actor=f"ip:{ip}",
+            target=request.url.path,
+            ip=ip,
+            details={"origin": origin},
+        )
+        raise HTTPException(403, "origen no permitido")
+
+
+async def require_admin(request: Request) -> AdminIdentity:
+    await require_gateway(request)
+    admin_id, username = request.headers.get("x-admin-id"), request.headers.get("x-admin-user")
+    if not admin_id or not username:
+        raise HTTPException(401, "no autenticado")
+    return AdminIdentity(admin_id, username)
+
+
+async def require_user(request: Request) -> UserIdentity:
+    """Cuenta de usuario verificada por auth (verify-user) y propagada por el gateway (spec §9.2)."""
+    await require_gateway(request)
+    user_id, alias = request.headers.get("x-user-id"), request.headers.get("x-user-name")
+    if not user_id or not alias:
+        raise HTTPException(401, "no autenticado")
+    return UserIdentity(user_id, unquote(alias))
+
+
+def session_from_headers(conn: HTTPConnection) -> SessionIdentity | None:
+    headers = conn.headers
+    values = (
+        headers.get("x-session-id"),
+        headers.get("x-room-id"),
+        headers.get("x-alias"),
+        headers.get("x-room-mode"),
+        headers.get("x-user-id"),
+    )
+    if not all(values):
+        return None
+    session_id, room_id, alias, mode, user_id = values
+    return SessionIdentity(session_id, room_id, unquote(alias), mode, user_id)
+
+
+async def require_session(request: Request) -> SessionIdentity:
+    await require_gateway(request)
+    who = session_from_headers(request)
+    if who is None:
+        raise HTTPException(401, "no autenticado")
+    return who
+```
+
+En `services/shared/shared/testing.py`, reemplaza `user_headers` por:
+```python
+def user_headers(user_id: str = USER_ID, alias: str = "ana") -> dict:
+    """La cuenta que verify-user de auth le entrega al gateway (spec §9.2); el alias va codificado."""
+    return {**gateway_headers(), "X-User-Id": user_id, "X-User-Name": encode_alias(alias)}
+```
+
+Run: `ruff format services/shared && ruff check --fix services/shared && pytest services/shared -q`
+Expected: sin errores de ruff y PASS
+
+- [ ] **Step 4: Imagen y límites de recursos**
+
+Reemplazar `services/Dockerfile` por:
+```dockerfile
+# Plantilla única de los servicios Python (spec §4.2). Uso: --build-arg SERVICE=<svc>
+FROM python:3.13-slim
+ARG SERVICE
+# Paquetes del sistema que solo necesita un servicio (media: ffmpeg para MP3 y MP4, spec §12).
+ARG APT_PACKAGES=""
+# LOG_FORMAT=json: una línea JSON por registro, con el mismo formato en todos los servicios (RNF-19).
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 SERVICE=${SERVICE} LOG_FORMAT=json
+RUN if [ -n "$APT_PACKAGES" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends $APT_PACKAGES \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi \
+ && useradd --uid 10001 --no-create-home app \
+ && mkdir -p /data/media /data/quarantine \
+ && chown -R app:app /data
+WORKDIR /srv
+COPY services/${SERVICE}/requirements.lock /srv/requirements.lock
+RUN pip install --no-cache-dir -r /srv/requirements.lock
+COPY services/shared /srv/shared
+RUN pip install --no-cache-dir --no-deps /srv/shared
+COPY services/${SERVICE} /srv/svc
+RUN pip install --no-cache-dir --no-deps /srv/svc
+WORKDIR /srv/svc
+USER app
+EXPOSE 8000
+# --ws-max-size: uvicorn corta antes de leer tramas absurdas; chat aplica su propio tope de 16 KB (4413).
+# --no-access-log: el registro de acceso lo escribe shared.observability (JSON, con request_id y sin
+# la query, que en las descargas lleva la firma de la URL).
+CMD exec uvicorn --factory "${SERVICE}_svc.main:create_app" --host 0.0.0.0 --port 8000 \
+    --proxy-headers --forwarded-allow-ips '*' --ws-ping-interval 30 --ws-ping-timeout 30 \
+    --ws-max-size 65536 --no-server-header --no-access-log
+```
+
+En `deploy/docker-compose.yml`, agrega al ancla `x-python-service` (el monitor mide contra estos límites; `media` puede subir los suyos):
+```yaml
+  mem_limit: 512m
+  cpus: 1.0
+```
+
+Run: `docker compose -f deploy/docker-compose.yml config -q`
+Expected: sin errores.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add services/shared services/Dockerfile deploy/docker-compose.yml
+git commit -m "feat(shared): id de correlación, registros JSON, métricas y alerta de consumo (RNF-18, RNF-19)"
+```
+
+---
+
+### Task FND-10: Calidad, control de cambios y modelo de amenazas (RNF-10, RNF-11, RS-30, RS-32, RS-33, RS-34, RS-37)
+
+> **Rev. 4.** Tarea nueva con los requisitos de desarrollo seguro de la Actividad 3 (spec §21.3).
+
+**Files:**
+- Modify: `ruff.toml` (complejidad ≤ 10), `services/shared/pyproject.toml` (`pytest-cov`), `.github/workflows/ci.yml` (cobertura y job `secrets`), `docs/trazabilidad-riesgos.md` (columna ISO/IEC 27001)
+- Create: `.gitleaks.toml`, `.github/pull_request_template.md`, `docs/modelo-amenazas.md`
+
+**Interfaces:**
+- Produces: la CI falla si un servicio baja del 80 % de cobertura de líneas, si una función supera complejidad 10 o si aparece un secreto en el historial; la rama `main` exige PR revisado y CI en verde.
+
+- [ ] **Step 1: Complejidad y cobertura**
+
+Reemplazar `ruff.toml` por:
+```toml
+line-length = 100
+target-version = "py313"
+
+[lint]
+select = ["E", "F", "I", "B", "S", "UP", "C90"]  # C90: complejidad ciclomática (RNF-11)
+ignore = ["E501"]  # ruff format ajusta el código; SQL y comentarios largos no se parten a la fuerza
+
+[lint.mccabe]
+max-complexity = 10
+
+[lint.isort]
+known-first-party = ["shared", "auth_svc", "rooms_svc", "chat_svc", "media_svc", "audit_svc"]
+
+[lint.flake8-bugbear]
+# FastAPI declara dependencias y parámetros con llamadas en los valores por defecto.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.params.Depends", "fastapi.params.Query"]
+
+[lint.per-file-ignores]
+"**/tests/**" = ["S101", "S105", "S106", "S311", "S603", "S607"]  # las pruebas lanzan ffmpeg, mkcert y herramientas
+"e2e/**" = ["S101", "S105", "S106", "S113", "S311", "S603", "S607"]
+"services/shared/shared/testing.py" = ["S101", "S105", "S106", "S311", "S603", "S608"]
+"services/*/tools/**" = ["S311"]
+"deploy/**" = ["S603", "S607"]
+```
+
+En `services/shared/pyproject.toml`, agrega `"pytest-cov>=5.0",` a `dev`, después de `pytest-timeout`.
+
+En `.github/workflows/ci.yml`, reemplaza el paso `Pruebas` del job `services` por:
+```yaml
+      - name: Pruebas con cobertura ≥ 80 % (RNF-10)
+        run: |
+          pkg="${{ matrix.svc }}_svc"; [ "${{ matrix.svc }}" = shared ] && pkg=shared
+          pytest "services/${{ matrix.svc }}" -m "not clamav" --cov="$pkg" --cov-report=term --cov-fail-under=80
+```
+y cambia el nombre del paso `Ruff` por `Ruff (incluye complejidad ≤ 10, RNF-11)`.
+
+Run: `pip install -e "services/shared[dev]" && ruff check services && pytest services/shared --cov=shared --cov-fail-under=80 -q`
+Expected: `All checks passed!` y `Required test coverage of 80% reached` (shared ≈ 85 %; con la rev. 4, cada servicio queda entre 85 % y 98 %).
+
+- [ ] **Step 2: Secretos en el historial (RS-32)**
+
+`.gitleaks.toml`:
+```toml
+# Detección de secretos en la CI (spec §16.5, RS-32). Las pruebas, el e2e y la documentación usan
+# contraseñas y tokens FIJOS de prueba (shared.testing); los secretos reales viven en deploy/secrets/,
+# que está en .gitignore.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Valores de prueba documentados"
+paths = [
+  '''services/[^/]+/tests/''',
+  '''services/shared/shared/testing\.py''',
+  '''e2e/''',
+  '''perf/''',
+  '''docs/''',
+]
+```
+
+En `.github/workflows/ci.yml`, agrega el job:
+```yaml
+  secrets:
+    # Detección de secretos en todo el historial (RS-32). Las excepciones están en .gitleaks.toml.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks
+        run: >-
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.21.2
+          git /repo --config /repo/.gitleaks.toml --redact --no-banner
+```
+
+Run: `docker run --rm -v "${PWD}:/repo" ghcr.io/gitleaks/gitleaks:v8.21.2 git /repo --config /repo/.gitleaks.toml --redact --no-banner`
+Expected: `no leaks found`.
+
+- [ ] **Step 3: Control de cambios (RS-37)**
+
+`.github/pull_request_template.md`:
+```markdown
+## Qué cambia y por qué
+
+<!-- Tarea del plan (por ejemplo, ATH-5) y riesgos o requisitos que toca (R1–R17, RS-xx, RNF-xx). -->
+
+## Lista de verificación de seguridad (RS-37)
+
+- [ ] La identidad (admin, cuenta, sesión, sala) sale del gateway o de la sesión verificada, nunca del cuerpo de la petición.
+- [ ] Las rutas `/internal/*` nuevas usan `allow(...)` con la allowlist mínima, y las públicas `require_gateway`.
+- [ ] Consultas con `text()` y parámetros nombrados; nada del usuario entra al texto SQL.
+- [ ] Errores genéricos al cliente; el detalle va a la auditoría. Ningún secreto, token, contraseña ni cuerpo de mensaje en los registros.
+- [ ] Cada rechazo nuevo emite su evento de auditoría; los eventos que otorgan algo son `required=True`.
+- [ ] Hay pruebas `test_rNN_*` del riesgo que toca el cambio y `docs/trazabilidad-riesgos.md` está al día.
+- [ ] Sin secretos en el código: la CI (gitleaks) pasa.
+- [ ] `ruff`, la cobertura (≥ 80 %), bandit, pip-audit y la prueba de enrutamiento del gateway pasan.
+- [ ] Si cambia el modelo de confianza o un flujo de datos, se actualizó `docs/modelo-amenazas.md`.
+```
+
+En GitHub → *Settings* → *Branches* → *Add branch ruleset* para `main`: exigir *pull request* con 1 aprobación, descartar aprobaciones viejas al subir cambios, exigir que pasen los checks `services`, `secrets`, `frontend` y `gateway`, y bloquear *force push* y borrado. Anota la captura en la trazabilidad (evidencia de RS-37).
+
+- [ ] **Step 4: Modelo de amenazas y trazabilidad normativa (RS-30, RS-33, RS-34)**
+
+`docs/modelo-amenazas.md`:
+```markdown
+# Modelo de amenazas (STRIDE)
+
+Evidencia de RS-30 (*Secure by Design*): se elabora **antes** de implementar los componentes críticos y se revisa cuando cambian el modelo de confianza, las cuentas, las salas o los formatos admitidos. Fuente: spec §3 (limitaciones), §4 (arquitectura y confianza) y §16.3 (R16, R17). Cada amenaza remite al riesgo del SGSI, a su control y a la prueba que lo demuestra (`docs/trazabilidad-riesgos.md`).
+
+## Límites de confianza
+
+| Límite | Del lado no confiable | Del lado confiable | Control en el cruce |
+|---|---|---|---|
+| Internet → gateway | navegador, cualquier cliente | gateway | TLS 1.3, HSTS, CSP, rate limit, `auth_request`, cabeceras de identidad sobrescritas |
+| gateway → servicios | red `apps` | cada servicio | `X-Service-Token` (hash por llamador), allowlist por ruta, identidad solo si el llamador es `gateway` |
+| servicio → servicio | red `apps` | receptor | token propio del llamador y allowlist (R16) |
+| servicio → PostgreSQL | red `data` | BD del servicio | rol `<svc>_app` sin DDL, una BD por servicio (R11) |
+| media → archivos subidos | bytes del usuario | procesos de análisis | firma, validación con límites, ClamAV, procesos aislados con timeout, ffmpeg endurecido (R9) |
+| auth → mailer | — | correo saliente | red interna `mail`; solo `mailer` sale a internet en el VPS |
+
+## Amenazas por componente
+
+| Componente | S (suplantación) | T (manipulación) | R (repudio) | I (divulgación) | D (denegación) | E (elevación) |
+|---|---|---|---|---|---|---|
+| gateway | Cabeceras de identidad falsas → se sobrescriben (R16) | Downgrade a TLS 1.2 o `ws://` → solo TLS 1.3, 301 (R7) | — | `/internal/*` expuesto → 404 (R16) | Inundación de peticiones o WebSockets → `limit_req`, `limit_conn` (R10) | Rutas mal enrutadas → `check_routes.py` en la CI |
+| auth (admin) | Fuerza bruta → bloqueo + TOTP (R4) | Fijación de sesión → token nuevo al pasar a `full` | Acciones sin autor → auditoría obligatoria | Secreto TOTP en BD → AES-GCM con KEK (R2) | Bloqueo del admin por fallos ajenos → contadores separados por cuenta e IP | Cuenta de usuario en `/api/admin/*` → cookies y verificaciones distintas (R5) |
+| auth (cuentas) | *Credential stuffing* → Argon2id, bloqueo, retraso, política (R17) | Registro con correo ajeno → código por correo; la cuenta sin verificar se renueva | Alta sin rastro → `user.register` obligatorio | Enumeración de correos → registro siempre 202, login genérico | Registros masivos → tope por dispositivo e IP | Alias que imita a otro → alias único por forma canónica, solo latino |
+| rooms | Sesión robada → atada a la cookie de dispositivo (R13) | Cupo superado por carrera → `UPDATE` condicional + `CHECK` (R15) | Ingreso sin rastro → `room.enter.ok` obligatorio | Enumeración de salas → mismo 401/404 (RS-35) | Fuerza bruta de claves → rate limit por usuario, IP, dispositivo y sala (R8) | Usuario que crea salas → `require_admin` (R5) |
+| chat | MITM interno → *hello* firmado (R7) | Trama alterada o repetida → AES-GCM + AAD + `seq` (R14) | Remitente falso → `from` sale de la sesión (R14) | Mensajes en BD → DEK por sala con KEK (R2) | Ráfagas o tramas gigantes → token bucket, 16 KB (R10) | Mensaje en otra sala → sala desde la sesión, AAD |
+| media | Subir como otro → sesión del gateway | Archivo con contenido oculto → análisis por formato + cuarentena + CDR + reanálisis (R6, RS-36) | Subida sin autor → `files.user_id` y auditoría | Descarga ajena → URL firmada por sesión y sala (R12) | Bombas, archivos enormes → topes y límites, procesos con timeout (R9) | Ejecutar el archivo → `attachment`, `nosniff`, sin ruta pública |
+| audit | Servicio que se hace pasar por otro → `service` sale del token | Borrar o editar eventos → rol solo INSERT/SELECT + cadena SHA-256 (R3) | — | Datos sensibles en eventos → nunca contraseñas, tokens ni cuerpos | audit caído → los otorgamientos fallan cerrados (503) | — |
+| BD / secretos | — | DDL desde la app → rol sin DDL (R11) | — | Copia de la BD → hashes Argon2id, KEK fuera de la BD, respaldos cifrados con age | — | Credenciales de otra BD → `CONNECT` solo a la propia (R11) |
+
+## Supuestos y riesgos aceptados
+
+- `chat` ve el texto de los mensajes y `media` los archivos (limitación 1 de la spec): la confianza en esos servicios es explícita.
+- El tramo interno es HTTP: los tokens de servicio viajan en claro dentro de redes Docker internas (limitación 3); se mitiga con redes segmentadas y `cap_drop: ALL`.
+- Quien conoce la clave de una sala y tiene otra cuenta puede unirse (limitación 2); lo limita el cupo y queda auditado.
+- El estegoanálisis no detecta todo (limitación 5); la sanitización destruye la mayoría de los canales.
+
+## Revisión
+
+| Fecha | Cambio revisado | Revisores | Resultado |
+|---|---|---|---|
+| — | Diseño inicial (spec rev. 4) | — | — |
+```
+
+En `docs/trazabilidad-riesgos.md`, agrega la columna *Control ISO/IEC 27001:2022* después de *Control* con estos valores (referencia de diseño, no certificación):
+
+| R | Control ISO/IEC 27001:2022 |
+|---|---|
+| R1, R4, R8, R17 | A.5.17 Información de autenticación · A.8.5 Autenticación segura |
+| R2 | A.8.24 Uso de criptografía |
+| R3 | A.8.15 Registro de eventos |
+| R5, R12, R14 | A.5.15 Control de acceso · A.8.3 Restricción de acceso a la información |
+| R6, R9 | A.8.7 Protección contra malware · A.8.12 Prevención de fuga de datos |
+| R7 | A.8.20 Seguridad de redes · A.8.24 Uso de criptografía |
+| R10 | A.8.6 Gestión de la capacidad · A.8.16 Actividades de seguimiento |
+| R11 | A.8.2 Derechos de acceso privilegiado |
+| R13, R15 | A.5.15 Control de acceso · A.8.5 Autenticación segura |
+| R16 | A.8.22 Segregación de redes · A.8.5 Autenticación segura |
+
+y una sección *Controles de seguridad de la aplicación (ISO/IEC 27034)* que remita, por cada control, a su criterio de verificación (la prueba de la columna *Tests*).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add ruff.toml services/shared/pyproject.toml .github .gitleaks.toml docs/modelo-amenazas.md docs/trazabilidad-riesgos.md
+git commit -m "ci: cobertura mínima, complejidad, detección de secretos, plantilla de PR y modelo de amenazas"
+```
 
 ---
 
