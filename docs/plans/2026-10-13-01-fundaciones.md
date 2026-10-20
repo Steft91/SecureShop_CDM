@@ -2,13 +2,23 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Dejar listo todo lo que comparten los servicios: el contexto de Claude Code, la librería `shared` (secretos, cripto, contraseñas, límites, autenticación entre servicios, identidad, auditoría, base web, utilidades de prueba), los vectores cripto, la plantilla Docker, la generación de secretos, PostgreSQL con 5 BD y la CI.
+**Goal:** Dejar listo todo lo que comparten los servicios: el contexto de Claude Code, la librería `shared` (secretos, cripto, contraseñas, límites, autenticación entre servicios, identidad, auditoría, base web, caracteres invisibles, utilidades de prueba), los vectores cripto, la plantilla Docker, la generación de secretos, PostgreSQL con 5 BD y la CI.
 
 **Architecture:** `services/shared` es un paquete Python instalable (`chat-shared` → `import shared`). Cada servicio lo instala junto al suyo. La infraestructura (Dockerfile único con `ARG SERVICE`, `gen_secrets.py`, `init.sh`) se escribe una vez y cada servicio solo agrega su bloque al compose.
 
 **Tech Stack:** Python 3.13, FastAPI, SQLAlchemy 2 + asyncpg, Alembic, cryptography, argon2-cffi, httpx, pytest · Docker Compose · GitHub Actions.
 
-**Spec:** `docs/specs/2026-10-12-chat-seguro-design.md` (§4.3, §5, §7.6, §10, §11, §15, §16, §17).
+**Spec:** `docs/specs/2026-10-12-chat-seguro-design.md` (§4.3, §5, §7.6, §10, §11, §12.8, §15, §16, §17).
+
+> **Revisión 3 (2026-10-19, spec rev. 3: cuenta obligatoria y archivos de cualquier tipo).** Cambian:
+> - FND-1: reglas, skill de estegoanálisis, trazabilidad con R17, `CLAUDE.md` y `ruff.toml` (las pruebas pueden lanzar procesos);
+> - FND-4: `UserIdentity`, `require_user`, cabeceras `X-User-*`, `USER_COOKIE` y `user_headers`;
+> - FND-5: `embed_lsb` para muestras int16, más audio y MP3 sintéticos;
+> - FND-6: paquetes del sistema por servicio en el `Dockerfile` y el conteo correcto de secretos (26);
+> - FND-7: ffmpeg en la CI de `media`;
+> - FND-8, nueva: `shared.text`.
+>
+> Si ya ejecutaste esas tareas, aplica solo las diferencias y vuelve a correr `pytest services/shared`.
 
 ## Global Constraints
 
@@ -25,10 +35,11 @@ Las de `docs/plans/2026-10-13-00-indice.md` § *Global Constraints*. Resumen ope
 
 ## Review Focus
 
-Ninguno de los 5 casos del índice cae en este archivo, pero las utilidades que se crean aquí los soportan:
+Ninguno de los casos del índice cae en este archivo, pero las utilidades que se crean aquí los soportan:
 - `TokenBucket` para los límites del WS.
-- `natural_image`/`embed_lsb` para los tests de imágenes.
-- `session_headers` codifica alias con tildes.
+- `natural_image`/`embed_lsb` para los tests de imágenes; `natural_audio`/`wav_bytes`/`mp3_bytes` para los de audio, sin ffmpeg.
+- `session_headers` codifica alias con tildes y, como `user_headers`, lleva la cuenta (`X-User-Id`) que verificó el gateway.
+- `shared.text.clean` no toca los emojis compuestos (👨‍👩‍👧, ❤️): lo prueba `test_texto_normal_sin_hallazgos` (FND-8).
 
 ---
 
@@ -117,7 +128,7 @@ def self_test() -> int:
     assert check("/repo/services/auth/tests/test_x.py", 'password = "SuperSecreta-12345678"', root) is None
     assert check("/repo/docs/specs/a.md", "nunca ws://", root) is None
     assert check("/repo/deploy/llave.txt", "-----BEGIN PRIVATE KEY-----", root)
-    assert check("/repo/services/media/media_svc/formats.py", 'signature=b"\\x89PNG\\r\\n"', root) is None
+    assert check("/repo/services/media/media_svc/formats/png.py", 'SIGNATURE = b"\\x89PNG\\r\\n"', root) is None
     print("guard.py: autoprueba OK")
     return 0
 
@@ -215,7 +226,7 @@ build/
 node_modules/
 frontend/dist/
 
-# Calibración del estegoanálisis (imágenes personales)
+# Calibración del estegoanálisis (imágenes y grabaciones personales)
 services/media/tools/calibracion/
 ```
 
@@ -226,6 +237,10 @@ services/media/tools/calibracion/
 *.conf text eol=lf
 *.png binary
 *.jpg binary
+*.gif binary
+*.mp3 binary
+*.wav binary
+*.mp4 binary
 *.pdf binary
 *.docx binary
 ```
@@ -265,7 +280,7 @@ known-first-party = ["shared", "auth_svc", "rooms_svc", "chat_svc", "media_svc",
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.params.Depends", "fastapi.params.Query"]
 
 [lint.per-file-ignores]
-"**/tests/**" = ["S101", "S105", "S106", "S311"]
+"**/tests/**" = ["S101", "S105", "S106", "S311", "S603", "S607"]  # las pruebas lanzan ffmpeg, mkcert y herramientas
 "e2e/**" = ["S101", "S105", "S106", "S113", "S311", "S603", "S607"]
 "services/shared/shared/testing.py" = ["S101", "S105", "S106", "S311", "S603", "S608"]
 "services/*/tools/**" = ["S311"]
@@ -282,14 +297,15 @@ Fuente: spec §2–§15 y Tabla 3 de la Tarea 2. Si un cambio rompe una de estas
 
 1. **Transporte:** el cliente solo habla TLS 1.3 con el gateway. Nunca `ws://` ni `http://` hacia el navegador. El WS va por `wss://${location.host}/ws`.
 2. **Secretos:** solo se leen con `shared.secrets` desde `/run/secrets`. Nunca en el código, en variables de entorno ni en logs. Los valores de prueba viven en `tests/` o en `shared/testing.py` y lo dicen en un comentario.
-3. **Identidad:** el remitente, la sala y el admin salen de la identidad verificada (`require_admin`, `require_session`, `session_from_headers`). Nunca del cuerpo de la petición ni de la trama.
+3. **Identidad:** el remitente, la cuenta, la sala y el admin salen de la identidad verificada (`require_admin`, `require_user`, `require_session`, `session_from_headers`). Nunca del cuerpo de la petición ni de la trama: el alias en el chat es el nombre de la cuenta.
 4. **SQL:** siempre `text()` con parámetros nombrados. Prohibido interpolar datos con f-strings.
-5. **Contraseñas y claves de sala:** Argon2id (`shared.passwords`), con verificación contra un hash dummy cuando el usuario o la sala no existen.
+5. **Contraseñas y claves de sala:** Argon2id (`shared.passwords`), con verificación contra un hash dummy cuando el usuario, el admin o la sala no existen.
 6. **Errores:** el cliente recibe `{"error": "..."}` genérico; el detalle va a auditoría. Todo rechazo de seguridad se audita (`audit.emit(...)`).
 7. **Datos sensibles:** nunca se registran contraseñas, claves de sala, tokens, cuerpos de mensajes ni secretos TOTP.
 8. **Fallar cerrado:** si falta un secreto, el servicio no arranca. Si ClamAV o la BD no responden → 503. Si `audit` no responde en un evento obligatorio → 503 con rollback.
 9. **Cripto:** solo con `shared.crypto` (AES-256-GCM con AAD, ECDH P-256, HKDF-SHA256, ECDSA P-256). Nada de primitivas propias ni modos sin autenticación.
-10. **Archivos:** jamás se sirve un archivo sin firma HMAC válida y pertenencia a la sala. Todo archivo publicado pasó por la sanitización.
+10. **Archivos:** solo los 9 formatos de la lista blanca (spec §12.1), detectados por firma. Jamás se sirve un archivo sin firma HMAC válida y pertenencia a la sala, y todo archivo publicado pasó por la sanitización. El contenido activo (macros, JavaScript, adjuntos, OLE) se rechaza. ffmpeg y ffprobe solo se llaman desde `media_svc.ffmpeg` (demuxer forzado, `-protocol_whitelist file`, sin shell y con timeout).
+11. **Cuentas:** admins y usuarios nunca se mezclan (tablas, cookies y verificaciones distintas). Una sola sesión activa por cuenta y una sola sesión de sala por usuario, ambas atadas a la cookie de dispositivo (R13).
 ```
 
 `.claude/rules/microservices.md`:
@@ -297,8 +313,8 @@ Fuente: spec §2–§15 y Tabla 3 de la Tarea 2. Si un cambio rompe una de estas
 # Modelo de confianza entre microservicios (R16, spec §4.3)
 
 - Toda ruta de un servicio exige `X-Service-Token` válido (`ServiceTokenMiddleware`, que agrega `shared.web.create_base_app`). Solo `/health` está exento.
-- Rutas públicas (enrutadas por el gateway): `Depends(require_gateway)`, `Depends(require_admin)` o `Depends(require_session)`. Rutas internas: `/internal/...` con `Depends(allow("<llamador>", ...))`.
-- Las cabeceras `X-Admin-*` y `X-Session-*` **solo** se leen a través de `shared.identity`, que exige que el llamador sea `gateway`.
+- Rutas públicas (enrutadas por el gateway): `Depends(require_gateway)`, `Depends(require_admin)`, `Depends(require_user)` o `Depends(require_session)`. Rutas internas: `/internal/...` con `Depends(allow("<llamador>", ...))`.
+- Las cabeceras `X-Admin-*`, `X-User-*` y `X-Session-*` **solo** se leen a través de `shared.identity`, que exige que el llamador sea `gateway`.
 - Cada servicio se conecta **solo a su BD** con su rol `<svc>_app`. Nunca se consulta la BD de otro servicio: se pide por su API interna.
 - Las llamadas a otros servicios pasan por `ServiceClient` (`app.state.peers`), nunca por un `httpx` suelto.
 - Allowlist vigente: auth ← gateway · rooms ← gateway, chat · chat ← gateway, rooms, media · media ← gateway · audit ← gateway, auth, rooms, chat, media.
@@ -342,6 +358,7 @@ paths:
 - Sin estilos ni scripts inline (la CSP los bloquea). Estilos en `src/styles.css`.
 - Sin `React.StrictMode`: monta los efectos dos veces, abre y cierra el WebSocket, y eso termina la sesión.
 - HTTP solo por `src/lib/api.ts`; WebSocket solo por `src/lib/ws.ts`.
+- Archivos del chat (`src/pages/Attachment.tsx`): imágenes con `<img>`; audio y video desde una URL `blob:` tras un clic; documentos y texto solo como descarga. Nunca se renderiza un documento ni un TXT dentro de la página.
 ```
 
 `.claude/rules/testing.md`:
@@ -357,6 +374,8 @@ paths:
 - Un archivo `test_rNN_<tema>.py` por riesgo; el nombre de cada test describe el comportamiento, en español.
 - Los servicios vecinos se simulan con `shared.testing.Recorder`. Se verifica a quién se llamó, con qué token y con qué cuerpo.
 - WebSocket: `TestClient` dentro de `with` (un solo event loop) y la clase `Participant` del `conftest.py` de chat.
+- `media` necesita ffmpeg/ffprobe en el PATH para MP3 y MP4 (Windows: `winget install Gyan.FFmpeg`; macOS: `brew install ffmpeg`). Sin ffmpeg, esas pruebas se saltan (`needs_ffmpeg`); en la CI siempre corren.
+- Las muestras de cada formato se generan en las propias pruebas del formato (las que comparten varios archivos, en `services/media/tests/samples.py`): no se versionan binarios.
 - Escribe el test, míralo fallar y recién entonces implementa.
 - Al cerrar una tarea, actualiza `docs/trazabilidad-riesgos.md`.
 ```
@@ -366,13 +385,13 @@ paths:
 `.claude/commands/risk-check.md`:
 ```markdown
 ---
-description: Contrasta los cambios actuales con R1–R16 y actualiza la trazabilidad
+description: Contrasta los cambios actuales con R1–R17 y actualiza la trazabilidad
 ---
 Revisa los cambios de la rama actual contra los riesgos del proyecto.
 
 1. Obtén el diff: `git diff main...HEAD` y `git diff` (lo que no está commiteado).
 2. Lee `docs/trazabilidad-riesgos.md`, `.claude/rules/security.md` y `.claude/rules/microservices.md`.
-3. Por cada archivo cambiado, identifica qué riesgo (R1–R16) toca. La tabla del spec §16.4 dice qué servicio cubre cada uno.
+3. Por cada archivo cambiado, identifica qué riesgo (R1–R17) toca. La tabla del spec §16.4 dice qué servicio cubre cada uno.
 4. Señala:
    - controles que el cambio debilita (con `archivo:línea`);
    - controles nuevos sin test `test_rNN_*`;
@@ -385,20 +404,28 @@ Revisa los cambios de la rama actual contra los riesgos del proyecto.
 ```markdown
 ---
 name: stego-analysis
-description: Referencia del estegoanálisis del servicio media (chi² de Westfeld, análisis RS, entropía LSB, estructura PNG/JPEG, sanitización por aleatorización del LSB y calibración). Úsala al tocar services/media, ajustar umbrales o agregar un formato.
+description: Referencia del análisis de archivos de media (lista blanca de 9 formatos, estegoanálisis por formato —chi², RS y SPA para LSB; estructura de PNG, JPEG, GIF, WAV, MP3, MP4, PDF, DOCX y TXT—, contenido activo, sanitización CDR, ffmpeg endurecido y calibración). Úsala al tocar services/media, ajustar umbrales o agregar un formato.
 ---
-# Estegoanálisis en `media` (spec §12)
+# Análisis de archivos en `media` (spec §12)
 
-## Detectores (PNG, canales RGB)
-| Detector | Cálculo | Dispara si |
+## Lista blanca y contrato (`media_svc/formats/`)
+PNG, JPEG, GIF (imagen, 5 MB) · MP3, WAV (audio, 10 MB) · MP4 H.264/AAC (video, 25 MB) · PDF, DOCX (documento, 10 MB) · TXT UTF-8 (texto, 1 MB). Cada módulo expone `FORMAT = Format(mime, ext, category, detect, validate, analyze, sanitize)`; `validate`, `analyze` y `sanitize` reciben `(data, cfg)` y corren en el `ProcessPoolExecutor` con timeout. El veredicto es `{"format", "suspicious", "active", "reasons", "metrics"}`: `active` → rechazo, `suspicious` → cuarentena.
+
+## Detectores
+| Formato | Estadística | Estructura (dispara si…) |
 |---|---|---|
-| Chi² (Westfeld–Pfitzmann) | Por canal: pares `(2k, 2k+1)`, `E=(h2k+h2k+1)/2`, `χ²=Σ(h2k−E)²/E` (pares con `E>4`), `p = chi2.sf(χ², pares−1)`; prefijos 10/25/50/100 % (≥ 1000 píxeles) | `p ≥ STEGO_CHI2_P` (0.95) |
-| RS (Fridrich 2001) | Grupos 2×2 en zigzag, variación `Σ|xᵢ₊₁−xᵢ|`, máscara `[0,1,1,0]`, raíz de menor módulo de `2(d1+d0)x² + (d−0−d−1−d1−3d0)x + d0−d−0`, `p̂ = x/(x−½)` | `p̂ ≥ STEGO_RS_RATE` (0.08) |
-| Entropía LSB | Bloques 64×64; media y fracción de bloques con H ≥ 0.999 | Solo si `STEGO_ENTROPY_TRIGGER` está activo (por defecto, no) |
-| Estructura PNG | Bytes tras `IEND`, chunks de texto > 1 KB, chunks desconocidos | Cualquiera |
-| Estructura JPEG | Más de 16 bytes tras `FFD9`, APPn+COM > 64 KB | Cualquiera |
+| PNG | Chi² Westfeld–Pfitzmann por canal en prefijos 10/25/50/100 % (`p ≥ STEGO_CHI2_P`, 0.95) · RS de Fridrich (`p̂ ≥ STEGO_RS_RATE`, 0.08) · entropía LSB de apoyo | bytes tras `IEND`, chunks de texto > 1 KB, chunks desconocidos |
+| JPEG | — (*stretch*: chi² DCT) | > 16 bytes tras `FFD9`, APPn + COM > 64 KB |
+| GIF | fracción de colores casi idénticos en la paleta (solo con `STEGO_GIF_PALETTE_TRIGGER`) | datos tras el trailer, comentarios > 1 KB, extensiones de aplicación ajenas a NETSCAPE2.0/ANIMEXTS1.0, texto plano |
+| WAV | SPA (Dumitrescu–Wu–Wang en conjuntos de traza de Ker) por canal en prefijos 1 %…100 % (`p̂ ≥ STEGO_WAV_RATE`, 0.08); **se abstiene** si la traza 0 tiene < 20 000 pares o < 10 % | datos tras el RIFF, chunks fuera de la lista, LIST/id3/bext > 64 KB, JUNK/PAD con datos |
+| MP3 | — (*stretch*: MP3Stego vía `part2_3_length`) | bytes fuera de las tramas (salvo última trama truncada), bits private/copyright/original que cambian entre tramas, GEOB, PRIV > 1 KB, frames desconocidos, etiquetas > 64 KB; carátula → su analizador |
+| MP4 | — (el flujo de video no se analiza) | datos tras la última caja, cajas de nivel superior desconocidas, udta/meta/uuid > 64 KB, free/skip con > 1 KB distinto de cero, > 4 KB del `mdat` sin paquete (ffprobe), flujos extra |
+| PDF | — | > 2 bytes tras `%%EOF`, objetos huérfanos > 1 KB, Info + XMP > 64 KB · **activo:** JavaScript, acciones Launch/Submit/ImportData/GoToE/GoToR, adjuntos, XFA, multimedia |
+| DOCX | — | bytes fuera de las entradas del ZIP, comentario, campos extra desconocidos, partes sin relación, `w:vanish` con texto, metadatos personalizados (+ `w:docVars`) > 64 KB; imágenes → su analizador · **activo:** macros, OLE, ActiveX, `embeddings/`, relaciones externas que no son hipervínculos |
+| TXT | — | caracteres invisibles (Cf, salvo ZWJ en emojis y BOM inicial), selectores de variación encadenados, tabulaciones finales o > `STEGO_TXT_TRAILING` espacios finales, palabras con alfabetos mezclados |
 
-## Valores medidos en el prototipo (2026-10-13, imágenes sintéticas "fotográficas")
+## Valores medidos en los prototipos
+PNG (2026-10-13, imágenes sintéticas "fotográficas"):
 | Imagen | chi² p | RS p̂ |
 |---|---|---|
 | Limpia (3 semillas) | 0.33–0.38 | 0.002–0.013 |
@@ -409,20 +436,38 @@ description: Referencia del estegoanálisis del servicio media (chi² de Westfel
 | LSB aleatorio 100 % | 1.0 | 1.0 (¡0.0 en una semilla: RS degenera cerca del 100 %; lo cubre chi²!) |
 | Captura con colores planos | 0.0 | 0.0 |
 
-## Sanitización y por qué existe `clean_sha256`
-- PNG: XOR del plano LSB con bits aleatorios (destruye LSB-1) y recodificación sin chunks auxiliares; conserva el alfa.
-- JPEG: orientación EXIF aplicada y recodificación RGB q=90 sin metadatos.
-- Una imagen con el LSB aleatorizado es estadísticamente igual a una con LSB embebido al 100 % (chi² = 1.0). Por eso `media` guarda `clean_sha256` y no vuelve a analizar sus propias salidas. También se probaron como alternativas poner el LSB en cero (lo marca RS = 0.19), recodificar como JPEG (chi² 0.89–0.96) y redimensionar (chi² 0.997).
+WAV (2026-10-19, voz sintética de `shared.testing.natural_audio`, regla de abstención activa):
+| Señal | SPA p̂ |
+|---|---|
+| Limpia (20 casos de 10 s, mono y estéreo) | ≤ 0.040 |
+| LSB aleatorio 10 % | 0.081–0.140 |
+| LSB secuencial 10 % | mediana 0.39 (el prefijo lo concentra); mínimo 0.065 en audios de 5 s |
+| LSB 100 % | ~0.96, pero **degenera a 0.0** en algunos casos (como RS) |
+| Ruido fuerte o música a volumen alto | `None` (no concluyente): lo cubre la sanitización |
 
-## Calibración con fotos reales
-1. Copia ≥ 30 imágenes limpias (fotos de celular, capturas) en `services/media/tools/calibracion/` (gitignored).
+Chi² no sirve en audio de 16 bits: con 65 536 valores el histograma es demasiado suave y da p ≈ 1 en audio limpio.
+
+## Sanitización y por qué existe `clean_sha256`
+- PNG: XOR del plano LSB con bits aleatorios y recodificación sin chunks auxiliares; conserva el alfa. WAV: lo mismo con el LSB de cada muestra (−96 dB).
+- JPEG: orientación EXIF aplicada y recodificación RGB q=90; GIF: recuantización de cada cuadro. En ambos hay que vaciar `image.info` antes de guardar: `convert()` lo copia y Pillow volvería a escribir el comentario.
+- MP3: recodificación con LAME sin etiquetas. MP4: remultiplexado (`-c copy`) sin metadatos; el flujo de video no se toca (limitación declarada).
+- PDF: reescritura completa con pikepdf, sin Info ni XMP. DOCX: ZIP reconstruido con las partes alcanzables, sin texto oculto, `w:docVars` ni metadatos; sus imágenes se sanitizan con su formato. TXT: `shared.text.clean`.
+- Un archivo con el LSB aleatorizado es estadísticamente igual a uno con LSB embebido al 100 % (chi² = 1.0). Por eso `media` guarda `clean_sha256` y no vuelve a analizar sus propias salidas. En PNG también se probaron como alternativas poner el LSB en cero (lo marca RS = 0.19), recodificar como JPEG (chi² 0.89–0.96) y redimensionar (chi² 0.997).
+
+## ffmpeg
+Solo a través de `media_svc/ffmpeg.py`: demuxer forzado (`-f mp3`/`-f mp4`), `-protocol_whitelist file`, sin shell, `prlimit` (2 GiB, 120 s de CPU) en Linux y timeout. Nunca autodetección de formato.
+
+## Calibración con archivos reales
+1. Copia ≥ 30 imágenes limpias (fotos de celular, capturas) y ≥ 20 grabaciones WAV (voz y música) en `services/media/tools/calibracion/` (gitignored).
 2. `python services/media/tools/stego_lab.py calibrate services/media/tools/calibracion`
-3. Elige umbrales con FPR ≤ 5 % y TPR máxima para "secuencial 10 %". Configúralos con `STEGO_CHI2_P` / `STEGO_RS_RATE` en `deploy/docker-compose.yml` y anota la tabla en el informe.
+3. Elige umbrales con FPR ≤ 5 % y TPR máxima para "secuencial 10 %". Configúralos con `STEGO_CHI2_P` / `STEGO_RS_RATE` / `STEGO_WAV_RATE` en `deploy/docker-compose.yml` y anota la tabla en el informe.
+4. Herramientas reales para el informe: OpenStego (PNG), steghide (JPEG, WAV), MP3Stego, StegCloak (texto) y `copy /b` o `cat`. `stego_lab.py append` y `hide-text` reproducen los casos estructurales.
 
 ## Agregar un formato
-1. Firma + `pil_format` + `analyze` + `sanitize` en `media_svc/formats.py` (`FORMATS`).
-2. Módulo `media_svc/<formato>.py` con funciones de módulo (las ejecuta un `ProcessPoolExecutor`).
-3. Tests: uno limpio, uno con payload y uno de sanitización. Actualizar R6/R9 en la trazabilidad.
+1. Módulo `media_svc/formats/<formato>.py` con `detect`, `validate`, `analyze` y `sanitize` como funciones de módulo, y `FORMAT = Format(...)`.
+2. Su entrada en `FORMATS` (`media_svc/formats/__init__.py`), **antes de TXT**; si es una imagen, también en `IMAGES`.
+3. El tope de su categoría en `Settings.max_bytes_<categoría>` y el MIME en `frontend/src/lib/files.ts`.
+4. Tests: uno limpio, uno por cada hallazgo, uno inválido y uno de sanitización (la salida no debe tener hallazgos estructurales). Muestras generadas en el archivo de pruebas del formato (las compartidas, en `tests/samples.py`). Actualizar R6/R9 en la trazabilidad.
 ```
 
 `.claude/skills/crypto-protocol/SKILL.md`:
@@ -462,7 +507,7 @@ description: Protocolo criptográfico del chat (hello ECDSA firmado, ECDH P-256,
 ```markdown
 ---
 name: security-auditor
-description: Revisor de seguridad de solo lectura. Úsalo antes de cerrar una tarea o un PR para contrastar los cambios con los riesgos R1–R16, OWASP Top 10 y el modelo de confianza entre microservicios.
+description: Revisor de seguridad de solo lectura. Úsalo antes de cerrar una tarea o un PR para contrastar los cambios con los riesgos R1–R17, OWASP Top 10 y el modelo de confianza entre microservicios.
 tools: Read, Grep, Glob, Bash
 ---
 Eres el auditor de seguridad del proyecto "Salas de Chat Seguras" (curso Software Seguro). Solo lees; nunca editas archivos.
@@ -484,7 +529,7 @@ Procedimiento:
    - ¿Rompe el protocolo de `shared/crypto.py`?
 3. Verifica que cada control tocado siga teniendo su `test_rNN_*`; ejecuta `pytest services/<svc> -q` si hace falta.
 
-Formato de salida: una lista ordenada por severidad (Crítica, Alta, Media, Baja). Cada ítem lleva `archivo:línea`, riesgo afectado (R1–R16 u OWASP A0x), qué falla y la corrección concreta. Si no hay hallazgos, dilo explícitamente e indica qué revisaste.
+Formato de salida: una lista ordenada por severidad (Crítica, Alta, Media, Baja). Cada ítem lleva `archivo:línea`, riesgo afectado (R1–R17 u OWASP A0x), qué falla y la corrección concreta. Si no hay hallazgos, dilo explícitamente e indica qué revisaste.
 ```
 
 - [ ] **Step 7: Tabla de trazabilidad inicial**
@@ -493,7 +538,7 @@ Formato de salida: una lista ordenada por severidad (Crítica, Alta, Media, Baja
 ```markdown
 # Trazabilidad de riesgos → controles → pruebas
 
-Fuente de riesgos: Tarea 2 (Tablas 1–4) + R16 (spec §16.3). Cada tarea del plan actualiza su fila. "Implementado" exige un test en verde.
+Fuente de riesgos: Tarea 2 (Tablas 1–4) + R16 y R17 (spec §16.3). Cada tarea del plan actualiza su fila. "Implementado" exige un test en verde.
 
 | R | Riesgo | Control (Tabla 3 / spec) | Servicio / archivos | Tests | Estado |
 |---|---|---|---|---|---|
@@ -502,17 +547,18 @@ Fuente de riesgos: Tarea 2 (Tablas 1–4) + R16 (spec §16.3). Cada tarea del pl
 | R3 | Manipulación de registros de auditoría | Servicio audit, rol solo INSERT/SELECT, cadena SHA-256 | audit | — | Pendiente |
 | R4 | Fuerza bruta contra el admin | Bloqueo + retraso progresivo + TOTP | auth | — | Pendiente |
 | R5 | Endpoints admin sin verificación de rol | `auth_request` + `require_admin` en cada servicio | gateway, rooms, media, audit | — | Pendiente |
-| R6 | Imágenes con esteganografía | chi²/RS/estructura + cuarentena + sanitización | media | — | Pendiente |
+| R6 | Archivos con esteganografía (9 formatos) | chi²/RS (PNG), SPA (WAV), estructura por formato, caracteres invisibles + cuarentena + sanitización | media, shared, chat | — | Pendiente |
 | R7 | WebSocket sin cifrar | TLS 1.3, `wss://`, Origin, hello firmado + AES-GCM | gateway, chat | — | Pendiente |
-| R8 | Fuerza bruta de claves de sala | Rate limit IP/dispositivo/sala + política de clave | rooms | — | Pendiente |
-| R9 | Archivos maliciosos | Magic bytes, Pillow, tope de píxeles, ClamAV | media | — | Pendiente |
+| R8 | Fuerza bruta de claves de sala | Rate limit usuario/IP/dispositivo/sala + política de clave | rooms | — | Pendiente |
+| R9 | Archivos maliciosos | Lista blanca por firma, topes por categoría, validación por formato (bombas de píxeles y ZIP), rechazo de contenido activo, ClamAV | media | — | Pendiente |
 | R10 | Agotamiento de conexiones | Rate limit Nginx + token bucket + tamaño de trama | gateway, chat | — | Pendiente |
 | R11 | Credenciales de BD con privilegios excesivos | Rol `<svc>_app` sin DDL, una BD por servicio | todos | — | Pendiente |
 | R12 | Archivos accesibles sin autorización | URL firmada + pertenencia a la sala | media | — | Pendiente |
-| R13 | Sesiones simultáneas de un alias | Índice único parcial + cookie de dispositivo | rooms | — | Pendiente |
+| R13 | Sesiones simultáneas de una cuenta | Índices únicos parciales (sesión de usuario y de sala) + cookie de dispositivo + inactividad | auth, rooms | — | Pendiente |
 | R14 | Mensajes inyectados en otra sala | Identidad desde la sesión, AAD, anti-replay | chat | — | Pendiente |
 | R15 | Cupo superado por concurrencia | `UPDATE … WHERE current < max` + `CHECK` | rooms | — | Pendiente |
 | R16 | Suplantación entre microservicios | Token por servicio con hash, allowlist, gateway sobrescribe identidad | shared, todos | — | Pendiente |
+| R17 | Ataques automatizados a contraseñas de usuarios | Argon2id, bloqueo por cuenta e IP con retraso, política de contraseña, rate limit de registro, error genérico | auth | — | Pendiente |
 
 ## Verificación manual (evidencia para el informe)
 | Prueba | Comando | Resultado esperado | Fecha / resultado |
@@ -528,7 +574,7 @@ Fuente de riesgos: Tarea 2 (Tablas 1–4) + R16 (spec §16.3). Cada tarea del pl
 ````markdown
 # Salas de Chat Seguras — contexto del proyecto
 
-Proyecto integrador de **Software Seguro**: salas de chat con **microservicios**. El objetivo es demostrar con pruebas los tratamientos de riesgo del SGSI (Tarea 2) más R16 (suplantación entre microservicios). Equipo: Manangón, Díaz, Cedeño. Plazo: 13 oct – 2 nov 2026.
+Proyecto integrador de **Software Seguro**: salas de chat con **microservicios**. El objetivo es demostrar con pruebas los tratamientos de riesgo del SGSI (Tarea 2) más R16 (suplantación entre microservicios) y R17 (ataques a contraseñas de usuarios). Equipo: Manangón, Díaz, Cedeño. Plazo: 13 oct – 2 nov 2026.
 
 - **Spec (fuente de verdad):** `docs/specs/2026-10-12-chat-seguro-design.md`
 - **Plan:** `docs/plans/2026-10-13-00-indice.md` (+ un archivo por subsistema)
@@ -539,17 +585,17 @@ Proyecto integrador de **Software Seguro**: salas de chat con **microservicios**
 | Pieza | Qué hace | BD |
 |---|---|---|
 | gateway (Nginx) | TLS 1.3, CSP/HSTS, rate limit, `auth_request`, SPA, `/chat-key.json` | — |
-| auth | Admin con Argon2id + TOTP; `GET /internal/verify-admin` | auth |
-| rooms | Salas, ingreso con alias, cupo atómico, dispositivo único, sesiones; `GET /internal/verify-session` | rooms |
-| chat | WebSocket: hello firmado (ECDSA) + ECDH → AES-256-GCM por conexión; mensajes cifrados en reposo | chat |
-| media | Imágenes: firma → Pillow → ClamAV → chi²/RS → cuarentena o sanitización; URL firmadas | media |
+| auth | Admin con Argon2id + TOTP; cuentas de usuario con sesión única por dispositivo; `verify-admin` y `verify-user` | auth |
+| rooms | Salas, ingreso con cuenta, cupo atómico, una sesión de sala por usuario, sesiones; `GET /internal/verify-session` | rooms |
+| chat | WebSocket: hello firmado (ECDSA) + ECDH → AES-256-GCM por conexión; limpia caracteres invisibles; mensajes cifrados en reposo | chat |
+| media | 9 formatos (imagen, audio, video, documento, texto): firma → validación → ClamAV → estegoanálisis por formato → cuarentena, rechazo o sanitización; URL firmadas | media |
 | audit | Log encadenado con SHA-256; su rol solo hace INSERT/SELECT | audit |
 
-Confianza: el gateway sobrescribe `X-Admin-*` y `X-Session-*`. Cada servicio exige `X-Service-Token` (guarda solo hashes) y acepta esas cabeceras únicamente si el llamador es `gateway`. Detalle en `.claude/rules/microservices.md`.
+Confianza: el gateway sobrescribe `X-Admin-*`, `X-User-*` y `X-Session-*`. Cada servicio exige `X-Service-Token` (guarda solo hashes) y acepta esas cabeceras únicamente si el llamador es `gateway`. Detalle en `.claude/rules/microservices.md`.
 
 ## Mapa del repo
 ```
-services/shared   librería común (secrets, crypto, passwords, ratelimit, service_auth, identity, audit_client, web, testing)
+services/shared   librería común (secrets, crypto, passwords, ratelimit, service_auth, identity, audit_client, web, text, testing)
 services/<svc>    <svc>_svc/ (código) · migrations/ · tests/ · pyproject.toml · requirements.lock
 services/Dockerfile   plantilla única (ARG SERVICE) · services/lock.sh
 gateway/          nginx.conf · snippets/ · Dockerfile (compila la SPA)
@@ -567,7 +613,7 @@ pip install -e "services/shared[dev]" -e services/audit -e services/auth -e serv
 | Tarea | Comando |
 |---|---|
 | BD de pruebas | `docker compose -f deploy/docker-compose.test.yml up -d` |
-| Tests de un servicio | `pytest services/<svc>` (ClamAV real: levantar el perfil `clamav` y `pytest services/media -m clamav`) |
+| Tests de un servicio | `pytest services/<svc>` (MP3/MP4 de `media` necesitan ffmpeg en el PATH; ClamAV real: levantar el perfil `clamav` y `pytest services/media -m clamav`) |
 | Lint | `ruff check services deploy e2e` y `ruff format --check services deploy e2e` |
 | Secretos locales | `python deploy/gen_secrets.py` |
 | Certificados locales | `mkcert -install` y `mkcert -cert-file deploy/certs/fullchain.pem -key-file deploy/certs/privkey.pem localhost 127.0.0.1 ::1` |
@@ -1021,7 +1067,7 @@ def decrypt_frame(
     return seq, payload
 
 
-# --- URLs firmadas (spec §9.6) --------------------------------------------------
+# --- URLs firmadas (spec §9.7) --------------------------------------------------
 def sign_url(key: bytes, file_id: str, session_id: str, exp: int) -> str:
     message = f"{file_id}|{session_id}|{exp}".encode()
     return b64e(hmac.new(key, message, hashlib.sha256).digest())
@@ -1441,7 +1487,7 @@ Expected: FAIL — `ModuleNotFoundError`
 - [ ] **Step 2: Implementar `shared/passwords.py`**
 
 ```python
-"""Argon2id para contraseñas de admin y claves de sala (riesgos 1 y 4, spec §11.1).
+"""Argon2id para contraseñas (admins y usuarios) y claves de sala (riesgos 1, 4 y 17, spec §11.1).
 
 Perfil RFC 9106 de baja memoria (t=3, m=64 MiB, p=4), el predeterminado de argon2-cffi.
 """
@@ -1453,8 +1499,8 @@ from argon2.exceptions import InvalidHashError, VerificationError
 from starlette.concurrency import run_in_threadpool
 
 _hasher = PasswordHasher()
-# ponytail: tope global de 4 cálculos simultáneos (4 × 64 MiB) para que un ataque de ingresos
-# masivos no agote la RAM; súbelo si el host tiene memoria de sobra.
+# ponytail: tope global de 4 cálculos simultáneos (4 × 64 MiB) para que un ataque de registros,
+# logins o ingresos masivos no agote la RAM; súbelo si el host tiene memoria de sobra.
 _SLOTS = threading.BoundedSemaphore(4)
 _DUMMY_HASH = _hasher.hash("dummy-password-timing-only")
 
@@ -1498,7 +1544,7 @@ def strong_enough(secret: str, *, forbid: str = "") -> bool:
 - [ ] **Step 3: Implementar `shared/ratelimit.py`**
 
 ```python
-"""Límites de intentos fallidos (spec §9.1–§9.2) y token bucket del WebSocket (spec §9.4)."""
+"""Límites de intentos fallidos (spec §9.1–§9.3) y token bucket del WebSocket (spec §9.5)."""
 
 import time
 from collections.abc import Callable
@@ -1573,13 +1619,13 @@ git commit -m "feat(shared): Argon2id con tope de concurrencia, política de cla
 - Consumes: `shared.crypto.sha256`, `shared.crypto.b64e` (FND-2).
 - Produces:
   - `shared.service_auth`: `TOKEN_HEADER = "X-Service-Token"`; `ServiceAuth(name, token, callers)` con `from_secrets(name, *, needs_token)` e `identify(token)->str|None`; `ServiceTokenMiddleware`; `allow(*callers)` (dependencia que devuelve el llamador); `ServiceClient(auth, urls, transport=None)` con `post(service, path, *, json, timeout=3.0)->httpx.Response`.
-  - `shared.identity`: `AdminIdentity(admin_id, username)`, `SessionIdentity(session_id, room_id, alias, mode)`, `client_ip(conn)`, `encode_alias(alias)`, `require_gateway`, `require_admin`, `require_session`, `session_from_headers(conn)`.
+  - `shared.identity`: `AdminIdentity(admin_id, username)`, `UserIdentity(user_id, username)`, `SessionIdentity(session_id, room_id, alias, mode, user_id)`, `client_ip(conn)`, `encode_alias(alias)`, `require_gateway`, `require_admin`, `require_user`, `require_session`, `session_from_headers(conn)`.
   - `shared.audit_client`: `AuditUnavailable`, `AuditClient(ServiceClient).emit(severity, action, *, actor, target=None, ip=None, details=None, required=False)`.
-  - `shared.web`: `ADMIN_COOKIE`, `ROOM_COOKIE`, `DEVICE_COOKIE`, `set_cookie(response, name, value, max_age=None)`, `clear_cookie(response, name)`, `create_base_app(*, title, settings, engine, service_auth, audit, lifespan=None)->FastAPI`. La app expone `app.state.settings/engine/service_auth/audit` y `request.state.caller`.
+  - `shared.web`: `ADMIN_COOKIE`, `USER_COOKIE`, `ROOM_COOKIE`, `DEVICE_COOKIE`, `set_cookie(response, name, value, max_age=None)`, `clear_cookie(response, name)`, `create_base_app(*, title, settings, engine, service_auth, audit, lifespan=None)->FastAPI`. La app expone `app.state.settings/engine/service_auth/audit` y `request.state.caller`.
   - `shared.testing`:
-    - constantes `ORIGIN`, `TOKENS`, `ROLE_PASSWORD`;
+    - constantes `ORIGIN`, `TOKENS`, `ROLE_PASSWORD`, `USER_ID`;
     - `service_auth(name, callers)`;
-    - cabeceras: `service_headers(name)`, `gateway_headers()`, `admin_headers(admin_id=..., username="root")`, `session_headers(session_id, room_id, alias, mode="both")`, `cookie_header(cookies)->dict`;
+    - cabeceras: `service_headers(name)`, `gateway_headers()`, `admin_headers(admin_id=..., username="root")`, `user_headers(user_id=USER_ID, username="ana")`, `session_headers(session_id, room_id, alias, mode="both", *, user_id=USER_ID)`, `cookie_header(cookies)->dict`;
     - `Recorder(routes=None)` con `.transport`, `.calls`, `.events(action=None)` y `.to(prefix)`.
 
 - [ ] **Step 1: Utilidades de prueba (parte 1)**
@@ -1604,6 +1650,7 @@ from shared.service_auth import TOKEN_HEADER, ServiceAuth
 ORIGIN = "https://testserver"
 ROLE_PASSWORD = "solo-pruebas"
 TOKENS = {name: f"token-de-prueba-{name}" for name in ("gateway", "auth", "rooms", "chat", "media")}
+USER_ID = "00000000-0000-4000-8000-0000000000aa"  # cuenta de prueba por defecto
 
 
 def service_auth(name: str, callers: tuple[str, ...]) -> ServiceAuth:
@@ -1625,11 +1672,19 @@ def admin_headers(admin_id: str = "00000000-0000-4000-8000-0000000000ad", userna
     return {**gateway_headers(), "X-Admin-Id": admin_id, "X-Admin-User": username}
 
 
-def session_headers(session_id: str, room_id: str, alias: str, mode: str = "both") -> dict:
+def user_headers(user_id: str = USER_ID, username: str = "ana") -> dict:
+    """La cuenta que verify-user de auth le entrega al gateway (spec §9.2)."""
+    return {**gateway_headers(), "X-User-Id": user_id, "X-User-Name": username}
+
+
+def session_headers(
+    session_id: str, room_id: str, alias: str, mode: str = "both", *, user_id: str = USER_ID
+) -> dict:
     return {
         **gateway_headers(),
         "X-Session-Id": session_id,
         "X-Room-Id": room_id,
+        "X-User-Id": user_id,
         "X-Alias": encode_alias(alias),
         "X-Room-Mode": mode,
     }
@@ -1708,7 +1763,15 @@ from starlette.websockets import WebSocketDisconnect
 
 from shared import testing
 from shared.audit_client import AuditClient
-from shared.identity import AdminIdentity, SessionIdentity, require_admin, require_gateway, require_session
+from shared.identity import (
+    AdminIdentity,
+    SessionIdentity,
+    UserIdentity,
+    require_admin,
+    require_gateway,
+    require_session,
+    require_user,
+)
 from shared.service_auth import ServiceClient, allow
 from shared.web import create_base_app
 
@@ -1739,6 +1802,10 @@ def build_app(recorder: testing.Recorder):
 
     @router.get("/api/sesion")
     async def sesion(who: SessionIdentity = Depends(require_session)) -> dict:
+        return asdict(who)
+
+    @router.get("/api/usuario")
+    async def usuario(who: UserIdentity = Depends(require_user)) -> dict:
         return asdict(who)
 
     @router.post("/internal/solo-chat", dependencies=[Depends(allow("chat"))])
@@ -1821,7 +1888,20 @@ def test_alias_con_tildes_viaja_codificado(client):
         "room_id": "r1",
         "alias": "José Ñúñez",
         "mode": "text",
+        "user_id": testing.USER_ID,
     }
+
+
+def test_identidad_de_usuario_solo_desde_el_gateway(client):
+    assert client.get("/api/usuario", headers=testing.gateway_headers()).status_code == 401
+    assert client.get("/api/usuario", headers=testing.user_headers()).json() == {
+        "user_id": testing.USER_ID,
+        "username": "ana",
+    }
+    impostor = {**testing.service_headers("chat"), "X-User-Id": "x", "X-User-Name": "ana"}
+    assert client.get("/api/usuario", headers=impostor).status_code == 403
+    sin_cuenta = {k: v for k, v in testing.session_headers("s1", "r1", "ana").items() if k != "X-User-Id"}
+    assert client.get("/api/sesion", headers=sin_cuenta).status_code == 401
 
 
 def test_errores_genericos(client):
@@ -1874,11 +1954,18 @@ class AdminIdentity:
 
 
 @dataclass(frozen=True)
+class UserIdentity:
+    user_id: str
+    username: str
+
+
+@dataclass(frozen=True)
 class SessionIdentity:
     session_id: str
     room_id: str
-    alias: str
+    alias: str  # el nombre de la cuenta (spec §9.3)
     mode: str
+    user_id: str
 
 
 def client_ip(conn: HTTPConnection) -> str | None:
@@ -1916,6 +2003,15 @@ async def require_admin(request: Request) -> AdminIdentity:
     return AdminIdentity(admin_id, username)
 
 
+async def require_user(request: Request) -> UserIdentity:
+    """Cuenta de usuario verificada por auth (verify-user) y propagada por el gateway (spec §9.2)."""
+    await require_gateway(request)
+    user_id, username = request.headers.get("x-user-id"), request.headers.get("x-user-name")
+    if not user_id or not username:
+        raise HTTPException(401, "no autenticado")
+    return UserIdentity(user_id, username)
+
+
 def session_from_headers(conn: HTTPConnection) -> SessionIdentity | None:
     headers = conn.headers
     values = (
@@ -1923,11 +2019,12 @@ def session_from_headers(conn: HTTPConnection) -> SessionIdentity | None:
         headers.get("x-room-id"),
         headers.get("x-alias"),
         headers.get("x-room-mode"),
+        headers.get("x-user-id"),
     )
     if not all(values):
         return None
-    session_id, room_id, alias, mode = values
-    return SessionIdentity(session_id, room_id, unquote(alias), mode)
+    session_id, room_id, alias, mode, user_id = values
+    return SessionIdentity(session_id, room_id, unquote(alias), mode, user_id)
 
 
 async def require_session(request: Request) -> SessionIdentity:
@@ -2123,6 +2220,7 @@ from shared.service_auth import ServiceTokenMiddleware
 log = logging.getLogger("web")
 
 ADMIN_COOKIE = "__Host-admin"
+USER_COOKIE = "__Host-user"
 ROOM_COOKIE = "__Host-room"
 DEVICE_COOKIE = "__Host-device"
 
@@ -2177,7 +2275,7 @@ def create_base_app(*, title: str, settings, engine, service_auth, audit, lifesp
 ```
 
 Run: `pytest services/shared -q`
-Expected: PASS (incluye los 11 tests de `test_r16_service_auth.py`)
+Expected: PASS (incluye los 12 tests de `test_r16_service_auth.py`)
 
 - [ ] **Step 6: Trazabilidad y commit**
 
@@ -2193,10 +2291,10 @@ git commit -m "feat(shared): token por servicio, identidad del gateway, auditor�
 
 ---
 
-### Task FND-5: Utilidades de BD para pruebas, migraciones comunes e imágenes sintéticas
+### Task FND-5: Utilidades de BD para pruebas, migraciones comunes e imágenes y audio sintéticos
 
 **Files:**
-- Modify: `services/shared/shared/testing.py` (agregar lo de BD e imágenes)
+- Modify: `services/shared/shared/testing.py` (agregar lo de BD, imágenes y audio)
 - Create: `services/shared/shared/migrations.py`
 - Create: `deploy/docker-compose.test.yml`
 - Test: `services/shared/tests/test_testing.py`
@@ -2207,7 +2305,8 @@ git commit -m "feat(shared): token por servicio, identidad del gateway, auditor�
   - `shared.migrations.run(service)`.
   - `shared.testing`:
     - BD: `PG_HOST`, `PG_PORT`, `FOREIGN_DB`, `dsn(user, password, database, driver="postgresql+asyncpg")`, `db_urls(service)->(owner_url, app_url)`, `prepare_database(service, service_dir)`, `run(coro)`, `sql(url, statement, **params)->list[dict]`, `with_conn(url, fn, *args)`, `truncate_all(owner_url)`, `assert_least_privilege(app_url, table)`;
-    - imágenes: `natural_image(seed=0, size=256)`, `embed_lsb(pixels, rate, mode="seq", seed=1)`, `png_bytes(pixels, **kw)`, `jpeg_bytes(pixels, quality=90, **kw)`.
+    - imágenes: `natural_image(seed=0, size=256)`, `embed_lsb(values, rate, mode="seq", seed=1)` (píxeles uint8 o muestras int16), `png_bytes(pixels, **kw)`, `jpeg_bytes(pixels, quality=90, **kw)`;
+    - audio (sin ffmpeg): `natural_audio(seed=0, seconds=10.0, rate=44100, channels=1)` (int16, forma `(n, canales)`), `wav_bytes(samples, rate=44100)`, `mp3_bytes(frames=40)` (silencio MPEG-1 Layer III armado a mano).
 
 - [ ] **Step 1: Postgres de pruebas**
 
@@ -2252,6 +2351,19 @@ def test_imagenes_sinteticas():
     assert (stego != pixels).any()
     assert testing.png_bytes(pixels).startswith(b"\x89PNG")
     assert testing.jpeg_bytes(pixels).startswith(b"\xff\xd8\xff")
+
+
+def test_audio_sintetico():
+    samples = testing.natural_audio(0, seconds=1, channels=2)
+    assert samples.shape == (44100, 2)
+    assert samples.dtype.name == "int16"
+    stego = testing.embed_lsb(samples, 0.5, "random")
+    assert ((stego >> 1) == (samples >> 1)).all()  # en int16 tampoco se tocan los bits altos
+    assert (stego != samples).any()
+    wav = testing.wav_bytes(samples)
+    assert wav[:4] == b"RIFF" and wav[8:12] == b"WAVE"
+    assert len(wav) == 44 + samples.size * 2
+    assert len(testing.mp3_bytes(3)) == 3 * 417 and testing.mp3_bytes(1)[:4] == b"\xff\xfb\x90\xc0"
 ```
 
 Run: `pytest services/shared/tests/test_testing.py -q`
@@ -2391,7 +2503,7 @@ def assert_least_privilege(app_url: str, table: str) -> None:
         raise AssertionError("el rol de la app pudo conectarse a otra base de datos")
 
 
-# --- Imágenes sintéticas (requieren numpy y Pillow, extra [dev]) --------------------
+# --- Imágenes y audio sintéticos (requieren numpy y Pillow, extra [dev]) ------------
 def natural_image(seed: int = 0, size: int = 256):
     """Imagen "fotográfica": textura suave + ruido, pasada por JPEG q=85 como una foto de celular.
 
@@ -2410,17 +2522,18 @@ def natural_image(seed: int = 0, size: int = 256):
     return np.asarray(Image.open(io.BytesIO(buffer.getvalue())).convert("RGB")).copy()
 
 
-def embed_lsb(pixels, rate: float, mode: str = "seq", seed: int = 1):
-    """LSB replacement con bits aleatorios (simula un mensaje cifrado). mode: 'seq' | 'random'."""
+def embed_lsb(values, rate: float, mode: str = "seq", seed: int = 1):
+    """LSB replacement con bits aleatorios (simula un mensaje cifrado) en píxeles uint8 o muestras
+    int16. mode: 'seq' | 'random'."""
     import numpy as np
 
-    flat = pixels.reshape(-1).copy()
+    flat = values.reshape(-1).copy()
     count = int(len(flat) * rate)
     rng = np.random.default_rng(seed)
-    bits = rng.integers(0, 2, count, dtype=np.uint8)
+    bits = rng.integers(0, 2, count, dtype=np.uint8).astype(flat.dtype)
     index = np.arange(count) if mode == "seq" else rng.choice(len(flat), count, replace=False)
-    flat[index] = (flat[index] & 0xFE) | bits
-    return flat.reshape(pixels.shape)
+    flat[index] = flat[index] - (flat[index] & 1) + bits  # sin máscara de 8 bits: vale para int16
+    return flat.reshape(values.shape)
 
 
 def png_bytes(pixels, **save_kwargs) -> bytes:
@@ -2437,6 +2550,50 @@ def jpeg_bytes(pixels, quality: int = 90, **save_kwargs) -> bytes:
     buffer = io.BytesIO()
     Image.fromarray(pixels).save(buffer, format="JPEG", quality=quality, **save_kwargs)
     return buffer.getvalue()
+
+
+def natural_audio(seed: int = 0, seconds: float = 10.0, rate: int = 44100, channels: int = 1):
+    """Voz sintética de 16 bits: tonos con sílabas y pausas + ruido de fondo, a nivel de grabación.
+
+    Es suave a escala del LSB, así que SPA resulta concluyente. Prototipo 2026-10-19: limpio
+    p̂ ≤ 0.04; LSB al 10 % (secuencial o aleatorio) p̂ ≥ 0.10 con 10 s de audio.
+    """
+    import numpy as np
+
+    rng = np.random.default_rng(seed)
+    t = np.arange(int(seconds * rate)) / rate
+    columns = []
+    for channel in range(channels):
+        signal = np.zeros_like(t)
+        for frequency, amplitude in ((150, 0.5), (300, 0.3), (450, 0.15), (900, 0.05)):
+            signal += amplitude * np.sin(
+                2 * np.pi * (frequency + 3 * channel) * t + rng.uniform(0, 2 * np.pi)
+            )
+        syllables = np.clip(np.sin(2 * np.pi * 1.3 * t + rng.uniform(0, 6)), 0, None) ** 2
+        columns.append(signal * syllables + rng.normal(0, 0.002, t.shape))
+    return np.clip(np.stack(columns, axis=-1) * 1500, -32768, 32767).round().astype(np.int16)
+
+
+def wav_bytes(samples, rate: int = 44100) -> bytes:
+    """WAV PCM de 16 bits con solo los chunks fmt y data."""
+    import wave
+
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as out:
+        out.setnchannels(samples.shape[1] if samples.ndim == 2 else 1)
+        out.setsampwidth(2)
+        out.setframerate(rate)
+        out.writeframes(samples.astype("<i2").tobytes())
+    return buffer.getvalue()
+
+
+def mp3_bytes(frames: int = 40) -> bytes:
+    """MP3 de silencio sin ffmpeg: tramas MPEG-1 Layer III mono de 128 kbps a 44.1 kHz.
+
+    Cabecera FF FB 90 C0 (sin CRC ni relleno, mono) + información lateral en cero
+    (part2_3_length = 0: ningún coeficiente) → tramas de 417 bytes que decodifican a silencio.
+    """
+    return (b"\xff\xfb\x90\xc0" + bytes(413)) * frames
 ```
 
 - [ ] **Step 4: Punto de entrada común de Alembic**
@@ -2481,7 +2638,7 @@ Expected: PASS
 
 ```bash
 git add services/shared deploy/docker-compose.test.yml
-git commit -m "feat(shared): utilidades de BD de prueba, migraciones comunes e imágenes sintéticas"
+git commit -m "feat(shared): utilidades de BD de prueba, migraciones comunes e imágenes y audio sintéticos"
 ```
 
 ---
@@ -2496,9 +2653,9 @@ git commit -m "feat(shared): utilidades de BD de prueba, migraciones comunes e i
 **Interfaces:**
 - Consumes: `shared.crypto` (para el test).
 - Produces:
-  - `deploy/secrets/*`: los 27 archivos de la spec §11.1, entre ellos `gateway_token.conf`.
+  - `deploy/secrets/*`: los 26 archivos de la spec §11.1, entre ellos `gateway_token.conf`.
   - `deploy/public/chat-key.json` con `{"kid", "pub"}`.
-  - Imagen por servicio: `docker build --build-arg SERVICE=<svc> -f services/Dockerfile .`.
+  - Imagen por servicio: `docker build --build-arg SERVICE=<svc> -f services/Dockerfile .` (`media` suma `--build-arg APT_PACKAGES=ffmpeg`).
   - Compose con `db`, las redes y las anclas `x-python-service` / `x-migrate`, que las tareas de cada servicio reutilizan.
 
 - [ ] **Step 1: Test del generador de secretos (falla)**
@@ -2523,7 +2680,7 @@ def gen(root: Path, *args: str) -> None:
 def test_genera_todo_y_no_sobrescribe(tmp_path):
     gen(tmp_path)
     secrets = tmp_path / "secrets"
-    assert len(list(secrets.iterdir())) == 27
+    assert len(list(secrets.iterdir())) == 26
     token = (secrets / "svc_token_gateway").read_text().strip()
     assert (secrets / "svc_hash_gateway").read_text() == hashlib.sha256(token.encode()).hexdigest()
     assert token in (secrets / "gateway_token.conf").read_text()
@@ -2666,8 +2823,14 @@ Expected: PASS
 # Plantilla única de los servicios Python (spec §4.2). Uso: --build-arg SERVICE=<svc>
 FROM python:3.13-slim
 ARG SERVICE
+# Paquetes del sistema que solo necesita un servicio (media: ffmpeg para MP3 y MP4, spec §12).
+ARG APT_PACKAGES=""
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 SERVICE=${SERVICE}
-RUN useradd --uid 10001 --no-create-home app \
+RUN if [ -n "$APT_PACKAGES" ]; then \
+      apt-get update && apt-get install -y --no-install-recommends $APT_PACKAGES \
+      && rm -rf /var/lib/apt/lists/*; \
+    fi \
+ && useradd --uid 10001 --no-create-home app \
  && mkdir -p /data/media /data/quarantine \
  && chown -R app:app /data
 WORKDIR /srv
@@ -2874,6 +3037,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      - name: ffmpeg (solo media)
+        if: matrix.svc == 'media'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Instalar
         run: |
           python -m pip install --upgrade pip
@@ -2904,6 +3070,211 @@ git commit -m "ci: lint, pruebas, bandit y pip-audit de los servicios"
 git push -u origin feat/arquitectura-chat-seguro
 ```
 Expected: el workflow `ci` pasa en GitHub (job `services (shared)`).
+
+---
+
+### Task FND-8: Caracteres invisibles y otros canales ocultos en texto (`shared.text`, R6)
+
+**Files:**
+- Create: `services/shared/shared/text.py`
+- Test: `services/shared/tests/test_r06_texto.py`
+
+**Interfaces:**
+- Consumes: nada (solo `unicodedata` y `re` de la stdlib).
+- Produces: `shared.text.scan(text) -> dict[str, int]` (`invisible`, `extra_selectors`, `trailing_tabs`, `trailing_spaces`, `mixed_script_words`) y `shared.text.clean(text) -> (texto_limpio, quitados)`. Lo usan `media` para los archivos TXT (MED-10) y `chat` para los mensajes (CHAT-3).
+
+- [ ] **Step 1: Tests (fallan)**
+
+`services/shared/tests/test_r06_texto.py`:
+```python
+import pytest
+
+from shared.text import clean, scan
+
+STEGCLOAK = "hola‌‍⁡⁢⁣⁤ mundo"  # los 6 caracteres que usa StegCloak
+
+
+def test_texto_normal_sin_hallazgos():
+    texto = "Hola, ¿qué tal? Ñandú, acentos y emojis 🎉 ❤️ 👍🏽 👨‍👩‍👧\n\tcon sangría\n"
+    assert scan(texto) == {
+        "invisible": 0,
+        "extra_selectors": 0,
+        "trailing_tabs": 0,
+        "trailing_spaces": 0,
+        "mixed_script_words": 0,
+    }
+    assert clean(texto) == (texto, 0)
+
+
+def test_r06_caracteres_de_ancho_cero():
+    assert scan(STEGCLOAK)["invisible"] == 6
+    assert clean(STEGCLOAK) == ("hola mundo", 6)
+
+
+@pytest.mark.parametrize(
+    "oculto",
+    [
+        "a‮b",  # control bidi (Trojan Source)
+        "a\U000e0041\U000e0042b",  # etiquetas Unicode (ASCII smuggling)
+        "a­b",  # guion suave
+        "a﻿b",  # BOM en medio del texto
+        "aㅤb",  # relleno Hangul (no es Cf)
+    ],
+)
+def test_r06_otros_invisibles(oculto):
+    assert scan(oculto)["invisible"] >= 1
+    assert clean(oculto)[0] == "ab"
+
+
+def test_bom_inicial_no_cuenta_pero_se_quita():
+    assert scan("﻿hola")["invisible"] == 0
+    assert clean("﻿hola") == ("hola", 1)
+
+
+def test_r06_selectores_de_variacion_encadenados():
+    oculto = "😀" + "︁︂" + "\U000e0101" * 5
+    assert scan(oculto)["extra_selectors"] == 6
+    assert clean(oculto) == ("😀︁", 6)
+
+
+def test_r06_espacios_al_final_de_linea():
+    snow = "linea uno \t \nlinea dos  \t\r\nfin"
+    found = scan(snow)
+    assert (found["trailing_tabs"], found["trailing_spaces"]) == (2, 4)
+    assert clean(snow) == ("linea uno\nlinea dos\nfin", 6)
+
+
+def test_r06_homoglifos():
+    assert scan("pаypal")["mixed_script_words"] == 1  # 'а' cirílica
+    assert scan("Ελληνικά y español")["mixed_script_words"] == 0  # palabras de un solo alfabeto
+```
+
+Run: `pytest services/shared/tests/test_r06_texto.py -q`
+Expected: FAIL — `ModuleNotFoundError: No module named 'shared.text'`
+
+- [ ] **Step 2: Implementar `shared/text.py`**
+
+`services/shared/shared/text.py`:
+```python
+"""Canales ocultos en texto (spec §12.8): caracteres invisibles, selectores de variación,
+espacios al final de línea y homoglifos. Lo usan media (archivos TXT) y chat (mensajes)."""
+
+import re
+import unicodedata
+
+BOM = "﻿"
+ZWJ = "‍"
+# Invisibles que no son de categoría Cf pero también sirven para esconder datos.
+EXTRA_INVISIBLE = frozenset("͏ᅟᅠㅤﾠ")
+SCRIPTS = ("LATIN", "CYRILLIC", "GREEK")
+WORD = re.compile(r"[^\W\d_]+")
+
+
+def is_variation_selector(char: str) -> bool:
+    code = ord(char)
+    return 0xFE00 <= code <= 0xFE0F or 0xE0100 <= code <= 0xE01EF
+
+
+def is_invisible(char: str) -> bool:
+    """Categoría Cf (ancho cero, bidi, etiquetas, guion suave, BOM) y rellenos invisibles."""
+    return (
+        unicodedata.category(char) == "Cf"
+        or char in EXTRA_INVISIBLE
+        or 0xE0000 <= ord(char) <= 0xE007F
+    )
+
+
+def is_pictographic(char: str) -> bool:
+    """Aproximación de Extended_Pictographic por bloques: emoji, símbolos y modificadores de tono."""
+    code = ord(char)
+    return (
+        0x1F000 <= code <= 0x1FAFF
+        or 0x2600 <= code <= 0x27BF
+        or 0x2300 <= code <= 0x23FF
+        or 0x2B00 <= code <= 0x2BFF
+        or code in (0x00A9, 0x00AE, 0x203C, 0x2049, 0x2122, 0x2139, 0x3030, 0x303D, 0x3297, 0x3299)
+    )
+
+
+def _joins_emoji(kept: list[str], text: str, index: int) -> bool:
+    """U+200D legítimo: une dos emojis (👨‍👩‍👧), aunque el primero lleve un selector de variación."""
+    previous = next((char for char in reversed(kept) if not is_variation_selector(char)), "")
+    following = text[index + 1] if index + 1 < len(text) else ""
+    return is_pictographic(previous) and is_pictographic(following)
+
+
+def _filter(text: str) -> tuple[str, int, int]:
+    """(texto sin invisibles ni selectores sobrantes, invisibles quitados, selectores quitados)."""
+    kept: list[str] = []
+    invisible = selectors = 0
+    for index, char in enumerate(text):
+        if is_variation_selector(char):
+            if kept and not is_variation_selector(kept[-1]) and not kept[-1].isspace():
+                kept.append(char)  # uno tras un carácter base: uso normal (❤️)
+            else:
+                selectors += 1  # encadenados: bytes "pegados" a un emoji
+        elif is_invisible(char):
+            if char == ZWJ and _joins_emoji(kept, text, index):
+                kept.append(char)
+            else:
+                invisible += 1
+        else:
+            kept.append(char)
+    return "".join(kept), invisible, selectors
+
+
+def _scripts(word: str) -> set[str]:
+    found = set()
+    for char in word:
+        name = unicodedata.name(char, "")
+        found.update(script for script in SCRIPTS if name.startswith(script))
+    return found
+
+
+def scan(text: str) -> dict[str, int]:
+    """Conteos de cada canal. Un BOM al inicio del archivo es normal y no cuenta."""
+    body = text.removeprefix(BOM)
+    _, invisible, selectors = _filter(body)
+    trailing_tabs = trailing_spaces = 0
+    for line in body.split("\n"):
+        line = line.removesuffix("\r")
+        tail = line[len(line.rstrip(" \t")) :]
+        trailing_tabs += tail.count("\t")
+        trailing_spaces += tail.count(" ")
+    return {
+        "invisible": invisible,
+        "extra_selectors": selectors,
+        "trailing_tabs": trailing_tabs,
+        "trailing_spaces": trailing_spaces,
+        "mixed_script_words": sum(1 for word in WORD.findall(body) if len(_scripts(word)) > 1),
+    }
+
+
+def clean(text: str) -> tuple[str, int]:
+    """Quita invisibles, selectores sobrantes y espacios finales; normaliza los saltos a \\n.
+
+    Devuelve el texto limpio y cuántos caracteres se quitaron. Los homoglifos no se corrigen:
+    no hay forma de saber qué letra quiso escribir el autor.
+    """
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    filtered, invisible, selectors = _filter(normalized)
+    lines = filtered.split("\n")
+    stripped = [line.rstrip(" \t") for line in lines]
+    trailing = sum(len(line) - len(kept) for line, kept in zip(lines, stripped, strict=True))
+    return "\n".join(stripped), invisible + selectors + trailing
+```
+
+Run: `pytest services/shared -q`
+Expected: PASS
+
+- [ ] **Step 3: Trazabilidad y commit**
+
+Fila R6: agregar `services/shared/shared/text.py` y `services/shared/tests/test_r06_texto.py`.
+
+```bash
+git add services/shared docs/trazabilidad-riesgos.md
+git commit -m "feat(shared): detección y limpieza de caracteres invisibles en texto (R6)"
+```
 
 Al cerrar este archivo, marca `[x] 01 Fundaciones` en la sección *Estado actual* de `CLAUDE.md`.
 
