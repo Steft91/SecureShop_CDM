@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Dejar listo todo lo que comparten los servicios: el contexto de Claude Code, la librería `shared` (secretos, cripto, contraseñas, límites, autenticación entre servicios, identidad, auditoría, base web, utilidades de prueba), los vectores cripto, la plantilla Docker, la generación de secretos, PostgreSQL con 5 BD y la CI.
+**Goal:** Dejar listo todo lo que comparten los servicios: el contexto de Claude Code, la librería `shared` (secretos, cripto, contraseñas, límites, autenticación entre servicios, identidad del usuario con sus permisos, auditoría, base web, utilidades de prueba), los vectores cripto, la plantilla Docker, la generación de secretos (incluida la clave de firma de los JWT), PostgreSQL con 5 BD y la CI.
 
 **Architecture:** `services/shared` es un paquete Python instalable (`chat-shared` → `import shared`). Cada servicio lo instala junto al suyo. La infraestructura (Dockerfile único con `ARG SERVICE`, `gen_secrets.py`, `init.sh`) se escribe una vez y cada servicio solo agrega su bloque al compose.
 
@@ -26,9 +26,9 @@ Las de `docs/plans/2026-10-13-00-indice.md` § *Global Constraints*. Resumen ope
 ## Review Focus
 
 Ninguno de los 5 casos del índice cae en este archivo, pero las utilidades que se crean aquí los soportan:
-- `TokenBucket` para los límites del WS.
+- `TokenBucket` para los límites del WS y de la API de esteganografía.
 - `natural_image`/`embed_lsb` para los tests de imágenes.
-- `session_headers` codifica alias con tildes.
+- `user_headers` arma la identidad que pasa el gateway, con los permisos separados por comas; `user_from_headers` tolera que `X-User-Perms` no venga (sin permisos).
 
 ---
 
@@ -117,7 +117,7 @@ def self_test() -> int:
     assert check("/repo/services/auth/tests/test_x.py", 'password = "SuperSecreta-12345678"', root) is None
     assert check("/repo/docs/specs/a.md", "nunca ws://", root) is None
     assert check("/repo/deploy/llave.txt", "-----BEGIN PRIVATE KEY-----", root)
-    assert check("/repo/services/media/media_svc/formats.py", 'signature=b"\\x89PNG\\r\\n"', root) is None
+    assert check("/repo/services/stego/stego_svc/formats.py", 'signature=b"\\x89PNG\\r\\n"', root) is None
     print("guard.py: autoprueba OK")
     return 0
 
@@ -216,7 +216,7 @@ node_modules/
 frontend/dist/
 
 # Calibración del estegoanálisis (imágenes personales)
-services/media/tools/calibracion/
+services/stego/tools/calibracion/
 ```
 
 `.gitattributes`:
@@ -258,7 +258,7 @@ select = ["E", "F", "I", "B", "S", "UP"]
 ignore = ["E501"]  # ruff format ajusta el código; SQL y comentarios largos no se parten a la fuerza
 
 [lint.isort]
-known-first-party = ["shared", "auth_svc", "rooms_svc", "chat_svc", "media_svc", "audit_svc"]
+known-first-party = ["shared", "auth_svc", "rooms_svc", "chat_svc", "media_svc", "stego_svc", "audit_svc"]
 
 [lint.flake8-bugbear]
 # FastAPI declara dependencias y parámetros con llamadas en los valores por defecto.
@@ -282,14 +282,17 @@ Fuente: spec §2–§15 y Tabla 3 de la Tarea 2. Si un cambio rompe una de estas
 
 1. **Transporte:** el cliente solo habla TLS 1.3 con el gateway. Nunca `ws://` ni `http://` hacia el navegador. El WS va por `wss://${location.host}/ws`.
 2. **Secretos:** solo se leen con `shared.secrets` desde `/run/secrets`. Nunca en el código, en variables de entorno ni en logs. Los valores de prueba viven en `tests/` o en `shared/testing.py` y lo dicen en un comentario.
-3. **Identidad:** el remitente, la sala y el admin salen de la identidad verificada (`require_admin`, `require_session`, `session_from_headers`). Nunca del cuerpo de la petición ni de la trama.
-4. **SQL:** siempre `text()` con parámetros nombrados. Prohibido interpolar datos con f-strings.
-5. **Contraseñas y claves de sala:** Argon2id (`shared.passwords`), con verificación contra un hash dummy cuando el usuario o la sala no existen.
-6. **Errores:** el cliente recibe `{"error": "..."}` genérico; el detalle va a auditoría. Todo rechazo de seguridad se audita (`audit.emit(...)`).
-7. **Datos sensibles:** nunca se registran contraseñas, claves de sala, tokens, cuerpos de mensajes ni secretos TOTP.
-8. **Fallar cerrado:** si falta un secreto, el servicio no arranca. Si ClamAV o la BD no responden → 503. Si `audit` no responde en un evento obligatorio → 503 con rollback.
-9. **Cripto:** solo con `shared.crypto` (AES-256-GCM con AAD, ECDH P-256, HKDF-SHA256, ECDSA P-256). Nada de primitivas propias ni modos sin autenticación.
-10. **Archivos:** jamás se sirve un archivo sin firma HMAC válida y pertenencia a la sala. Todo archivo publicado pasó por la sanitización.
+3. **Identidad:** el usuario sale de la identidad que verificó el gateway (`require_user`, `require_perm`, `user_from_headers`), y el alias y la pertenencia a la sala, de `rooms`. Nunca del cuerpo de la petición ni de la trama.
+4. **Autorización:** por permiso del catálogo (`require_perm`) o por dueño/miembro de la sala, siempre en el servidor. Nunca por el rol del JWT ni por un campo del cuerpo. Los modelos de entrada usan `extra="forbid"`.
+5. **SQL:** siempre `text()` con parámetros nombrados. Prohibido interpolar datos con f-strings.
+6. **Contraseñas y claves de sala:** Argon2id (`shared.passwords`), con verificación contra un hash dummy cuando el usuario o la sala no existen.
+7. **Errores:** el cliente recibe `{"error": "..."}` genérico; el detalle va a auditoría. Todo rechazo de seguridad se audita (`audit.emit(...)`).
+8. **Datos sensibles:** nunca se registran contraseñas, claves de sala, tokens (JWT incluidos), cuerpos de mensajes ni secretos TOTP.
+9. **Fallar cerrado:** si falta un secreto, el servicio no arranca. Si ClamAV, `stego` o la BD no responden → 503. Si `audit` no responde en un evento que otorga algo → 503 con rollback. Lo que **quita** acceso (logout, suspensión, expulsión, cierre) nunca espera a la auditoría.
+10. **Cripto:** solo con `shared.crypto` (AES-256-GCM con AAD, ECDH P-256, HKDF-SHA256, ECDSA P-256) y PyJWT con `algorithms=["RS256"]` fijo. Nada de primitivas propias ni modos sin autenticación.
+11. **Archivos:** jamás se sirve un archivo sin firma HMAC válida y pertenencia a la sala. Todo archivo publicado pasó por la sanitización.
+12. **Datos en reposo:** los mensajes (DEK por sala, `chat`) y los archivos (DEK por archivo, `media`) se guardan siempre cifrados con envelope encryption. Un archivo en el volumen nunca es una imagen legible.
+13. **Documentos de cumplimiento:** un cambio de control, algoritmo, clave o ruta de datos actualiza `docs/trazabilidad-riesgos.md` y, si aplica, `docs/justificacion-criptografica.md` y `docs/cumplimiento-normativo.md`.
 ```
 
 `.claude/rules/microservices.md`:
@@ -297,15 +300,15 @@ Fuente: spec §2–§15 y Tabla 3 de la Tarea 2. Si un cambio rompe una de estas
 # Modelo de confianza entre microservicios (R16, spec §4.3)
 
 - Toda ruta de un servicio exige `X-Service-Token` válido (`ServiceTokenMiddleware`, que agrega `shared.web.create_base_app`). Solo `/health` está exento.
-- Rutas públicas (enrutadas por el gateway): `Depends(require_gateway)`, `Depends(require_admin)` o `Depends(require_session)`. Rutas internas: `/internal/...` con `Depends(allow("<llamador>", ...))`.
-- Las cabeceras `X-Admin-*` y `X-Session-*` **solo** se leen a través de `shared.identity`, que exige que el llamador sea `gateway`.
-- Cada servicio se conecta **solo a su BD** con su rol `<svc>_app`. Nunca se consulta la BD de otro servicio: se pide por su API interna.
+- Rutas públicas (enrutadas por el gateway): `Depends(require_gateway)`, `Depends(require_user)` o `Depends(require_perm("<permiso>"))`. Rutas internas: `/internal/...` con `Depends(allow("<llamador>", ...))`.
+- Las cabeceras `X-User-Id`, `X-User-Name`, `X-Session-Id` y `X-User-Perms` **solo** se leen a través de `shared.identity`, que exige que el llamador sea `gateway`. Los permisos que traen son los actuales: el gateway los pide a `auth` en cada request.
+- Cada servicio se conecta **solo a su BD** con su rol `<svc>_app`. Nunca se consulta la BD de otro servicio: se pide por su API interna (por ejemplo, la membresía de una sala se le pregunta a `rooms`).
 - Las llamadas a otros servicios pasan por `ServiceClient` (`app.state.peers`), nunca por un `httpx` suelto.
-- Allowlist vigente: auth ← gateway · rooms ← gateway, chat · chat ← gateway, rooms, media · media ← gateway · audit ← gateway, auth, rooms, chat, media.
+- Allowlist vigente: auth ← gateway, chat · rooms ← gateway, chat, media · chat ← gateway, auth, rooms, media · media ← gateway, chat · stego ← gateway, media · audit ← gateway, auth, rooms, chat, media, stego.
 - Agregar un servicio o un llamador requiere tocar:
   - la red en `deploy/docker-compose.yml`;
   - los secretos `svc_token_*`/`svc_hash_*` y `deploy/gen_secrets.py`;
-  - el rol de BD en `deploy/postgres/init.sh`;
+  - el rol de BD en `deploy/postgres/init.sh` (si el servicio guarda datos);
   - la allowlist del receptor;
   - esta regla.
 ```
@@ -338,7 +341,8 @@ paths:
 
 - TypeScript `strict`. Prohibido `dangerouslySetInnerHTML`, `eval` y HTML construido con strings.
 - Toda la criptografía pasa por `src/lib/crypto.ts` (WebCrypto). Las `CryptoKey` son no extraíbles y viven solo en memoria.
-- Nada en `localStorage`/`sessionStorage`: los tokens están en cookies `HttpOnly` que JS no ve.
+- Nada en `localStorage`/`sessionStorage`: los tokens (el JWT incluido) están en cookies `HttpOnly` que JS no ve. La SPA ignora el `access_token` del cuerpo del login.
+- Los botones se muestran según `GET /api/auth/me` (permisos) y `is_owner` de la sala, pero ocultarlos no protege nada: la autorización es del servidor.
 - Sin estilos ni scripts inline (la CSP los bloquea). Estilos en `src/styles.css`.
 - Sin `React.StrictMode`: monta los efectos dos veces, abre y cierra el WebSocket, y eso termina la sesión.
 - HTTP solo por `src/lib/api.ts`; WebSocket solo por `src/lib/ws.ts`.
@@ -371,7 +375,7 @@ description: Contrasta los cambios actuales con R1–R16 y actualiza la trazabil
 Revisa los cambios de la rama actual contra los riesgos del proyecto.
 
 1. Obtén el diff: `git diff main...HEAD` y `git diff` (lo que no está commiteado).
-2. Lee `docs/trazabilidad-riesgos.md`, `.claude/rules/security.md` y `.claude/rules/microservices.md`.
+2. Lee `docs/trazabilidad-riesgos.md`, `docs/requisitos.md`, `.claude/rules/security.md` y `.claude/rules/microservices.md`.
 3. Por cada archivo cambiado, identifica qué riesgo (R1–R16) toca. La tabla del spec §16.4 dice qué servicio cubre cada uno.
 4. Señala:
    - controles que el cambio debilita (con `archivo:línea`);
@@ -385,9 +389,21 @@ Revisa los cambios de la rama actual contra los riesgos del proyecto.
 ```markdown
 ---
 name: stego-analysis
-description: Referencia del estegoanálisis del servicio media (chi² de Westfeld, análisis RS, entropía LSB, estructura PNG/JPEG, sanitización por aleatorización del LSB y calibración). Úsala al tocar services/media, ajustar umbrales o agregar un formato.
+description: Referencia del estegoanálisis del servicio stego (chi² de Westfeld, análisis RS, entropía LSB, estructura PNG/JPEG, veredicto, sanitización por aleatorización del LSB y calibración). Úsala al tocar services/stego o services/media, ajustar umbrales o agregar un formato.
 ---
-# Estegoanálisis en `media` (spec §12)
+# Estegoanálisis en `stego` (spec §12)
+
+`stego` no guarda nada: valida, analiza y sanitiza. `media` decide la política (cuarentena, rechazo o publicación) con el veredicto.
+
+## Veredicto (spec §12.7)
+| Veredicto | Cuándo | Política en las salas |
+|---|---|---|
+| `invalida` (422) | Firma, tamaño, píxeles o decodificación inválidos | Rechazo |
+| `problema` | Anomalía estructural (datos al final, chunks de texto grandes o desconocidos, metadatos JPEG excesivos) | Cuarentena |
+| `revision_manual` | chi², RS (o entropía, si se activa) sobre el umbral, o timeout del análisis | Cuarentena |
+| `limpia` | Nada de lo anterior | Sanitización y publicación |
+
+Si coinciden una anomalía estructural y una estadística, gana `problema`.
 
 ## Detectores (PNG, canales RGB)
 | Detector | Cálculo | Dispara si |
@@ -415,14 +431,15 @@ description: Referencia del estegoanálisis del servicio media (chi² de Westfel
 - Una imagen con el LSB aleatorizado es estadísticamente igual a una con LSB embebido al 100 % (chi² = 1.0). Por eso `media` guarda `clean_sha256` y no vuelve a analizar sus propias salidas. También se probaron como alternativas poner el LSB en cero (lo marca RS = 0.19), recodificar como JPEG (chi² 0.89–0.96) y redimensionar (chi² 0.997).
 
 ## Calibración con fotos reales
-1. Copia ≥ 30 imágenes limpias (fotos de celular, capturas) en `services/media/tools/calibracion/` (gitignored).
-2. `python services/media/tools/stego_lab.py calibrate services/media/tools/calibracion`
-3. Elige umbrales con FPR ≤ 5 % y TPR máxima para "secuencial 10 %". Configúralos con `STEGO_CHI2_P` / `STEGO_RS_RATE` en `deploy/docker-compose.yml` y anota la tabla en el informe.
+1. Copia ≥ 30 imágenes limpias (fotos de celular, capturas) en `services/stego/tools/calibracion/` (gitignored). Para el primer parcial alcanzan 15.
+2. `python services/stego/tools/stego_lab.py calibrate services/stego/tools/calibracion`
+3. Elige umbrales con FPR ≤ 5 % y TPR máxima para "secuencial 10 %". Configúralos con `STEGO_CHI2_P` / `STEGO_RS_RATE` en `deploy/docker-compose.yml` y anota la tabla en `docs/calibracion-estego.md`.
 
 ## Agregar un formato
-1. Firma + `pil_format` + `analyze` + `sanitize` en `media_svc/formats.py` (`FORMATS`).
-2. Módulo `media_svc/<formato>.py` con funciones de módulo (las ejecuta un `ProcessPoolExecutor`).
-3. Tests: uno limpio, uno con payload y uno de sanitización. Actualizar R6/R9 en la trazabilidad.
+1. Firma + `pil_format` + `analyze` + `sanitize` en `stego_svc/formats.py` (`FORMATS`).
+2. Módulo `stego_svc/<formato>.py` con funciones de módulo (las ejecuta un `ProcessPoolExecutor`).
+3. Clasificar sus motivos en `stego_svc/verdict.py` (`STRUCTURAL` o `STATISTICAL`).
+4. Tests: uno limpio, uno con payload y uno de sanitización. Actualizar R6/R9 en la trazabilidad.
 ```
 
 `.claude/skills/crypto-protocol/SKILL.md`:
@@ -435,7 +452,7 @@ description: Protocolo criptográfico del chat (hello ECDSA firmado, ECDH P-256,
 
 ## Handshake (por conexión WS)
 1. Cliente → `{"t":"hello","pub":"<b64url punto P-256 sin comprimir, 65 B>"}` (primera trama, ≤ 10 s).
-2. chat: ECDH efímero, `salt` de 32 B, `K = HKDF-SHA256(shared, salt, info="secure-chat/v1|{room_id}|{session_id}", 32)`.
+2. chat: ECDH efímero, `salt` de 32 B, `K = HKDF-SHA256(shared, salt, info="secure-chat/v1|{room_id}|{session_id}", 32)`. `session_id` es el id de la sesión de la cuenta (`X-Session-Id`, claim `sid` del JWT).
 3. chat firma `T = "secure-chat/v1/hello|{room}|{session}|{client_pub}|{server_pub}|{salt}"` con ECDSA P-256/SHA-256 (firma P1363 `r‖s`, 64 B) y responde `{"t":"hello","pub","salt","sig"}`.
 4. El cliente verifica `sig` sobre `T` reconstruida con **su** `client_pub`, usando `/chat-key.json` (lo sirve el gateway). Si falla → cierra con 4400.
 
@@ -443,7 +460,7 @@ description: Protocolo criptográfico del chat (hello ECDSA firmado, ECDH P-256,
 - `{"seq","n","c"}`: AES-256-GCM, nonce aleatorio de 12 B, tag de 16 B al final de `c`. AAD `v1|{room}|{session}|{seq}|{c2s|s2c}`; en `s2c`, la sesión es la del destinatario.
 - `seq` empieza en 1 por conexión y dirección, y es estrictamente creciente.
 - El payload es JSON compacto (`separators=(",", ":")`, `ensure_ascii=False`), igual que `JSON.stringify`.
-- Códigos de cierre: 4400 malformada, tag o handshake · 4401 sesión terminada · 4403 origin, modo o archivo ajeno · 4408 replay · 4409 reemplazada · 4410 inactividad · 4413 grande · 4429 rate.
+- Códigos de cierre: 4400 malformada, tag o handshake · 4401 sesión o membresía terminada · 4403 origin, no miembro, modo, archivo ajeno o borrado no autorizado · 4408 replay · 4409 reemplazada · 4410 inactividad · 4411 expulsado · 4413 grande · 4429 rate.
 
 ## Vectores
 `docs/crypto-vectors.json` se regenera con `python services/shared/tools/gen_crypto_vectors.py`. Lo verifican `services/shared/tests/test_vectors.py` y `frontend/src/lib/crypto.test.ts`. Si cambias el protocolo, regenera y deja ambos tests en verde.
@@ -451,9 +468,11 @@ description: Protocolo criptográfico del chat (hello ECDSA firmado, ECDH P-256,
 ## Claves y rotación
 | Clave | Dónde | Rotación |
 |---|---|---|
+| `jwt_signing_key` | auth (RSA 3072, firma los JWT RS256) | `python deploy/gen_secrets.py --rotate jwt_signing_key` + reiniciar auth (todos vuelven a iniciar sesión) |
 | `kek_auth_v{n}` | auth (TOTP) | montar v{n+1}, `CURRENT_KEK_VERSION`, `python -m auth_svc.rotate_kek` |
 | `kek_chat_v{n}` | chat (DEK de salas) | igual + `python -m chat_svc.rotate kek` |
 | DEK de una sala | `room_keys` (chat) | `python -m chat_svc.rotate room <room_id>` |
+| `kek_media_v{n}` | media (DEK de cada archivo, `files.dek_wrapped`) | igual + `python -m media_svc.rotate_kek` |
 | `chat_sign_key` | chat; pública en `deploy/public/chat-key.json` | `python deploy/gen_secrets.py --rotate chat_sign_key` + reiniciar chat y el gateway |
 | `svc_token_<x>` | dueño; hash en los receptores | `--rotate svc_token_<x>` + reiniciar `<x>` y sus receptores |
 ```
@@ -470,7 +489,7 @@ Eres el auditor de seguridad del proyecto "Salas de Chat Seguras" (curso Softwar
 Antes de opinar, lee:
 - `docs/specs/2026-10-12-chat-seguro-design.md` §4.3 (modelo de confianza), §10–§14;
 - `.claude/rules/security.md` y `.claude/rules/microservices.md`;
-- `docs/trazabilidad-riesgos.md`.
+- `docs/trazabilidad-riesgos.md` y `docs/requisitos.md` (requisitos RS-xx).
 
 Procedimiento:
 1. `git diff main...HEAD --stat` y luego el diff de cada archivo de `services/`, `gateway/`, `frontend/src/` y `deploy/`.
@@ -495,31 +514,35 @@ Formato de salida: una lista ordenada por severidad (Crítica, Alta, Media, Baja
 
 Fuente de riesgos: Tarea 2 (Tablas 1–4) + R16 (spec §16.3). Cada tarea del plan actualiza su fila. "Implementado" exige un test en verde.
 
-| R | Riesgo | Control (Tabla 3 / spec) | Servicio / archivos | Tests | Estado |
-|---|---|---|---|---|---|
-| R1 | Claves de sala en texto plano | Argon2id con sal única | rooms | — | Pendiente |
-| R2 | Claves criptográficas en el código fuente | Docker secrets, KEK/DEK, rotación | shared, auth, chat | — | Pendiente |
-| R3 | Manipulación de registros de auditoría | Servicio audit, rol solo INSERT/SELECT, cadena SHA-256 | audit | — | Pendiente |
-| R4 | Fuerza bruta contra el admin | Bloqueo + retraso progresivo + TOTP | auth | — | Pendiente |
-| R5 | Endpoints admin sin verificación de rol | `auth_request` + `require_admin` en cada servicio | gateway, rooms, media, audit | — | Pendiente |
-| R6 | Imágenes con esteganografía | chi²/RS/estructura + cuarentena + sanitización | media | — | Pendiente |
-| R7 | WebSocket sin cifrar | TLS 1.3, `wss://`, Origin, hello firmado + AES-GCM | gateway, chat | — | Pendiente |
-| R8 | Fuerza bruta de claves de sala | Rate limit IP/dispositivo/sala + política de clave | rooms | — | Pendiente |
-| R9 | Archivos maliciosos | Magic bytes, Pillow, tope de píxeles, ClamAV | media | — | Pendiente |
-| R10 | Agotamiento de conexiones | Rate limit Nginx + token bucket + tamaño de trama | gateway, chat | — | Pendiente |
-| R11 | Credenciales de BD con privilegios excesivos | Rol `<svc>_app` sin DDL, una BD por servicio | todos | — | Pendiente |
-| R12 | Archivos accesibles sin autorización | URL firmada + pertenencia a la sala | media | — | Pendiente |
-| R13 | Sesiones simultáneas de un alias | Índice único parcial + cookie de dispositivo | rooms | — | Pendiente |
-| R14 | Mensajes inyectados en otra sala | Identidad desde la sesión, AAD, anti-replay | chat | — | Pendiente |
-| R15 | Cupo superado por concurrencia | `UPDATE … WHERE current < max` + `CHECK` | rooms | — | Pendiente |
-| R16 | Suplantación entre microservicios | Token por servicio con hash, allowlist, gateway sobrescribe identidad | shared, todos | — | Pendiente |
+La columna *ISO/IEC 27001:2022* relaciona cada control con el Anexo A; el detalle (mecanismo y evidencia) está en `docs/cumplimiento-normativo.md` §1.2. Los requisitos RF/RS del docente están en `docs/requisitos.md`.
+
+| R | Riesgo | Control (Tabla 3 / spec) | ISO/IEC 27001:2022 | Servicio / archivos | Tests | Estado |
+|---|---|---|---|---|---|---|
+| R1 | Claves de sala en texto plano | Argon2id con sal única | A.5.17, A.8.24 | rooms | — | Pendiente |
+| R2 | Claves criptográficas en el código fuente | Docker secrets, KEK/DEK (mensajes y archivos), rotación | A.8.24, A.8.9, A.8.12 | shared, auth, chat, media | — | Pendiente |
+| R3 | Manipulación de registros de auditoría | Servicio audit, rol solo INSERT/SELECT, cadena SHA-256 | A.8.15, A.5.28, A.5.33 | audit | — | Pendiente |
+| R4 | Fuerza bruta contra las cuentas | Bloqueo + retraso progresivo + TOTP para permisos de admin | A.8.5, A.5.17 | auth | — | Pendiente |
+| R5 | Operaciones sin verificación de permisos | `auth_request` con permisos actuales + `require_perm` y dueño de sala en cada servicio; registro sin `admin`; nunca sin admin | A.5.15, A.8.2, A.5.18 | gateway, auth, rooms, media, stego, audit | — | Pendiente |
+| R6 | Imágenes con esteganografía | chi²/RS/estructura (`stego`) + cuarentena + sanitización (`media`) | A.8.7, A.8.16 | stego, media | — | Pendiente |
+| R7 | WebSocket sin cifrar | TLS 1.3, `wss://`, Origin, hello firmado + AES-GCM | A.8.20, A.8.24 | gateway, chat | — | Pendiente |
+| R8 | Fuerza bruta de claves de sala | Rate limit IP/usuario/sala + política de clave | A.5.17, A.8.5, A.8.6 | rooms | — | Pendiente |
+| R9 | Archivos maliciosos | Magic bytes, Pillow, tope de píxeles (`stego`), ClamAV (`media`) | A.8.7, A.8.28 | stego, media | — | Pendiente |
+| R10 | Agotamiento de conexiones | Rate limit Nginx + token bucket + tamaño de trama | A.8.6, A.8.20 | gateway, chat | — | Pendiente |
+| R11 | Credenciales de BD con privilegios excesivos | Rol `<svc>_app` sin DDL, una BD por servicio | A.8.2, A.5.18, A.8.22 | todos | — | Pendiente |
+| R12 | Archivos accesibles sin autorización | URL firmada + pertenencia a la sala | A.8.3, A.8.12 | media | — | Pendiente |
+| R13 | Sesiones simultáneas de una cuenta | Índice único parcial en `user_sessions` + sesión ligada a la cookie de dispositivo + vencimiento por inactividad | A.5.16, A.5.15, A.8.5 | auth | — | Pendiente |
+| R14 | Mensajes inyectados en otra sala | Identidad desde la sesión, AAD, anti-replay | A.8.3, A.8.24 | chat | — | Pendiente |
+| R15 | Cupo superado por concurrencia | `UPDATE … WHERE current < max` + `CHECK` | A.8.6, A.8.28 | rooms | — | Pendiente |
+| R16 | Suplantación entre microservicios | Token por servicio con hash, allowlist, gateway sobrescribe identidad | A.5.15, A.8.21, A.8.22 | shared, todos | — | Pendiente |
 
 ## Verificación manual (evidencia para el informe)
 | Prueba | Comando | Resultado esperado | Fecha / resultado |
 |---|---|---|---|
 | TLS 1.2 rechazado | `curl --tlsv1.2 --tls-max 1.2 https://localhost/` | error de handshake | — |
 | http → https | `curl -I http://localhost/ws` | `301` | — |
-| /internal no enrutado | `curl https://localhost/internal/verify-admin` | `404` JSON | — |
+| /internal no enrutado | `curl https://localhost/internal/verify` | `404` JSON | — |
+| Cabeceras de identidad falsificadas | `curl -H "X-User-Id: x" -H "X-User-Perms: audit:read" https://localhost/api/admin/audit` | `401` JSON | — |
+| Flujo del parcial (Postman) | Runner de `docs/postman/parcial-1.postman_collection.json` | todas las pruebas en verde | — |
 ```
 
 - [ ] **Step 8: Escribir `CLAUDE.md`**
@@ -528,24 +551,27 @@ Fuente de riesgos: Tarea 2 (Tablas 1–4) + R16 (spec §16.3). Cada tarea del pl
 ````markdown
 # Salas de Chat Seguras — contexto del proyecto
 
-Proyecto integrador de **Software Seguro**: salas de chat con **microservicios**. El objetivo es demostrar con pruebas los tratamientos de riesgo del SGSI (Tarea 2) más R16 (suplantación entre microservicios). Equipo: Manangón, Díaz, Cedeño. Plazo: 13 oct – 2 nov 2026.
+Proyecto integrador de **Software Seguro**: salas de chat con **microservicios**, cuentas con roles (RBAC) y salas con dueño, como en Discord. El objetivo es demostrar con pruebas los tratamientos de riesgo del SGSI (Tarea 2) más R16 (suplantación entre microservicios). Equipo: Manangón, Díaz, Cedeño. Primer parcial: auth + stego + audit + gateway, probado con Postman; lo demás, por incrementos.
 
-- **Spec (fuente de verdad):** `docs/specs/2026-10-12-chat-seguro-design.md`
+- **Spec (fuente de verdad):** `docs/specs/2026-10-12-chat-seguro-design.md` (rev. 4)
 - **Plan:** `docs/plans/2026-10-13-00-indice.md` (+ un archivo por subsistema)
+- **Tickets (cadena Andrés → Stefany → Zaith):** `docs/tickets/README.md`
 - **Riesgos → controles → tests:** `docs/trazabilidad-riesgos.md`
+- **Requisitos del docente (RF/RS):** `docs/requisitos.md` · **Normas y enfoques:** `docs/cumplimiento-normativo.md` · **Criptografía justificada:** `docs/justificacion-criptografica.md`
 - **Documentos académicos:** `Documentación/` (no tocar sin que lo pidan)
 
 ## Arquitectura
 | Pieza | Qué hace | BD |
 |---|---|---|
-| gateway (Nginx) | TLS 1.3, CSP/HSTS, rate limit, `auth_request`, SPA, `/chat-key.json` | — |
-| auth | Admin con Argon2id + TOTP; `GET /internal/verify-admin` | auth |
-| rooms | Salas, ingreso con alias, cupo atómico, dispositivo único, sesiones; `GET /internal/verify-session` | rooms |
-| chat | WebSocket: hello firmado (ECDSA) + ECDH → AES-256-GCM por conexión; mensajes cifrados en reposo | chat |
-| media | Imágenes: firma → Pillow → ClamAV → chi²/RS → cuarentena o sanitización; URL firmadas | media |
+| gateway (Nginx) | TLS 1.3, CSP/HSTS, rate limit, `auth_request` a `auth`, SPA, `/chat-key.json` | — |
+| auth | Registro, login (Argon2id, TOTP para permisos de admin), JWT RS256 + sesión por dispositivo, roles y permisos; `GET /internal/verify` | auth |
+| rooms | Salas con dueño (máx. 2), membresía con clave y alias, cupo atómico, expulsión, veto y silencio | rooms |
+| chat | WebSocket: hello firmado (ECDSA) + ECDH → AES-256-GCM por conexión; mensajes cifrados en reposo; borrado | chat |
+| media | Subida: ClamAV → `stego` → cuarentena o sanitización; archivos cifrados; URL firmadas | media |
+| stego | Firma, Pillow, chi²/RS/estructura, veredicto y sanitización; `POST /api/stego/analyze` | — |
 | audit | Log encadenado con SHA-256; su rol solo hace INSERT/SELECT | audit |
 
-Confianza: el gateway sobrescribe `X-Admin-*` y `X-Session-*`. Cada servicio exige `X-Service-Token` (guarda solo hashes) y acepta esas cabeceras únicamente si el llamador es `gateway`. Detalle en `.claude/rules/microservices.md`.
+Confianza: el gateway pregunta a `auth` en cada request y sobrescribe `X-User-*` con la identidad y los permisos actuales. Cada servicio exige `X-Service-Token` (guarda solo hashes) y acepta esas cabeceras únicamente si el llamador es `gateway`. Detalle en `.claude/rules/microservices.md`.
 
 ## Mapa del repo
 ```
@@ -556,14 +582,15 @@ gateway/          nginx.conf · snippets/ · Dockerfile (compila la SPA)
 frontend/         React + Vite + TS (src/lib/crypto.ts, ws.ts, api.ts; src/pages/)
 e2e/              pruebas contra el stack completo vía https://localhost
 deploy/           docker-compose.yml · docker-compose.test.yml · gen_secrets.py · postgres/init.sh
-docs/             spec, planes, trazabilidad, vectores cripto, despliegue
+docs/             spec, planes, tickets, colección de Postman, trazabilidad, vectores cripto, despliegue
 ```
 
 ## Comandos
 Preparación (una vez): `py -3.13 -m venv .venv` (macOS/Linux: `python3.13 -m venv .venv`), activar e instalar:
 ```bash
-pip install -e "services/shared[dev]" -e services/audit -e services/auth -e services/rooms -e services/chat -e services/media
+pip install -e "services/shared[dev]" -e services/audit -e services/auth -e services/stego
 ```
+(Con el incremento 2 se suman `-e services/rooms -e services/chat`, y con el 3, `-e services/media`.)
 | Tarea | Comando |
 |---|---|
 | BD de pruebas | `docker compose -f deploy/docker-compose.test.yml up -d` |
@@ -582,11 +609,14 @@ pip install -e "services/shared[dev]" -e services/audit -e services/auth -e serv
 - Siempre `.claude/rules/security.md` y `.claude/rules/microservices.md`; `backend.md`, `frontend.md` y `testing.md` según la ruta.
 - Antes de cerrar una tarea: `/risk-check` y, si tocó seguridad, el subagente `security-auditor`.
 - No leer `deploy/secrets/` ni `deploy/certs/` (denegados en `.claude/settings.json`).
+- **Prohibido hacer `merge` a `main`** hasta que el equipo lo autorice; el trabajo va en `feat/arquitectura-chat-seguro` o ramas hijas. No hagas `push` ni abras PR sin que te lo pidan.
 - macOS/Linux: si el hook falla porque no encuentra `python`, activa el `.venv` antes de abrir Claude Code.
 
 ## Estado actual
-Actualizar al cerrar cada archivo del plan.
-- [ ] 01 Fundaciones · [ ] 02 Audit · [ ] 03 Auth · [ ] 04 Gateway · [ ] 05 Rooms · [ ] 06 Chat · [ ] 07 Media · [ ] 08 Frontend · [ ] 09 E2E y cierre
+Actualizar al cerrar cada ticket (`docs/tickets/README.md` tiene la cadena completa).
+- Primer parcial: [ ] 01 Fundaciones · [ ] 02 Audit · [ ] 03 Auth (ATH-1…4) · [ ] 10 Stego · [ ] 04 Gateway (GW-1) · [ ] Parcial (PAR-1…3)
+- Incremento 2: [ ] 03 Auth (ATH-5…6) · [ ] 05 Rooms · [ ] 06 Chat · [ ] 04 Gateway (GW-2) · [ ] 08 Frontend (FE-1…3)
+- Incremento 3: [ ] 07 Media · [ ] 08 Frontend (FE-4…5) · [ ] 09 E2E y cierre
 ````
 
 - [ ] **Step 9: Verificar formato y commit**
@@ -1572,15 +1602,15 @@ git commit -m "feat(shared): Argon2id con tope de concurrencia, política de cla
 **Interfaces:**
 - Consumes: `shared.crypto.sha256`, `shared.crypto.b64e` (FND-2).
 - Produces:
-  - `shared.service_auth`: `TOKEN_HEADER = "X-Service-Token"`; `ServiceAuth(name, token, callers)` con `from_secrets(name, *, needs_token)` e `identify(token)->str|None`; `ServiceTokenMiddleware`; `allow(*callers)` (dependencia que devuelve el llamador); `ServiceClient(auth, urls, transport=None)` con `post(service, path, *, json, timeout=3.0)->httpx.Response`.
-  - `shared.identity`: `AdminIdentity(admin_id, username)`, `SessionIdentity(session_id, room_id, alias, mode)`, `client_ip(conn)`, `encode_alias(alias)`, `require_gateway`, `require_admin`, `require_session`, `session_from_headers(conn)`.
+  - `shared.service_auth`: `TOKEN_HEADER = "X-Service-Token"`; `ServiceAuth(name, token, callers)` con `from_secrets(name, *, needs_token)` e `identify(token)->str|None`; `ServiceTokenMiddleware`; `allow(*callers)` (dependencia que devuelve el llamador); `ServiceClient(auth, urls, transport=None)` con `post(service, path, *, json=None, content=None, headers=None, timeout=3.0)->httpx.Response` (`json` para JSON, `content` para bytes, como las imágenes que `media` manda a `stego`).
+  - `shared.identity`: `UserIdentity(user_id, username, session_id, perms: frozenset[str])`, `client_ip(conn)`, `user_from_headers(conn)->UserIdentity|None`, `require_gateway`, `require_user`, `require_perm(*perms)` (403 `"permiso insuficiente"` y evento `perm.denied` si falta alguno).
   - `shared.audit_client`: `AuditUnavailable`, `AuditClient(ServiceClient).emit(severity, action, *, actor, target=None, ip=None, details=None, required=False)`.
-  - `shared.web`: `ADMIN_COOKIE`, `ROOM_COOKIE`, `DEVICE_COOKIE`, `set_cookie(response, name, value, max_age=None)`, `clear_cookie(response, name)`, `create_base_app(*, title, settings, engine, service_auth, audit, lifespan=None)->FastAPI`. La app expone `app.state.settings/engine/service_auth/audit` y `request.state.caller`.
+  - `shared.web`: `SESSION_COOKIE`, `DEVICE_COOKIE`, `set_cookie(response, name, value, max_age=None)`, `clear_cookie(response, name)`, `create_base_app(*, title, settings, engine, service_auth, audit, lifespan=None)->FastAPI` (con `engine=None`, `/health` responde sin BD: lo usa `stego`). La app expone `app.state.settings/engine/service_auth/audit` y `request.state.caller`.
   - `shared.testing`:
-    - constantes `ORIGIN`, `TOKENS`, `ROLE_PASSWORD`;
+    - constantes `ORIGIN`, `TOKENS` (gateway, auth, rooms, chat, media, stego), `ROLE_PASSWORD`, `USER_ID`, `SESSION_ID`;
     - `service_auth(name, callers)`;
-    - cabeceras: `service_headers(name)`, `gateway_headers()`, `admin_headers(admin_id=..., username="root")`, `session_headers(session_id, room_id, alias, mode="both")`, `cookie_header(cookies)->dict`;
-    - `Recorder(routes=None)` con `.transport`, `.calls`, `.events(action=None)` y `.to(prefix)`.
+    - cabeceras: `service_headers(name)`, `gateway_headers()`, `user_headers(user_id=USER_ID, username="ana", session_id=SESSION_ID, perms=())`, `cookie_header(cookies)->dict`;
+    - `Recorder(routes=None)` con `.transport`, `.calls`, `.events(action=None)` y `.to(prefix)`; un cuerpo que no es JSON (una imagen) queda en `Call.body` como `bytes`.
 
 - [ ] **Step 1: Utilidades de prueba (parte 1)**
 
@@ -1598,12 +1628,15 @@ from typing import Any
 import httpx
 
 from shared.crypto import sha256
-from shared.identity import encode_alias
 from shared.service_auth import TOKEN_HEADER, ServiceAuth
 
 ORIGIN = "https://testserver"
 ROLE_PASSWORD = "solo-pruebas"
-TOKENS = {name: f"token-de-prueba-{name}" for name in ("gateway", "auth", "rooms", "chat", "media")}
+TOKENS = {
+    name: f"token-de-prueba-{name}" for name in ("gateway", "auth", "rooms", "chat", "media", "stego")
+}
+USER_ID = "00000000-0000-4000-8000-0000000000a1"
+SESSION_ID = "00000000-0000-4000-8000-000000000051"
 
 
 def service_auth(name: str, callers: tuple[str, ...]) -> ServiceAuth:
@@ -1621,18 +1654,22 @@ def gateway_headers() -> dict:
     return {TOKEN_HEADER: TOKENS["gateway"], "origin": ORIGIN}
 
 
-def admin_headers(admin_id: str = "00000000-0000-4000-8000-0000000000ad", username: str = "root") -> dict:
-    return {**gateway_headers(), "X-Admin-Id": admin_id, "X-Admin-User": username}
-
-
-def session_headers(session_id: str, room_id: str, alias: str, mode: str = "both") -> dict:
-    return {
+def user_headers(
+    user_id: str = USER_ID,
+    username: str = "ana",
+    session_id: str = SESSION_ID,
+    perms: tuple[str, ...] = (),
+) -> dict:
+    """La identidad que pone el gateway después de verificar el JWT con auth (spec §4.3)."""
+    headers = {
         **gateway_headers(),
+        "X-User-Id": user_id,
+        "X-User-Name": username,
         "X-Session-Id": session_id,
-        "X-Room-Id": room_id,
-        "X-Alias": encode_alias(alias),
-        "X-Room-Mode": mode,
     }
+    if perms:  # Nginx no envía una cabecera vacía: sin permisos, X-User-Perms no viene
+        headers["X-User-Perms"] = ",".join(perms)
+    return headers
 
 
 def cookie_header(cookies: dict) -> dict:
@@ -1665,7 +1702,10 @@ class Recorder:
         return None
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
-        body = json.loads(request.content) if request.content else None
+        try:
+            body = json.loads(request.content) if request.content else None
+        except (ValueError, UnicodeDecodeError):
+            body = request.content  # binario: por ejemplo, una imagen hacia stego
         self.calls.append(Call(request.url.host, request.url.path, body, request.headers.get(TOKEN_HEADER)))
         route = self._route(request.url.path)
         if route == "down":
@@ -1696,7 +1736,6 @@ class Recorder:
 `services/shared/tests/test_r16_service_auth.py`:
 ```python
 import logging
-from dataclasses import asdict
 from types import SimpleNamespace
 
 import pytest
@@ -1708,7 +1747,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from shared import testing
 from shared.audit_client import AuditClient
-from shared.identity import AdminIdentity, SessionIdentity, require_admin, require_gateway, require_session
+from shared.identity import UserIdentity, require_gateway, require_perm, require_user
 from shared.service_auth import ServiceClient, allow
 from shared.web import create_base_app
 
@@ -1734,12 +1773,17 @@ def build_app(recorder: testing.Recorder):
         return {"n": body.n}
 
     @router.get("/api/admin/x")
-    async def admin(who: AdminIdentity = Depends(require_admin)) -> dict:
+    async def admin(who: UserIdentity = Depends(require_perm("audit:read"))) -> dict:
         return {"user": who.username}
 
-    @router.get("/api/sesion")
-    async def sesion(who: SessionIdentity = Depends(require_session)) -> dict:
-        return asdict(who)
+    @router.get("/api/yo")
+    async def yo(who: UserIdentity = Depends(require_user)) -> dict:
+        return {
+            "user_id": who.user_id,
+            "username": who.username,
+            "session_id": who.session_id,
+            "perms": sorted(who.perms),
+        }
 
     @router.post("/internal/solo-chat", dependencies=[Depends(allow("chat"))])
     async def interno() -> dict:
@@ -1809,19 +1853,35 @@ def test_ruta_interna_respeta_la_allowlist(client):
 
 def test_identidad_solo_vale_si_la_trae_el_gateway(client):
     assert client.get("/api/admin/x", headers=testing.gateway_headers()).status_code == 401
-    assert client.get("/api/admin/x", headers=testing.admin_headers()).json() == {"user": "root"}
-    impostor = {**testing.service_headers("chat"), "X-Admin-Id": "x", "X-Admin-User": "root"}
+    ok = client.get("/api/admin/x", headers=testing.user_headers(perms=("audit:read",)))
+    assert ok.json() == {"user": "ana"}
+    impostor = {
+        **testing.service_headers("chat"),
+        "X-User-Id": "x",
+        "X-User-Name": "ana",
+        "X-Session-Id": "s",
+        "X-User-Perms": "audit:read",
+    }
     assert client.get("/api/admin/x", headers=impostor).status_code == 403
 
 
-def test_alias_con_tildes_viaja_codificado(client):
-    headers = testing.session_headers("s1", "r1", "José Ñúñez", "text")
-    assert client.get("/api/sesion", headers=headers).json() == {
-        "session_id": "s1",
-        "room_id": "r1",
-        "alias": "José Ñúñez",
-        "mode": "text",
+def test_r05_sin_el_permiso_403_y_se_audita(client, recorder):
+    r = client.get("/api/admin/x", headers=testing.user_headers(perms=("stego:analyze",)))
+    assert (r.status_code, r.json()) == (403, {"error": "permiso insuficiente"})
+    [event] = recorder.events("perm.denied")
+    assert event["actor"] == "user:ana"
+    assert event["details"] == {"required": ["audit:read"]}
+
+
+def test_permisos_se_leen_de_la_cabecera(client):
+    headers = testing.user_headers(perms=("stego:analyze", "rooms:create"))
+    assert client.get("/api/yo", headers=headers).json() == {
+        "user_id": testing.USER_ID,
+        "username": "ana",
+        "session_id": testing.SESSION_ID,
+        "perms": ["rooms:create", "stego:analyze"],
     }
+    assert client.get("/api/yo", headers=testing.user_headers()).json()["perms"] == []
 
 
 def test_errores_genericos(client):
@@ -1859,7 +1919,6 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'shared.identity'`
 """Identidad propagada por el gateway (spec §4.3). Solo se lee si el llamador verificado es 'gateway'."""
 
 from dataclasses import dataclass
-from urllib.parse import quote, unquote
 
 from fastapi import HTTPException, Request
 from starlette.requests import HTTPConnection
@@ -1868,27 +1927,16 @@ UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
 @dataclass(frozen=True)
-class AdminIdentity:
-    admin_id: str
+class UserIdentity:
+    user_id: str
     username: str
-
-
-@dataclass(frozen=True)
-class SessionIdentity:
-    session_id: str
-    room_id: str
-    alias: str
-    mode: str
+    session_id: str  # sesión de la cuenta (claim sid del JWT)
+    perms: frozenset[str]  # los actuales: auth los lee de la BD en cada request
 
 
 def client_ip(conn: HTTPConnection) -> str | None:
     """IP del cliente original: uvicorn la toma de X-Forwarded-For, que el gateway sobrescribe."""
     return conn.client.host if conn.client else None
-
-
-def encode_alias(alias: str) -> str:
-    """Las cabeceras HTTP son latin-1: el alias (UTF-8) viaja percent-encoded."""
-    return quote(alias, safe="")
 
 
 async def require_gateway(request: Request) -> None:
@@ -1908,34 +1956,42 @@ async def require_gateway(request: Request) -> None:
         raise HTTPException(403, "origen no permitido")
 
 
-async def require_admin(request: Request) -> AdminIdentity:
-    await require_gateway(request)
-    admin_id, username = request.headers.get("x-admin-id"), request.headers.get("x-admin-user")
-    if not admin_id or not username:
-        raise HTTPException(401, "no autenticado")
-    return AdminIdentity(admin_id, username)
+def user_from_headers(conn: HTTPConnection) -> UserIdentity | None:
+    """Identidad que puso el gateway. Sin permisos, X-User-Perms no viene (Nginx omite cabeceras vacías).
 
-
-def session_from_headers(conn: HTTPConnection) -> SessionIdentity | None:
+    Quien la use fuera de require_user (el WebSocket de chat) debe comprobar antes que el llamador es 'gateway'.
+    """
     headers = conn.headers
-    values = (
-        headers.get("x-session-id"),
-        headers.get("x-room-id"),
-        headers.get("x-alias"),
-        headers.get("x-room-mode"),
-    )
+    values = (headers.get("x-user-id"), headers.get("x-user-name"), headers.get("x-session-id"))
     if not all(values):
         return None
-    session_id, room_id, alias, mode = values
-    return SessionIdentity(session_id, room_id, unquote(alias), mode)
+    perms = frozenset(perm for perm in headers.get("x-user-perms", "").split(",") if perm)
+    return UserIdentity(*values, perms)
 
 
-async def require_session(request: Request) -> SessionIdentity:
+async def require_user(request: Request) -> UserIdentity:
     await require_gateway(request)
-    who = session_from_headers(request)
+    who = user_from_headers(request)
     if who is None:
         raise HTTPException(401, "no autenticado")
     return who
+
+
+def require_perm(*perms: str):
+    """Dependencia de ruta: el usuario debe tener **todos** los permisos pedidos (spec §9.1)."""
+
+    async def dependency(request: Request) -> UserIdentity:
+        who = await require_user(request)
+        if not set(perms) <= who.perms:
+            ip = client_ip(request)
+            await request.app.state.audit.emit(
+                "warning", "perm.denied", actor=f"user:{who.username}", target=request.url.path, ip=ip,
+                details={"required": list(perms)},
+            )
+            raise HTTPException(403, "permiso insuficiente")
+        return who
+
+    return dependency
 ```
 
 - [ ] **Step 4: Implementar `shared/service_auth.py`**
@@ -2042,11 +2098,24 @@ class ServiceClient:
     ):
         self.auth, self.urls, self.transport = auth, urls, transport
 
-    async def post(self, service: str, path: str, *, json: dict, timeout: float = 3.0) -> httpx.Response:
+    async def post(
+        self,
+        service: str,
+        path: str,
+        *,
+        json: dict | None = None,
+        content: bytes | None = None,
+        headers: dict | None = None,
+        timeout: float = 3.0,
+    ) -> httpx.Response:
+        """`json` para cuerpos JSON; `content` para bytes (las imágenes que media manda a stego)."""
         # ponytail: un AsyncClient por llamada (sin pool compartido); basta en una red interna a esta escala.
         async with httpx.AsyncClient(transport=self.transport, timeout=timeout) as client:
             return await client.post(
-                self.urls[service] + path, json=json, headers={TOKEN_HEADER: self.auth.token or ""}
+                self.urls[service] + path,
+                json=json,
+                content=content,
+                headers={**(headers or {}), TOKEN_HEADER: self.auth.token or ""},
             )
 ```
 
@@ -2122,8 +2191,7 @@ from shared.service_auth import ServiceTokenMiddleware
 
 log = logging.getLogger("web")
 
-ADMIN_COOKIE = "__Host-admin"
-ROOM_COOKIE = "__Host-room"
+SESSION_COOKIE = "__Host-session"  # el JWT (spec §8.1)
 DEVICE_COOKIE = "__Host-device"
 
 
@@ -2166,6 +2234,8 @@ def create_base_app(*, title: str, settings, engine, service_auth, audit, lifesp
 
     @app.get("/health")
     async def health() -> JSONResponse:
+        if engine is None:  # servicio sin BD (stego)
+            return JSONResponse({"status": "ok"})
         try:
             async with engine.connect() as conn:
                 await conn.execute(text("SELECT 1"))
@@ -2177,7 +2247,7 @@ def create_base_app(*, title: str, settings, engine, service_auth, audit, lifesp
 ```
 
 Run: `pytest services/shared -q`
-Expected: PASS (incluye los 11 tests de `test_r16_service_auth.py`)
+Expected: PASS (incluye los 12 tests de `test_r16_service_auth.py`)
 
 - [ ] **Step 6: Trazabilidad y commit**
 
@@ -2496,7 +2566,7 @@ git commit -m "feat(shared): utilidades de BD de prueba, migraciones comunes e i
 **Interfaces:**
 - Consumes: `shared.crypto` (para el test).
 - Produces:
-  - `deploy/secrets/*`: los 27 archivos de la spec §11.1, entre ellos `gateway_token.conf`.
+  - `deploy/secrets/*`: los 30 archivos de la spec §11.1, entre ellos `gateway_token.conf`, `kek_media_v1`, `jwt_signing_key` (RSA de 3072 bits) y el token y hash de `stego`.
   - `deploy/public/chat-key.json` con `{"kid", "pub"}`.
   - Imagen por servicio: `docker build --build-arg SERVICE=<svc> -f services/Dockerfile .`.
   - Compose con `db`, las redes y las anclas `x-python-service` / `x-migrate`, que las tareas de cada servicio reutilizan.
@@ -2511,6 +2581,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+
 from shared.crypto import b64d, b64e, load_signing_key, public_bytes
 
 SCRIPT = Path(__file__).resolve().parents[3] / "deploy" / "gen_secrets.py"
@@ -2523,7 +2596,12 @@ def gen(root: Path, *args: str) -> None:
 def test_genera_todo_y_no_sobrescribe(tmp_path):
     gen(tmp_path)
     secrets = tmp_path / "secrets"
-    assert len(list(secrets.iterdir())) == 27
+    # 21 aleatorios (3 KEK, url, postgres, 10 de BD, 6 tokens) + 6 hashes + conf + chat_sign_key + jwt_signing_key
+    assert len(list(secrets.iterdir())) == 30
+    jwt_key = serialization.load_pem_private_key((secrets / "jwt_signing_key").read_bytes(), password=None)
+    assert isinstance(jwt_key, rsa.RSAPrivateKey) and jwt_key.key_size == 3072
+    stego_token = (secrets / "svc_token_stego").read_text().strip()
+    assert (secrets / "svc_hash_stego").read_text() == hashlib.sha256(stego_token.encode()).hexdigest()
     token = (secrets / "svc_token_gateway").read_text().strip()
     assert (secrets / "svc_hash_gateway").read_text() == hashlib.sha256(token.encode()).hexdigest()
     assert token in (secrets / "gateway_token.conf").read_text()
@@ -2569,13 +2647,14 @@ from collections.abc import Callable
 from pathlib import Path
 
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
-SERVICES = ("auth", "rooms", "chat", "media", "audit")
-CALLERS = ("gateway", "auth", "rooms", "chat", "media")
+SERVICES = ("auth", "rooms", "chat", "media", "audit")  # los que tienen BD (stego no)
+CALLERS = ("gateway", "auth", "rooms", "chat", "media", "stego")
 RANDOM = (
     "kek_auth_v1",
     "kek_chat_v1",
+    "kek_media_v1",
     "url_signing_key",
     "postgres_password",
     *(f"db_{svc}_{role}" for svc in SERVICES for role in ("owner", "app")),
@@ -2583,13 +2662,22 @@ RANDOM = (
 )
 
 
-def new_signing_key() -> str:
-    key = ec.generate_private_key(ec.SECP256R1())
+def pem(key) -> str:
     return key.private_bytes(
         serialization.Encoding.PEM,
         serialization.PrivateFormat.PKCS8,
         serialization.NoEncryption(),
     ).decode()
+
+
+def new_signing_key() -> str:
+    """ECDSA P-256 del hello del chat (spec §10.1)."""
+    return pem(ec.generate_private_key(ec.SECP256R1()))
+
+
+def new_jwt_key() -> str:
+    """RSA de 3072 bits para los JWT RS256 de auth (spec §11.1)."""
+    return pem(rsa.generate_private_key(public_exponent=65537, key_size=3072))
 
 
 def public_key_json(pem: str) -> str:
@@ -2638,6 +2726,7 @@ class Generator:
             token = self.read("svc_token_gateway")
             self.write("gateway_token.conf", f'proxy_set_header X-Service-Token "{token}";\n')
         self.ensure("chat_sign_key", new_signing_key)
+        self.ensure("jwt_signing_key", new_jwt_key)
         public = self.public_dir / "chat-key.json"
         if "chat_sign_key" in self.changed or not public.exists():
             public.write_text(public_key_json(self.read("chat_sign_key")), encoding="utf-8")
@@ -2793,18 +2882,22 @@ secrets:
   db_audit_app: {file: ./secrets/db_audit_app}
   kek_auth_v1: {file: ./secrets/kek_auth_v1}
   kek_chat_v1: {file: ./secrets/kek_chat_v1}
+  kek_media_v1: {file: ./secrets/kek_media_v1}
   chat_sign_key: {file: ./secrets/chat_sign_key}
+  jwt_signing_key: {file: ./secrets/jwt_signing_key}
   url_signing_key: {file: ./secrets/url_signing_key}
   gateway_token_conf: {file: ./secrets/gateway_token.conf}
   svc_token_auth: {file: ./secrets/svc_token_auth}
   svc_token_rooms: {file: ./secrets/svc_token_rooms}
   svc_token_chat: {file: ./secrets/svc_token_chat}
   svc_token_media: {file: ./secrets/svc_token_media}
+  svc_token_stego: {file: ./secrets/svc_token_stego}
   svc_hash_gateway: {file: ./secrets/svc_hash_gateway}
   svc_hash_auth: {file: ./secrets/svc_hash_auth}
   svc_hash_rooms: {file: ./secrets/svc_hash_rooms}
   svc_hash_chat: {file: ./secrets/svc_hash_chat}
   svc_hash_media: {file: ./secrets/svc_hash_media}
+  svc_hash_stego: {file: ./secrets/svc_hash_stego}
 ```
 
 - [ ] **Step 5: Verificar la BD real**
@@ -2842,7 +2935,7 @@ git commit -m "feat(deploy): plantilla Docker, generación de secretos y Postgre
 
 **Interfaces:**
 - Consumes: `services/shared` (FND-2…FND-6).
-- Produces: el job `services` con matriz `svc`. Cada tarea `*-1` de un servicio agrega su nombre a la matriz, y FE-1 agrega el job `frontend`.
+- Produces: el job `services` con matriz `svc`. Cada tarea `*-1` de un servicio agrega su nombre a la matriz, y FE-1 agrega el job `frontend`. Los jobs `codeql` (SAST) y `secrets` (gitleaks) cubren Shift Left desde el primer push.
 
 - [ ] **Step 1: Workflow**
 
@@ -2889,6 +2982,43 @@ jobs:
         run: bandit -q -ll -r "services/${{ matrix.svc }}" -x "services/${{ matrix.svc }}/tests,services/${{ matrix.svc }}/tools,services/shared/shared/testing.py"
       - name: pip-audit
         run: pip-audit --skip-editable
+
+  codeql:
+    # SAST (Shift Left). `upload: never` + artefacto SARIF funciona también en repositorios privados
+    # sin GitHub Advanced Security; si el repositorio es público, se puede quitar `upload: never`.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/analyze@v3
+        with:
+          upload: never
+          output: codeql-results
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codeql-${{ matrix.language }}
+          path: codeql-results
+
+  secrets:
+    # Detección de secretos en todo el historial. Si marca falsos positivos en `tests/`,
+    # agrega un `.gitleaks.toml` con una lista de permitidos para esas rutas.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
 - [ ] **Step 2: Formatear y verificar en local**
@@ -2896,14 +3026,14 @@ jobs:
 Run: `ruff format services/shared deploy && ruff check --fix services/shared deploy && pytest services/shared -q`
 Expected: sin errores de ruff y todos los tests en verde.
 
-- [ ] **Step 3: Commit y push**
+- [ ] **Step 3: Commit**
 
 ```bash
 git add .github/workflows/ci.yml services/shared deploy
-git commit -m "ci: lint, pruebas, bandit y pip-audit de los servicios"
-git push -u origin feat/arquitectura-chat-seguro
+git commit -m "ci: lint, pruebas, bandit, pip-audit, CodeQL y gitleaks"
 ```
-Expected: el workflow `ci` pasa en GitHub (job `services (shared)`).
+El `push` (`git push -u origin feat/arquitectura-chat-seguro`) se hace solo cuando el equipo lo pida.
+Expected: al hacer push, el workflow `ci` pasa en GitHub (jobs `services (shared)`, `codeql` y `secrets`).
 
 Al cerrar este archivo, marca `[x] 01 Fundaciones` en la sección *Estado actual* de `CLAUDE.md`.
 
