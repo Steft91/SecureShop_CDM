@@ -1,0 +1,43 @@
+# T-04 · FND-4: Autenticación entre servicios, identidad, auditoría y base web (R16)
+
+| Campo | Valor |
+|---|---|
+| Responsable | Andrés |
+| Incremento | Primer parcial |
+| Bloqueado por | [T-03 · FND-3](../zaith/T-03-argon2-y-limites.md) (Zaith) |
+| Desbloquea | [T-05 · FND-5](../stefany/T-05-utilidades-de-bd-y-pruebas.md) (Stefany) |
+| Plan | [`docs/plans/2026-10-13-01-fundaciones.md`](../../plans/2026-10-13-01-fundaciones.md), sección *Task FND-4* |
+| Estado | Pendiente |
+
+## Objetivo
+
+Tokens de servicio con allowlist por hash, identidad del gateway (`X-User-*`), `require_perm`, cliente de auditoría con fallback y la app base con errores JSON.
+
+## Criterios de aceptación
+
+- [ ] Los 12 tests de `test_r16_service_auth.py` pasan
+- [ ] Sin token → 401; un llamador fuera de la allowlist → 403 y `svc.reject.token`
+- [ ] Las cabeceras `X-User-*` sin el token del gateway se ignoran (401)
+- [ ] `require_perm` responde `403 "permiso insuficiente"` y audita `perm.denied`
+- [ ] `/health` responde sin token; con `engine=None`, sin BD
+
+## Entregables
+
+- `services/shared/shared/{service_auth,identity,audit_client,web,testing}.py`
+- `services/shared/tests/test_r16_service_auth.py`
+
+## Documentación a actualizar
+
+- Fila R16 de la trazabilidad
+
+## Verificación
+
+`pytest services/shared -q`
+
+## Al cerrar
+
+- [ ] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada (o `npx vitest run`, en el frontend)
+- [ ] La trazabilidad y los documentos de arriba están actualizados
+- [ ] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
+- [ ] *Estado* = Cerrado, con la fecha y el hash del commit
+- [ ] Avisar a Stefany de que puede empezar T-05
