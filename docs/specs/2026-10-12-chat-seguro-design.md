@@ -520,7 +520,7 @@ Para cada servicio con BD `<svc>` ∈ {auth, rooms, chat, media, audit}:
 | chat | `POST /internal/rooms/{room_id}/files` | media | `{file_id, user_id, alias}` → guarda el evento cifrado y lo difunde · `204` |
 | media | `POST /internal/files/{id}/delete` | chat | Borra el archivo del disco y marca `deleted` (idempotente) · `204` |
 | stego | `POST /internal/analyze` | media | Cuerpo: los bytes de la imagen (`application/octet-stream`) → `200` veredicto (§12.7) · `422 {error, motivos}` |
-| stego | `POST /internal/sanitize` | media | Bytes → `200` bytes sanitizados (`image/png` o `image/jpeg`) · `422` |
+| stego | `POST /internal/sanitize` | media | Bytes → `200` bytes sanitizados (`image/png` o `image/jpeg`) · `422` · `503` si la salida conserva residuos (§12.5) |
 | audit | `POST /internal/events` | auth, rooms, chat, media, stego | `{severity, action, actor, target?, ip?, details?}` → `201 {id}`; `service` sale del token |
 
 Todos los servicios exponen además `GET /health` sin token (`{"status": "ok"}` si su BD responde; `stego` responde sin BD), usado solo por el healthcheck de Docker.
@@ -776,12 +776,12 @@ Desde la revisión 4, `session_id` es el id de la sesión de la cuenta (`sid`). 
 # stego_svc/formats.py
 FORMATS = {
     "image/png":  Format(mime="image/png",  ext="png", signature=b"\x89PNG\r\n\x1a\n", pil_format="PNG",
-                         analyze=png.analyze,  sanitize=png.sanitize),
+                         analyze=png.analyze,  sanitize=png.sanitize,  residual=png.residual),
     "image/jpeg": Format(mime="image/jpeg", ext="jpg", signature=b"\xff\xd8\xff",      pil_format="JPEG",
-                         analyze=jpeg.analyze, sanitize=jpeg.sanitize),
+                         analyze=jpeg.analyze, sanitize=jpeg.sanitize, residual=jpeg.residual),
 }
 ```
-Para agregar un formato basta con una entrada nueva, su módulo y sus tests. `analyze` y `sanitize` son funciones de módulo (las ejecuta un `ProcessPoolExecutor`).
+Para agregar un formato basta con una entrada nueva, su módulo y sus tests. `analyze` y `sanitize` son funciones de módulo (las ejecuta un `ProcessPoolExecutor`). `residual(data)` devuelve solo los motivos **estructurales** (los mismos de `problema`) y reanaliza la salida de `sanitize` (§12.5).
 
 **Validación previa** (igual para la API pública y la interna): tope de 5 MB, firma (*magic bytes*) contra `FORMATS` ignorando la extensión y el `Content-Type`, `MAX_IMAGE_PIXELS` = 20 MP, formato decodificado igual al de la firma, `verify()` y luego `load()`.
 
@@ -808,6 +808,7 @@ Se necesitan ≥ 30 imágenes limpias reales (fotos de celular y capturas de pan
 ### 12.5 Sanitización (CDR) de todo archivo aceptado o liberado
 - **PNG:** se decodifica (se conserva el canal alfa si existe), se **reemplaza el plano LSB por bits aleatorios** (imperceptible; destruye payloads LSB-1 aunque no se detecten) y se recodifica sin chunks auxiliares. Recodificar sin tocar los píxeles **no** basta, porque PNG es sin pérdida.
 - **JPEG:** se aplica la orientación EXIF y se recodifica a RGB con calidad 90, sin EXIF, ICC ni comentarios.
+- **Reanálisis estructural de la salida:** antes de entregarla, `stego` revisa la estructura de lo que produjo el sanitizador (`residual`: datos pegados, chunks de texto o desconocidos, metadatos excesivos). Si queda algo, no la entrega: responde 503 y audita `stego.sanitize.failed` (critical), y `media` no publica ni libera nada. Solo se revisa la estructura: el plano LSB aleatorio dispararía chi² por diseño (A3-RS-36).
 - `media` guarda el `clean_sha256` de la salida. Una imagen con el plano LSB aleatorio es estadísticamente idéntica a una con LSB embebido al 100 %, así que el sistema reconoce sus propias salidas por hash (§9.6, paso 3) y no las vuelve a analizar. El prototipo del 2026-10-13 lo confirmó: también fallan las alternativas de poner el LSB en cero (lo marca RS), recodificar como JPEG o redimensionar (lo marca chi²).
 
 ### 12.6 Agregar formatos en el futuro
@@ -869,6 +870,8 @@ En JPEG, `checks` trae `trailing_bytes` y `metadata_bytes`. `chi2_p` y `rs_rate`
   - `proxy-base.conf`: `Host`, `X-Real-IP $remote_addr`, `X-Forwarded-For $remote_addr` (sobrescribe, no concatena), `X-Forwarded-Proto https` y el token del gateway (`include /run/secrets/gateway_token_conf`, el secreto que se genera en `deploy/secrets/gateway_token.conf`).
   - `proxy-public.conf`: base + **vacía** las 4 cabeceras `X-User-*` y `Authorization`. Las cookies sí pasan, porque `auth` las necesita en el login (dispositivo) y en el TOTP (etapa `preauth`).
   - `proxy-user.conf`: base + `X-User-*` desde `auth_request` + `Authorization ""` y `Cookie ""`: ni el JWT ni las cookies viajan a los servicios.
+- **Correlación (RNF-19):** el gateway genera `X-Request-ID` (`$request_id`), sobrescribe el del cliente y lo manda en `proxy-base.conf`, tanto a los servicios como al `auth_request` (la subpetición comparte variables con la petición, así que es el mismo id). Vuelve **una sola vez** al cliente (`add_header` a nivel `server`; los servicios no lo devuelven). Cada servicio toma el id (si cumple `^[A-Za-z0-9-]{8,64}$`, o crea uno), lo pone en sus registros, lo reenvía en `ServiceClient` y lo manda a `audit`, que lo guarda en `details.request_id` dentro del hash de la cadena.
+- **Registros (RNF-18):** una línea JSON por petición en el gateway y en cada servicio (`ts`, `service`, `level`, `request_id`, `logger`, `msg`, y `method`, `path`, `status`, `ms`), **sin query string**. uvicorn corre con `--no-access-log` y `LOG_FORMAT=json`.
 - **Errores en JSON:** `error_page 401 403 404 413 429 502 503` → `{"error":"…"}` con `default_type application/json`.
 - `client_max_body_size` es 16k por defecto y 5m solo en las rutas de subida y análisis. `client_body_timeout 10s`.
 - **Verificación manual** (evidencia para el informe): `curl --tlsv1.2 --tls-max 1.2 https://localhost/` debe fallar; `curl -I http://localhost/ws` → 301; `curl https://localhost/internal/verify` → 404.
@@ -882,6 +885,7 @@ En JPEG, `checks` trae `trailing_bytes` y `metadata_bytes`. `chi2_p` y `rs_rate`
 - Toma `pg_advisory_xact_lock(42)`, lee el último `hash` e inserta. *Límite conocido: las escrituras quedan serializadas; a esta escala no importa.*
 - `hash = SHA256(prev_hash || json canónico de {ts, service, severity, actor, action, target, ip, details})`, con claves ordenadas, sin espacios y `ensure_ascii=False`. El primer `prev_hash` son 32 bytes en cero.
 - `audit_app` no puede `UPDATE`, `DELETE` ni `TRUNCATE`. `GET /api/admin/audit/verify` recorre la cadena; si se rompe, devuelve `{ok:false, broken_at:id}` y registra `audit.chain.broken` (critical).
+- `POST /internal/events` acepta un `request_id` opcional (el `X-Request-ID` del gateway; si no cumple `^[A-Za-z0-9-]{8,64}$` → 422) y lo guarda dentro de `details`, así que el hash lo cubre. `audit` agrega el id también a sus propios eventos. Con él, una petición se sigue del gateway a los registros de cada servicio y a la cadena.
 - **Nunca** se registran contraseñas, claves de sala, tokens (JWT incluidos), cuerpos de mensajes ni secretos TOTP.
 
 ### 14.2 Eventos
@@ -891,7 +895,7 @@ En JPEG, `checks` trae `trailing_bytes` y `metadata_bytes`. `chi2_p` y `rs_rate`
 | rooms | `room.created`, `room.updated`, `room.closed`, `room.owner.transferred`, `room.member.joined`, `room.member.left`, `room.member.unbanned`, `room.member.unmuted` | `room.join.fail`, `room.join.ratelimited`, `room.join.full`, `room.join.alias_taken`, `room.join.banned`, `room.limit.reached`, `room.member.kicked`, `room.member.muted`, `room.forbidden` | — |
 | chat | `message.deleted`, `key.rotate.chat` | `ws.reject.{origin,handshake,replay,rate,size,forbidden,malformed,membership}`, `ws.muted` | `ws.tamper` |
 | media | `file.accepted`, `file.released`, `file.deleted`, `key.rotate.media` | `file.quarantined`, `file.rejected.{type,invalid,size,forbidden,muted}`, `file.download.denied`, `file.integrity.failed`, `clamav.unavailable`, `stego.unavailable` | `file.rejected.malware` |
-| stego | `stego.analyzed` (limpia) | `stego.analyzed` (problema, revisión manual o inválida), `stego.ratelimited` | — |
+| stego | `stego.analyzed` (limpia) | `stego.analyzed` (problema, revisión manual o inválida), `stego.ratelimited` | `stego.sanitize.failed` |
 | todos | — | `http.reject.origin`, `svc.reject.token` (token ausente o inválido, o llamador fuera de la allowlist), `perm.denied` (falta el permiso) | — |
 | audit | — | — | `audit.chain.broken` |
 
@@ -964,7 +968,7 @@ Se ejecuta en local antes de cada hito.
 `docs/trazabilidad-riesgos.md` tiene la tabla `Riesgo | Control | Servicio/Archivo(s) | Test(s) | Estado`. Se actualiza con cada cambio de seguridad (comando `/risk-check`) y se copia al informe final.
 
 ### 16.5 CI (`.github/workflows/ci.yml`)
-- Job `services`, en matriz `[shared, auth, rooms, chat, media, stego, audit]` con servicio `postgres:17`: `ruff check`, `ruff format --check`, `pytest -m "not clamav"`, `bandit -q -r <paquete>` y `pip-audit -r requirements.lock`. Cada servicio entra a la matriz con su tarea `*-1`.
+- Job `services`, en matriz `[shared, auth, rooms, chat, media, stego, audit]` con servicio `postgres:17`: `ruff check` (con complejidad ciclomática ≤ 10 por función, RNF-11), `ruff format --check`, `pytest -m "not clamav"` con **cobertura de líneas ≥ 80 %** por servicio (RNF-10), `bandit -q -r <paquete>` y `pip-audit -r requirements.lock`. Cada servicio entra a la matriz con su tarea `*-1`. `main` exige PR con una aprobación y estos jobs en verde; la plantilla de PR (`.github/pull_request_template.md`) trae la lista de verificación de seguridad.
 - Job `frontend`: `npm ci`, `npx vitest run`, `npm run build`, `npm audit --audit-level=high`.
 - Job `codeql`: análisis estático de CodeQL para Python y JavaScript/TypeScript (inyecciones, flujos de datos no confiables, uso inseguro de APIs).
 - Job `secrets`: gitleaks sobre todo el historial del repositorio.
@@ -1036,6 +1040,7 @@ Los tickets de cada persona (Zaith, Andrés y Stefany), uno por archivo, están 
 | `CLAMAV_HOST` / `CLAMAV_PORT` / `MEDIA_DIR` | media | `clamav` / `3310` / `/data` |
 | `UPLOAD_MAX_BYTES` / `MAX_IMAGE_PIXELS` / `ANALYZE_PER_MIN` | stego | `5242880` / `20000000` / `10` |
 | `STEGO_CHI2_P` / `STEGO_RS_RATE` / `STEGO_ENTROPY_TRIGGER` / `STEGO_TIMEOUT_S` | stego | `0.95` / `0.08` / `off` / `10` |
+| `LOG_FORMAT` | todos los servicios Python | `json` en los contenedores (la imagen lo fija); vacío en las pruebas |
 
 **Desarrollo del frontend:** `npm run dev` (Vite en `https://localhost:5173` con los certificados de mkcert) con `server.proxy` de `/api`, `/ws` y `/chat-key.json` hacia `https://localhost` (el gateway). Las cookies `__Host-` exigen https también en desarrollo.
 
@@ -1094,3 +1099,22 @@ El docente redujo el primer parcial a **dos microservicios integrados, sin inter
 | Servicio `stego` separado de `media` | La API de esteganografía del parcial se reutiliza en las salas | §4, §9.6, §9.9, §12 |
 | Primer parcial como corte definitivo (fundaciones, audit, gateway, auth y stego) | Las fundaciones exigen el gateway y `audit`; así no hay código provisional | §2, §18.1 |
 | Fuera de alcance: reportes, edición de mensajes, moderadores, correo, notificaciones y estadísticas | YAGNI; se agregan si el docente los pide | §3 |
+
+### 22.1 Requisitos de la Actividad 3 que se adoptan
+
+El 20/10 una rama paralela del equipo transcribió los requisitos de la Actividad 3 (21 RF, 19 RNF y 39 RS) sobre otro diseño (correo verificado, canal general, 9 formatos). Se revisaron contra esta revisión y se adoptó lo siguiente. El documento original no está en el repositorio, así que los IDs son los de esa transcripción.
+
+| Requisito | Qué se hace | Dónde | Cuándo |
+|---|---|---|---|
+| RNF-11 · complejidad ≤ 10 | Regla `C90` de ruff; `jpeg.structure` se parte | §16.5; FND-1, STG-1 | Parcial |
+| RNF-10 · cobertura ≥ 80 % | `--cov-fail-under=80` en la CI | §16.5; FND-7 | Parcial |
+| A3-RS-32 · cambios controlados | Plantilla de PR y protección de `main` (1 aprobación y la CI en verde) | §16.5; FND-1, FND-7 | Parcial |
+| RNF-18, RNF-19 · correlación y registros | `X-Request-ID`, registros JSON y `request_id` en la cadena de auditoría | §13, §14.1; FND-4, AUD-2, GW-1 | Parcial |
+| RNF-07 · consulta de auditoría con 100 000 eventos ≤ 2 s | Una prueba (el índice `(severity, id)` ya existe) | §14.3; AUD-3 | Parcial |
+| A3-RS-36 · reanálisis de lo sanitizado | `residual` estructural sobre la salida de `sanitize` | §12.5; STG-3 | Parcial |
+| RNF-14 · orden de mensajes por sala | Candado por sala al difundir: el orden en vivo coincide con el historial | §9.5; CHAT-3 | Incremento 2 |
+| RNF-18 · métricas y alerta de consumo | `GET /api/admin/metrics`, `resource.high` (CPU y memoria > 80 % durante 5 min) y pestaña *Estado* | FE-5 | Incremento 3 |
+| RNF-15…17 · recuperación | Respaldos cifrados con `age` (diarios, 14 días), restauración y simulacro | E2E-3 | Incremento 3 |
+| RNF-08, 09, 13 · usabilidad | Prueba de contraste y Lighthouse ≥ 90 | FE-5 | Incremento 3 |
+
+No se adoptan, salvo que el docente los pida: la prueba de 500 conexiones con 25 contenedores (RNF-06; si hace falta, una versión de 20 a 50 participantes con p95), `bench_formats` (solo hay dos formatos), la prueba con 5 personas y todo lo del otro diseño (correo, Mailpit, canal general, 9 formatos).

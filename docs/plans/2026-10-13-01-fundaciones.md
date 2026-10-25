@@ -36,6 +36,7 @@ Ninguno de los 5 casos del índice cae en este archivo, pero las utilidades que 
 
 **Files:**
 - Create: `.gitignore`, `.gitattributes`, `.dockerignore`, `ruff.toml`
+- Create: `.github/pull_request_template.md`
 - Create: `CLAUDE.md`
 - Create: `.claude/settings.json`
 - Create: `.claude/rules/security.md`, `.claude/rules/microservices.md`, `.claude/rules/backend.md`, `.claude/rules/frontend.md`, `.claude/rules/testing.md`
@@ -50,7 +51,8 @@ Ninguno de los 5 casos del índice cae en este archivo, pero las utilidades que 
 - Produces:
   - El hook `guard.py`, que corre antes de cada `Edit|Write|MultiEdit` de Claude Code.
   - La tabla de trazabilidad que actualizan todas las tareas.
-  - `ruff.toml` en la raíz, que aplica a todo `services/`, `deploy/` y `e2e/`.
+  - `ruff.toml` en la raíz, que aplica a todo `services/`, `deploy/` y `e2e/`. Incluye la regla `C90` con complejidad ciclomática ≤ 10 por función (RNF-11): una función más compleja se parte en el mismo ticket, no se silencia.
+  - `.github/pull_request_template.md` con la lista de verificación de seguridad (A3-RS-32).
 
 - [ ] **Step 1: Escribir el hook con su autoprueba**
 
@@ -254,8 +256,11 @@ line-length = 100
 target-version = "py313"
 
 [lint]
-select = ["E", "F", "I", "B", "S", "UP"]
+select = ["E", "F", "I", "B", "S", "UP", "C90"]  # C90: complejidad ciclomática (RNF-11)
 ignore = ["E501"]  # ruff format ajusta el código; SQL y comentarios largos no se parten a la fuerza
+
+[lint.mccabe]
+max-complexity = 10
 
 [lint.isort]
 known-first-party = ["shared", "auth_svc", "rooms_svc", "chat_svc", "media_svc", "stego_svc", "audit_svc"]
@@ -619,13 +624,33 @@ Actualizar al cerrar cada ticket (`docs/tickets/README.md` tiene la cadena compl
 - Incremento 3: [ ] 07 Media · [ ] 08 Frontend (FE-4…5) · [ ] 09 E2E y cierre
 ````
 
-- [ ] **Step 9: Verificar formato y commit**
+- [ ] **Step 9: Plantilla de PR**
+
+`.github/pull_request_template.md`:
+```markdown
+## Qué cambia
+<!-- La tarea del plan (p. ej. ATH-2) y su ticket (T-12). -->
+
+## Riesgos y requisitos
+<!-- R# y RF/RS que toca. -->
+
+## Lista de verificación de seguridad
+- [ ] Sin secretos, tokens ni contraseñas en el código, los registros ni los tests (salvo valores de prueba marcados como tales)
+- [ ] La autorización se decide en el servidor, por permiso o por pertenencia, nunca por un campo que mande el cliente
+- [ ] Cuerpos con `extra="forbid"`, consultas parametrizadas y errores genéricos hacia el cliente
+- [ ] Todo rechazo y todo otorgamiento de acceso se audita
+- [ ] Hay un `test_rNN_*` por cada control tocado y `docs/trazabilidad-riesgos.md` está al día
+- [ ] ruff, pytest (cobertura ≥ 80 %), bandit y pip-audit en verde
+- [ ] Nadie hace `merge` a `main` sin que el equipo lo autorice
+```
+
+- [ ] **Step 10: Verificar formato y commit**
 
 Run: `python .claude/hooks/guard.py --self-test && python -c "import json; json.load(open('.claude/settings.json', encoding='utf-8')); print('settings OK')"`
 Expected: `guard.py: autoprueba OK` y `settings OK`
 
 ```bash
-git add .gitignore .gitattributes .dockerignore ruff.toml CLAUDE.md .claude docs/trazabilidad-riesgos.md
+git add .gitignore .gitattributes .dockerignore ruff.toml .github/pull_request_template.md CLAUDE.md .claude docs/trazabilidad-riesgos.md
 git commit -m "chore: contexto de Claude Code, reglas de seguridad y trazabilidad de riesgos"
 ```
 
@@ -679,6 +704,7 @@ dependencies = [
 dev = [
   "pytest>=8.3",
   "pytest-timeout>=2.3",
+  "pytest-cov>=5.0",
   "ruff>=0.8",
   "bandit>=1.8",
   "pip-audit>=2.7",
@@ -1596,8 +1622,10 @@ git commit -m "feat(shared): Argon2id con tope de concurrencia, política de cla
 
 **Files:**
 - Create: `services/shared/shared/service_auth.py`, `services/shared/shared/identity.py`, `services/shared/shared/audit_client.py`, `services/shared/shared/web.py`
+- Create: `services/shared/shared/observability.py` (Step 6: correlación y registros JSON)
 - Create: `services/shared/shared/testing.py` (cabeceras, `ServiceAuth` de prueba y `Recorder`; FND-5 agrega lo de BD)
-- Test: `services/shared/tests/test_r16_service_auth.py`
+- Modify: `services/Dockerfile` (lo crea FND-6; allí ya trae `LOG_FORMAT=json` y `--no-access-log`)
+- Test: `services/shared/tests/test_r16_service_auth.py`, `services/shared/tests/test_observabilidad.py`
 
 **Interfaces:**
 - Consumes: `shared.crypto.sha256`, `shared.crypto.b64e` (FND-2).
@@ -1605,7 +1633,8 @@ git commit -m "feat(shared): Argon2id con tope de concurrencia, política de cla
   - `shared.service_auth`: `TOKEN_HEADER = "X-Service-Token"`; `ServiceAuth(name, token, callers)` con `from_secrets(name, *, needs_token)` e `identify(token)->str|None`; `ServiceTokenMiddleware`; `allow(*callers)` (dependencia que devuelve el llamador); `ServiceClient(auth, urls, transport=None)` con `post(service, path, *, json=None, content=None, headers=None, timeout=3.0)->httpx.Response` (`json` para JSON, `content` para bytes, como las imágenes que `media` manda a `stego`).
   - `shared.identity`: `UserIdentity(user_id, username, session_id, perms: frozenset[str])`, `client_ip(conn)`, `user_from_headers(conn)->UserIdentity|None`, `require_gateway`, `require_user`, `require_perm(*perms)` (403 `"permiso insuficiente"` y evento `perm.denied` si falta alguno).
   - `shared.audit_client`: `AuditUnavailable`, `AuditClient(ServiceClient).emit(severity, action, *, actor, target=None, ip=None, details=None, required=False)`.
-  - `shared.web`: `SESSION_COOKIE`, `DEVICE_COOKIE`, `set_cookie(response, name, value, max_age=None)`, `clear_cookie(response, name)`, `create_base_app(*, title, settings, engine, service_auth, audit, lifespan=None)->FastAPI` (con `engine=None`, `/health` responde sin BD: lo usa `stego`). La app expone `app.state.settings/engine/service_auth/audit` y `request.state.caller`.
+  - `shared.web`: `SESSION_COOKIE`, `DEVICE_COOKIE`, `set_cookie(response, name, value, max_age=None)`, `clear_cookie(response, name)`, `create_base_app(*, title, settings, engine, service_auth, audit, lifespan=None)->FastAPI` (con `engine=None`, `/health` responde sin BD: lo usa `stego`). La app expone `app.state.settings/engine/service_auth/audit` y `request.state.caller`. Instala `RequestContextMiddleware` como el más externo y llama a `configure_logging(title)`.
+  - `shared.observability` (RNF-18, RNF-19): `REQUEST_HEADER = "X-Request-ID"`, `REQUEST_ID: ContextVar[str | None]`, `JsonFormatter(service)`, `configure_logging(service)` (solo con `LOG_FORMAT=json`) y `RequestContextMiddleware`. El middleware toma el id que puso el gateway (si cumple `^[A-Za-z0-9-]{8,64}$`; si no, crea uno de 32 hex), lo deja en `REQUEST_ID` y registra **una línea por petición** con `method`, `path` (sin query string), `status` y `ms`. `ServiceClient.post` reenvía el id y `AuditClient.emit` lo manda como `request_id` (audit lo guarda en la cadena, AUD-2). Los servicios no devuelven el id al cliente: lo hace el gateway (GW-1).
   - `shared.testing`:
     - constantes `ORIGIN`, `TOKENS` (gateway, auth, rooms, chat, media, stego), `ROLE_PASSWORD`, `USER_ID`, `SESSION_ID`;
     - `service_auth(name, callers)`;
@@ -2249,16 +2278,213 @@ def create_base_app(*, title: str, settings, engine, service_auth, audit, lifesp
 Run: `pytest services/shared -q`
 Expected: PASS (incluye los 12 tests de `test_r16_service_auth.py`)
 
-- [ ] **Step 6: Trazabilidad y commit**
+- [ ] **Step 6: Correlación de peticiones y registros JSON (RNF-18, RNF-19)**
+
+Un mismo `X-Request-ID` recorre gateway → servicios → audit, así que una petición de la demo se reconstruye de punta a punta en la auditoría y en los registros.
+
+`services/shared/tests/test_observabilidad.py`:
+```python
+import asyncio
+import json
+import logging
+import re
+
+import httpx
+import pytest
+from fastapi import Depends, Request
+from fastapi.testclient import TestClient
+from test_r16_service_auth import build_app
+
+from shared import testing
+from shared.identity import require_gateway
+from shared.observability import REQUEST_HEADER, REQUEST_ID, JsonFormatter
+from shared.service_auth import ServiceClient
+
+
+@pytest.fixture
+def recorder():
+    return testing.Recorder()
+
+
+def build_client(recorder) -> TestClient:
+    app = build_app(recorder)
+
+    @app.get("/api/eco", dependencies=[Depends(require_gateway)])
+    async def eco(request: Request) -> dict:
+        await request.app.state.audit.emit("info", "prueba.eco", actor="system")
+        return {"id": REQUEST_ID.get()}
+
+    return TestClient(app, base_url=testing.ORIGIN)
+
+
+def test_el_id_del_gateway_llega_al_codigo_y_a_audit(recorder):
+    headers = {**testing.gateway_headers(), REQUEST_HEADER: "0123456789abcdef"}
+    r = build_client(recorder).get("/api/eco", headers=headers)
+    assert r.json() == {"id": "0123456789abcdef"}
+    assert recorder.events("prueba.eco")[0]["request_id"] == "0123456789abcdef"
+
+
+@pytest.mark.parametrize("presented", [None, "corto", "con espacios y !!"])
+def test_id_ausente_o_invalido_se_reemplaza(recorder, presented):
+    headers = {**testing.gateway_headers(), **({REQUEST_HEADER: presented} if presented else {})}
+    got = build_client(recorder).get("/api/eco", headers=headers).json()["id"]
+    assert re.fullmatch(r"[0-9a-f]{32}", got)
+
+
+def test_service_client_reenvia_el_id():
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.headers.get(REQUEST_HEADER))
+        return httpx.Response(204)
+
+    client = ServiceClient(
+        testing.service_auth("rooms", ("gateway",)), {"chat": "http://chat:8000"}, httpx.MockTransport(handler)
+    )
+    token = REQUEST_ID.set("0123456789abcdef")
+    try:
+        asyncio.run(client.post("chat", "/internal/x"))
+    finally:
+        REQUEST_ID.reset(token)
+    assert seen == ["0123456789abcdef"]
+
+
+def test_formato_json_de_los_registros():
+    record = logging.LogRecord("http", logging.INFO, __file__, 1, "request", None, None)
+    record.status, record.ms = 200, 3
+    token = REQUEST_ID.set("0123456789abcdef")
+    try:
+        line = json.loads(JsonFormatter("rooms").format(record))
+    finally:
+        REQUEST_ID.reset(token)
+    assert (line["service"], line["level"], line["request_id"], line["msg"]) == (
+        "rooms", "info", "0123456789abcdef", "request",
+    )
+    assert (line["status"], line["ms"]) == (200, 3)
+
+
+def test_una_linea_por_peticion_sin_query_string(recorder, caplog):
+    with caplog.at_level(logging.INFO, logger="http"):
+        build_client(recorder).get("/api/eco?sig=secreto", headers=testing.gateway_headers())
+    [record] = [r for r in caplog.records if r.name == "http"]
+    assert (record.method, record.path, record.status) == ("GET", "/api/eco", 200)
+    assert "secreto" not in caplog.text
+```
+
+Run: `pytest services/shared/tests/test_observabilidad.py -q`
+Expected: FAIL — `ModuleNotFoundError: No module named 'shared.observability'`
+
+`services/shared/shared/observability.py`:
+```python
+"""Correlación de peticiones y registros JSON (spec §21.1; RNF-18, RNF-19)."""
+
+import json
+import logging
+import re
+import time
+from contextvars import ContextVar
+from uuid import uuid4
+
+from starlette.datastructures import Headers
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from shared.secrets import env
+
+REQUEST_HEADER = "X-Request-ID"
+REQUEST_ID: ContextVar[str | None] = ContextVar("request_id", default=None)
+VALID_ID = re.compile(r"[A-Za-z0-9-]{8,64}")
+log = logging.getLogger("http")
+
+
+class JsonFormatter(logging.Formatter):
+    """Una línea JSON por registro: ts, service, level, request_id, logger, msg (y los campos de la petición)."""
+
+    def __init__(self, service: str) -> None:
+        super().__init__()
+        self.service = service
+
+    def format(self, record: logging.LogRecord) -> str:
+        entry = {
+            "ts": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
+            "service": self.service,
+            "level": record.levelname.lower(),
+            "request_id": REQUEST_ID.get(),
+            "logger": record.name,
+            "msg": record.getMessage(),
+        }
+        entry.update({k: getattr(record, k) for k in ("method", "path", "status", "ms") if hasattr(record, k)})
+        if record.exc_info:
+            entry["exc"] = self.formatException(record.exc_info)
+        return json.dumps(entry, ensure_ascii=False, default=str)
+
+
+def configure_logging(service: str) -> None:
+    """Solo con LOG_FORMAT=json (en los contenedores). Las líneas de arranque de uvicorn siguen en texto."""
+    if env("LOG_FORMAT", "") != "json":
+        return
+    handler = logging.StreamHandler()
+    handler.setFormatter(JsonFormatter(service))
+    root = logging.getLogger()
+    root.handlers[:] = [handler]
+    root.setLevel(logging.INFO)
+
+
+class RequestContextMiddleware:
+    """ASGI puro (no BaseHTTPMiddleware, para no romper los WebSocket). Va como el más externo."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
+        presented = Headers(scope=scope).get(REQUEST_HEADER, "")
+        token = REQUEST_ID.set(presented if VALID_ID.fullmatch(presented) else uuid4().hex)
+        started, status = time.perf_counter(), 500
+
+        async def capture(message: Message) -> None:
+            nonlocal status
+            if message["type"] == "http.response.start":
+                status = message["status"]
+            await send(message)
+
+        try:
+            await self.app(scope, receive, capture)
+        finally:
+            if scope["type"] == "http" and scope["path"] != "/health":
+                log.info(
+                    "request",
+                    extra={
+                        "method": scope["method"],
+                        "path": scope["path"],  # sin query string: las URL firmadas no se registran
+                        "status": status,
+                        "ms": round((time.perf_counter() - started) * 1000),
+                    },
+                )
+            REQUEST_ID.reset(token)
+```
+
+Modificar:
+- `shared/service_auth.py`: `from shared.observability import REQUEST_HEADER, REQUEST_ID` y, en `ServiceClient.post`, el diccionario de cabeceras queda `{**(headers or {}), TOKEN_HEADER: self.auth.token or "", **({REQUEST_HEADER: rid} if (rid := REQUEST_ID.get()) else {})}`.
+- `shared/audit_client.py`: `from shared.observability import REQUEST_ID` y `"request_id": REQUEST_ID.get()` en el `event`.
+- `shared/web.py`: `from shared.observability import RequestContextMiddleware, configure_logging`; en `create_base_app`, después de `app.add_middleware(ServiceTokenMiddleware)`, `app.add_middleware(RequestContextMiddleware)` (Starlette pone el último agregado como el más externo, así que también los rechazos por token llevan el id) y `configure_logging(title)` al principio.
+
+Run: `pytest services/shared -q`
+Expected: PASS (12 + 7 tests)
+
+- [ ] **Step 7: Trazabilidad y commit**
 
 En `docs/trazabilidad-riesgos.md`, fila **R16**:
-- *Servicio / archivos:* `services/shared/shared/service_auth.py`, `identity.py`, `web.py`
-- *Tests:* `services/shared/tests/test_r16_service_auth.py`
+- *Servicio / archivos:* `services/shared/shared/service_auth.py`, `identity.py`, `web.py`, `observability.py`
+- *Tests:* `services/shared/tests/test_r16_service_auth.py`, `test_observabilidad.py`
 - *Estado:* `En progreso (falta e2e del gateway)`
+
+Fila **R3** (auditoría): agregar `observability.py` (correlación) en *Servicio / archivos*; su prueba llega con AUD-2.
 
 ```bash
 git add services/shared docs/trazabilidad-riesgos.md
-git commit -m "feat(shared): token por servicio, identidad del gateway, auditoría con fallback y base web (R16)"
+git commit -m "feat(shared): token por servicio, identidad del gateway, auditoría con fallback, base web y correlación de peticiones (R16)"
 ```
 
 ---
@@ -2755,7 +2981,7 @@ Expected: PASS
 # Plantilla única de los servicios Python (spec §4.2). Uso: --build-arg SERVICE=<svc>
 FROM python:3.13-slim
 ARG SERVICE
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 SERVICE=${SERVICE}
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 SERVICE=${SERVICE} LOG_FORMAT=json
 RUN useradd --uid 10001 --no-create-home app \
  && mkdir -p /data/media /data/quarantine \
  && chown -R app:app /data
@@ -2770,9 +2996,10 @@ WORKDIR /srv/svc
 USER app
 EXPOSE 8000
 # --ws-max-size: uvicorn corta antes de leer tramas absurdas; chat aplica su propio tope de 16 KB (4413).
+# --no-access-log: la línea por petición la escribe RequestContextMiddleware (JSON, sin query string).
 CMD exec uvicorn --factory "${SERVICE}_svc.main:create_app" --host 0.0.0.0 --port 8000 \
     --proxy-headers --forwarded-allow-ips '*' --ws-ping-interval 30 --ws-ping-timeout 30 \
-    --ws-max-size 65536 --no-server-header
+    --ws-max-size 65536 --no-server-header --no-access-log
 ```
 
 `services/lock.sh`:
@@ -2931,11 +3158,11 @@ git commit -m "feat(deploy): plantilla Docker, generación de secretos y Postgre
 ### Task FND-7: Integración continua
 
 **Files:**
-- Create: `.github/workflows/ci.yml`
+- Create: `.github/workflows/ci.yml`, `.coveragerc`
 
 **Interfaces:**
-- Consumes: `services/shared` (FND-2…FND-6).
-- Produces: el job `services` con matriz `svc`. Cada tarea `*-1` de un servicio agrega su nombre a la matriz, y FE-1 agrega el job `frontend`. Los jobs `codeql` (SAST) y `secrets` (gitleaks) cubren Shift Left desde el primer push.
+- Consumes: `services/shared` (FND-2…FND-6), `pytest-cov` (dev de `shared`) y la regla `C90` de `ruff.toml` (FND-1).
+- Produces: el job `services` con matriz `svc`. Cada tarea `*-1` de un servicio agrega su nombre a la matriz, y FE-1 agrega el job `frontend`. El job falla si un servicio baja del **80 % de cobertura de líneas** (RNF-10) o si una función supera la complejidad 10 (RNF-11). Si un servicio no llega al 80 %, se agregan pruebas: el umbral no se baja. Los jobs `codeql` (SAST) y `secrets` (gitleaks) cubren Shift Left desde el primer push.
 
 - [ ] **Step 1: Workflow**
 
@@ -2975,8 +3202,10 @@ jobs:
           if [ "${{ matrix.svc }}" != "shared" ]; then pip install -e "services/${{ matrix.svc }}"; fi
       - name: Ruff
         run: ruff check "services/${{ matrix.svc }}" && ruff format --check "services/${{ matrix.svc }}"
-      - name: Pruebas
-        run: pytest "services/${{ matrix.svc }}" -m "not clamav"
+      - name: Pruebas con cobertura ≥ 80 % (RNF-10)
+        run: |
+          pkg="${{ matrix.svc }}_svc"; [ "${{ matrix.svc }}" = shared ] && pkg=shared
+          pytest "services/${{ matrix.svc }}" -m "not clamav" --cov="$pkg" --cov-report=term --cov-fail-under=80
       - name: Bandit
         # -ll: severidad media o mayor. Se excluyen las pruebas, las herramientas y el soporte de pruebas.
         run: bandit -q -ll -r "services/${{ matrix.svc }}" -x "services/${{ matrix.svc }}/tests,services/${{ matrix.svc }}/tools,services/shared/shared/testing.py"
@@ -3021,19 +3250,43 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+`.coveragerc` (en la raíz; mide solo código de producción):
+```ini
+[run]
+omit =
+    */tests/*
+    */migrations/*
+    */tools/*
+    */shared/testing.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+```
+
 - [ ] **Step 2: Formatear y verificar en local**
 
-Run: `ruff format services/shared deploy && ruff check --fix services/shared deploy && pytest services/shared -q`
-Expected: sin errores de ruff y todos los tests en verde.
+Run: `ruff format services/shared deploy && ruff check --fix services/shared deploy && pytest services/shared -q --cov=shared --cov-fail-under=80`
+Expected: sin errores de ruff, todos los tests en verde y `Required test coverage of 80% reached`.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add .github/workflows/ci.yml services/shared deploy
-git commit -m "ci: lint, pruebas, bandit, pip-audit, CodeQL y gitleaks"
+git add .github/workflows/ci.yml .coveragerc services/shared deploy
+git commit -m "ci: lint, pruebas con cobertura, bandit, pip-audit, CodeQL y gitleaks"
 ```
 El `push` (`git push -u origin feat/arquitectura-chat-seguro`) se hace solo cuando el equipo lo pida.
 Expected: al hacer push, el workflow `ci` pasa en GitHub (jobs `services (shared)`, `codeql` y `secrets`).
+
+- [ ] **Step 4: Proteger `main` (lo hace quien administra el repositorio, una sola vez)**
+
+En GitHub: *Settings → Branches → Add branch ruleset* sobre `main`:
+- exigir pull request con **1 aprobación**;
+- exigir que pasen los jobs `services`, `codeql` y `secrets`;
+- bloquear el *force push* y el borrado de la rama.
+
+Esto respalda por configuración la regla del equipo de no hacer `merge` a `main` sin autorización. Anota la fecha en la *Verificación manual* de `docs/trazabilidad-riesgos.md`.
 
 Al cerrar este archivo, marca `[x] 01 Fundaciones` en la sección *Estado actual* de `CLAUDE.md`.
 

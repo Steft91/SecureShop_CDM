@@ -170,6 +170,22 @@ Nada está implementado todavía: "Cubierto" significa *diseñado, planificado y
 | RP-10 | Informe final del primer parcial: descripción de la aplicación, cómo se construyó, tipo de API (REST), tecnologías, bibliotecas y herramientas, e integración con `auth` | Clase | `docs/informe-parcial-1.md` (tickets DOC del parcial) | **Ajustado (B-13)** |
 | RP-11 | Demostración en vivo del primer parcial: la API de esteganografía funcionando con el token de `auth` | Clase | `docs/postman/parcial-1.postman_collection.json` + guion `docs/demo-parcial-1.md` | **Ajustado (B-13)** |
 
+### 3.1 Requisitos no funcionales de la Actividad 3 que se adoptan
+
+Los IDs RNF y los que llevan el prefijo A3- son los de la transcripción de la Actividad 3 que hizo el equipo el 20/10 (el documento original no está en el repositorio). Los demás RNF de esa lista no se adoptan; ver `docs/specs/2026-10-12-chat-seguro-design.md` §22.1.
+
+| ID | Requisito | Origen | Spec | Plan | Verificación | Estado |
+|---|---|---|---|---|---|---|
+| RNF-07 | La consulta de auditoría con 100 000 eventos responde en ≤ 2 s | Actividad 3 | §14.3 | AUD-3 | `test_rnf07_consulta_por_severidad_con_100000_eventos` | Cubierto |
+| RNF-10 | Cobertura de líneas ≥ 80 % por servicio | Actividad 3 | §16.5 | FND-7 | CI (`--cov-fail-under=80`) | Cubierto |
+| RNF-11 | Complejidad ciclomática ≤ 10 por función | Actividad 3 | §16.5 | FND-1, STG-1 | CI (`ruff` con `C90`) | Cubierto |
+| RNF-14 | El orden de los mensajes en vivo coincide con el historial | Actividad 3 | §9.5 | CHAT-3 | `test_rnf14_el_orden_en_vivo_es_el_del_historial` | Cubierto (incremento 2) |
+| RNF-18 | Registros JSON por petición; métricas y alerta de consumo | Actividad 3 | §13, §22.1 | FND-4, GW-1; métricas en FE-5 | `test_observabilidad.py`; curl de GW-1 | Parcial: registros en el parcial; métricas en el incremento 3 |
+| RNF-19 | Id de correlación de punta a punta, también en la cadena de auditoría | Actividad 3 | §13, §14.1 | FND-4, AUD-2, GW-1 | `test_rnf19_el_id_de_correlacion_queda_en_la_cadena` | Cubierto |
+| RNF-15…17 | Recuperación: respaldos cifrados, restauración y reinicio | Actividad 3 | §22.1 | E2E-3 | Simulacro de restauración | Incremento 3 |
+| A3-RS-32 | Cambios controlados: PR con aprobación, plantilla y CI en verde | Actividad 3 | §16.5 | FND-1, FND-7 | Regla de `main` en GitHub | Cubierto |
+| A3-RS-36 | Reanálisis estructural de lo sanitizado antes de publicarlo | Actividad 3 | §12.5 | STG-3 | `test_rs36_sanitizacion_con_residuos_no_se_entrega` | Cubierto |
+
 ---
 
 ## 4. Decisiones de interpretación
