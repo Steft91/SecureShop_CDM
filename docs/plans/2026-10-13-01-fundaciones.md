@@ -560,7 +560,7 @@ Proyecto integrador de **Software Seguro**: salas de chat con **microservicios**
 
 - **Spec (fuente de verdad):** `docs/specs/2026-10-12-chat-seguro-design.md` (rev. 4)
 - **Plan:** `docs/plans/2026-10-13-00-indice.md` (+ un archivo por subsistema)
-- **Tickets (cadena Andrés → Stefany → Zaith):** `docs/tickets/README.md`
+- **Tickets (por módulos y personas):** `docs/tickets/README.md`
 - **Riesgos → controles → tests:** `docs/trazabilidad-riesgos.md`
 - **Requisitos del docente (RF/RS):** `docs/requisitos.md` · **Normas y enfoques:** `docs/cumplimiento-normativo.md` · **Criptografía justificada:** `docs/justificacion-criptografica.md`
 - **Documentos académicos:** `Documentación/` (no tocar sin que lo pidan)
@@ -618,7 +618,7 @@ pip install -e "services/shared[dev]" -e services/audit -e services/auth -e serv
 - macOS/Linux: si el hook falla porque no encuentra `python`, activa el `.venv` antes de abrir Claude Code.
 
 ## Estado actual
-Actualizar al cerrar cada ticket (`docs/tickets/README.md` tiene la cadena completa).
+Actualizar al cerrar cada ticket (`docs/tickets/README.md` tiene la ruta de cada persona).
 - Primer parcial: [ ] 01 Fundaciones · [ ] 02 Audit · [ ] 03 Auth (ATH-1…4) · [ ] 10 Stego · [ ] 04 Gateway (GW-1) · [ ] Parcial (PAR-1…3)
 - Incremento 2: [ ] 03 Auth (ATH-5…6) · [ ] 05 Rooms · [ ] 06 Chat · [ ] 04 Gateway (GW-2) · [ ] 08 Frontend (FE-1…3)
 - Incremento 3: [ ] 07 Media · [ ] 08 Frontend (FE-4…5) · [ ] 09 E2E y cierre
@@ -629,7 +629,7 @@ Actualizar al cerrar cada ticket (`docs/tickets/README.md` tiene la cadena compl
 `.github/pull_request_template.md`:
 ```markdown
 ## Qué cambia
-<!-- La tarea del plan (p. ej. ATH-2) y su ticket (T-12). -->
+<!-- La tarea del plan (p. ej. ATH-2) y su ticket (p. ej. ATH-2). -->
 
 ## Riesgos y requisitos
 <!-- R# y RF/RS que toca. -->

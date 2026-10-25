@@ -1,64 +1,85 @@
 # Tickets
 
-Un archivo por ticket, separado por persona (`andres/`, `stefany/` y `zaith/`). Cada ticket es una tarea de los planes de `docs/plans/`.
+Un archivo por ticket, separado por persona (`andres/`, `stefany/` y `zaith/`). Cada ticket es una tarea de los planes de `docs/plans/` y se llama como ella (`FND-2`, `ATH-3`…).
 
-## Reglas de la cadena
+## Cómo se trabaja
 
-- **Orden estricto, en rueda: Andrés → Stefany → Zaith.** El ticket T-NN empieza solo cuando T-(NN−1) está **cerrado**. Cerrado significa tests en verde, documentos actualizados, commit hecho y aviso al siguiente.
-- Cada ticket dice quién lo bloquea y a quién desbloquea.
-- Mientras espera su turno, cada integrante puede leer su próximo ticket, la tarea en el plan y las secciones del spec que cita, sin escribir código de esa tarea.
-- Al cerrar, el dueño cambia *Estado* en su ticket y en la tabla de abajo.
+- **Cada persona tiene su módulo y su ruta.** Sigue sus tickets en el orden de abajo, sin esperar turno a los demás.
+- **Solo hay tres dependencias entre personas que de verdad bloquean:** la librería `shared` (FND-2, FND-4 y FND-5, de Zaith; FND-3, de Andrés) para correr `pytest`; FND-6 para levantar contenedores; y los servicios ya hechos para integrar (GW-1, PAR, FE y E2E). Todo lo demás se acuerda por contrato.
+- **El contrato** es el bloque *Interfaces* de la tarea en el plan: nombres, firmas, rutas y cuerpos exactos. Se escribe contra él y los servicios vecinos se simulan con `testing.Recorder`.
+- Cada ticket dice qué **necesita** y quién lo **necesita**. Al cerrarlo, avisa a esas personas.
+- **Al arrancar:** Zaith cierra primero FND-2, FND-4 y FND-5 (la librería). Mientras tanto, Andrés escribe FND-3 y deja leídos sus planes (AUD y ATH), y Stefany deja leído el de STG; los tres pueden adelantar el código de sus servicios contra las *Interfaces*.
 - Commits en español, sin líneas de atribución, en `feat/arquitectura-chat-seguro`. Nada de `push`, PR ni merge a `main` sin que el equipo lo autorice.
 - Si el docente cambia el alcance, se ajustan primero el spec y el plan, y después los tickets.
 
-## Cadena
+## Reparto
 
-| Ticket | Tarea | Título | Responsable | Incremento | Estado |
+| Persona | Módulos | Parcial | Incr. 2 | Incr. 3 | Total |
 |---|---|---|---|---|---|
-| T-01 | [FND-1](andres/T-01-higiene-y-claude-code.md) | Higiene del repo y contexto de Claude Code | Andrés | Primer parcial | Pendiente |
-| T-02 | [FND-2](stefany/T-02-shared-cripto-y-secretos.md) | Paquete `shared`: secretos, criptografía y vectores | Stefany | Primer parcial | Pendiente |
-| T-03 | [FND-3](zaith/T-03-argon2-y-limites.md) | Contraseñas Argon2id y límites de intentos | Zaith | Primer parcial | Pendiente |
-| T-04 | [FND-4](andres/T-04-autenticacion-entre-servicios.md) | Autenticación entre servicios, identidad, auditoría y base web (R16) | Andrés | Primer parcial | Pendiente |
-| T-05 | [FND-5](stefany/T-05-utilidades-de-bd-y-pruebas.md) | Utilidades de BD para pruebas, migraciones comunes e imágenes sintéticas | Stefany | Primer parcial | Pendiente |
-| T-06 | [FND-6](zaith/T-06-docker-secretos-postgres.md) | Plantilla Docker, generación de secretos y PostgreSQL con 5 BD | Zaith | Primer parcial | Pendiente |
-| T-07 | [FND-7](andres/T-07-integracion-continua.md) | Integración continua | Andrés | Primer parcial | Pendiente |
-| T-08 | [AUD-1](stefany/T-08-audit-esqueleto.md) | Esqueleto de `audit`, migración y mínimo privilegio (R11) | Stefany | Primer parcial | Pendiente |
-| T-09 | [AUD-2](zaith/T-09-audit-ingesta-y-cadena.md) | Ingesta de eventos y cadena verificable (R3, R16) | Zaith | Primer parcial | Pendiente |
-| T-10 | [AUD-3](andres/T-10-audit-consulta.md) | Consulta y verificación para el admin global (R5) | Andrés | Primer parcial | Pendiente |
-| T-11 | [ATH-1](stefany/T-11-auth-esqueleto-y-jwt.md) | Esqueleto de `auth`, catálogo de permisos, roles semilla y firma de JWT (R11) | Stefany | Primer parcial | Pendiente |
-| T-12 | [ATH-2](zaith/T-12-auth-registro-login-verify.md) | Registro, login, JWT y sesión de dispositivo único, `verify`, `me` y `logout` (R4, R5, R13, R16) | Zaith | Primer parcial | Pendiente |
-| T-13 | [ATH-3](andres/T-13-auth-totp-y-admin.md) | TOTP para los permisos de admin y alta del admin global por CLI (R4) | Andrés | Primer parcial | Pendiente |
-| T-14 | [ATH-4](stefany/T-14-auth-roles-y-permisos.md) | Roles, permisos y administración de cuentas (R5) | Stefany | Primer parcial | Pendiente |
-| T-15 | [STG-1](zaith/T-15-stego-esqueleto-y-analisis.md) | Esqueleto de `stego` sin BD, estegoanálisis y sanitización (R6) | Zaith | Primer parcial | Pendiente |
-| T-16 | [STG-2](andres/T-16-stego-formatos-y-veredicto.md) | Formatos, validación previa y veredicto (R6, R9) | Andrés | Primer parcial | Pendiente |
-| T-17 | [STG-3](stefany/T-17-stego-api.md) | API pública e interna con análisis aislado (R5, R9, R10, R16) | Stefany | Primer parcial | Pendiente |
-| T-18 | [STG-4](zaith/T-18-stego-demo-y-calibracion.md) | Imágenes de la demo y calibración rápida | Zaith | Primer parcial | Pendiente |
-| T-19 | [GW-1](andres/T-19-gateway-parcial.md) | Gateway Nginx con TLS 1.3, `auth_request` y las rutas del parcial (R5, R7, R10, R16) | Andrés | Primer parcial | Pendiente |
-| T-20 | [PAR-1](stefany/T-20-postman.md) | Colección de Postman del flujo del docente (RP-11) | Stefany | Primer parcial | Pendiente |
-| T-21 | [PAR-2](zaith/T-21-informe-parcial.md) | Informe del primer parcial (RP-10) | Zaith | Primer parcial | Pendiente |
-| T-22 | [PAR-3](andres/T-22-demo-y-ensayo.md) | Guion de la demo y ensayo desde un clon limpio (RP-11) | Andrés | Primer parcial | Pendiente |
-| T-23 | [ATH-5](stefany/T-23-auth-suspension-y-latido.md) | Suspensión, reactivación, cambio de contraseña y latido de sesiones (R5, R13) | Stefany | Incremento 2 | Pendiente |
-| T-24 | [ATH-6](zaith/T-24-auth-rotacion-kek.md) | Rotación de la KEK de auth (R2) | Zaith | Incremento 2 | Pendiente |
-| T-25 | [ROOM-1](andres/T-25-rooms-crear-y-mis-salas.md) | Esqueleto de `rooms`, crear sala y *Mis salas* (R1, R5, R8, R11, R15) | Andrés | Incremento 2 | Pendiente |
-| T-26 | [ROOM-2](stefany/T-26-rooms-ingreso-y-salida.md) | Ingreso, salida y miembros (R8, R15) | Stefany | Incremento 2 | Pendiente |
-| T-27 | [ROOM-3](zaith/T-27-rooms-moderacion.md) | Administración de la sala por el dueño y el admin global (R5) | Zaith | Incremento 2 | Pendiente |
-| T-28 | [ROOM-4](andres/T-28-rooms-membresia-interna.md) | Membresía interna y latido (R16) | Andrés | Incremento 2 | Pendiente |
-| T-29 | [CHAT-1](stefany/T-29-chat-almacen-cifrado.md) | Esqueleto de `chat`, almacén cifrado y rotación (R2, R11) | Stefany | Incremento 2 | Pendiente |
-| T-30 | [CHAT-2](zaith/T-30-chat-conexion.md) | Conexión: identidad, membresía, `Origin`, *hello* firmado y presencia (R7, R16) | Zaith | Incremento 2 | Pendiente |
-| T-31 | [CHAT-3](andres/T-31-chat-tramas-y-mensajes.md) | Tramas, mensajes, silencio, borrado y `file_url` (R10, R14) | Andrés | Incremento 2 | Pendiente |
-| T-32 | [CHAT-4](stefany/T-32-chat-avisos-y-latidos.md) | Avisos internos, archivos publicados, latidos e inactividad (R16) | Stefany | Incremento 2 | Pendiente |
-| T-33 | [GW-2](zaith/T-33-gateway-salas-media-ws.md) | Gateway: rutas de salas, media y WebSocket | Zaith | Incremento 2 | Pendiente |
-| T-34 | [FE-1](andres/T-34-frontend-esqueleto-y-cripto.md) | Frontend: esqueleto, criptografía con vectores y SPA en el gateway | Andrés | Incremento 2 | Pendiente |
-| T-35 | [FE-2](stefany/T-35-frontend-cuenta-y-salas.md) | Frontend: cuenta, *Mis salas*, crear sala e ingresar | Stefany | Incremento 2 | Pendiente |
-| T-36 | [FE-3](zaith/T-36-frontend-chat-y-dueno.md) | Frontend: chat cifrado y controles del dueño | Zaith | Incremento 2 | Pendiente |
-| T-37 | [MED-1](andres/T-37-media-archivos-cifrados.md) | Esqueleto de `media`, archivos cifrados y rotación (R2, R11) | Andrés | Incremento 3 | Pendiente |
-| T-38 | [MED-2](stefany/T-38-media-subida-y-clamav.md) | Subida: membresía, límites y ClamAV (R9) | Stefany | Incremento 3 | Pendiente |
-| T-39 | [MED-3](zaith/T-39-media-politica-y-publicacion.md) | Política con `stego`, sanitización y publicación (R6, R9) | Zaith | Incremento 3 | Pendiente |
-| T-40 | [MED-4](andres/T-40-media-descarga-y-cuarentena.md) | Descarga firmada y cuarentena del admin global (R5, R12) | Andrés | Incremento 3 | Pendiente |
-| T-41 | [FE-4](stefany/T-41-frontend-imagenes.md) | Frontend: imágenes en el chat | Stefany | Incremento 3 | Pendiente |
-| T-42 | [FE-5](zaith/T-42-frontend-panel-admin.md) | Frontend: panel del admin global | Zaith | Incremento 3 | Pendiente |
-| T-43 | [E2E-1](andres/T-43-e2e-cuentas-y-gateway.md) | E2E: arnés, cuentas, RBAC y reglas del gateway (R4, R5, R13, R16) | Andrés | Incremento 3 | Pendiente |
-| T-44 | [E2E-2](stefany/T-44-e2e-chat-e-imagenes.md) | E2E: chat, moderación e imágenes (R6, R7, R12, R14) | Stefany | Incremento 3 | Pendiente |
-| T-45 | [E2E-3](zaith/T-45-cierre-final.md) | Calibración, VPS, trazabilidad final, informe de pruebas y demo | Zaith | Incremento 3 | Pendiente |
+| Zaith · Plataforma, chat e integración | Fundaciones, Gateway, Chat, E2E y cierre | 7 | 5 | 3 | 15 |
+| Andrés · Identidad y salas | Fundaciones, Audit, Auth, Rooms, Frontend | 8 | 6 | 1 | 15 |
+| Stefany · Contenido, cliente y entrega | Stego, Entrega del parcial, Frontend, Media | 7 | 3 | 5 | 15 |
 
-Las tareas 1–22 son el **primer parcial** (corte definitivo); 23–36, el **incremento 2** (salas y chat), y 37–45, el **incremento 3** (imágenes en las salas y cierre).
+## Ruta de cada persona
+
+### Zaith · Plataforma, chat e integración
+
+| Ticket | Título | Incremento | Necesita | Estado |
+|---|---|---|---|---|
+| [FND-1](zaith/FND-1-higiene-y-claude-code.md) | Higiene del repo y contexto de Claude Code | Primer parcial | — | Pendiente |
+| [FND-2](zaith/FND-2-shared-cripto-y-secretos.md) | Paquete `shared`: secretos, criptografía y vectores | Primer parcial | — | Pendiente |
+| [FND-4](zaith/FND-4-autenticacion-entre-servicios.md) | Autenticación entre servicios, identidad, auditoría y base web (R16) | Primer parcial | [FND-2](zaith/FND-2-shared-cripto-y-secretos.md) | Pendiente |
+| [FND-5](zaith/FND-5-utilidades-de-bd-y-pruebas.md) | Utilidades de BD para pruebas, migraciones comunes e imágenes sintéticas | Primer parcial | [FND-2](zaith/FND-2-shared-cripto-y-secretos.md) | Pendiente |
+| [FND-6](zaith/FND-6-docker-secretos-postgres.md) | Plantilla Docker, generación de secretos y PostgreSQL con 5 BD | Primer parcial | [FND-2](zaith/FND-2-shared-cripto-y-secretos.md) | Pendiente |
+| [FND-7](zaith/FND-7-integracion-continua.md) | Integración continua | Primer parcial | [FND-3](andres/FND-3-argon2-y-limites.md), [FND-6](zaith/FND-6-docker-secretos-postgres.md) | Pendiente |
+| [GW-1](zaith/GW-1-gateway-parcial.md) | Gateway Nginx con TLS 1.3, `auth_request` y las rutas del parcial (R5, R7, R10, R16) | Primer parcial | [ATH-4](andres/ATH-4-auth-roles-y-permisos.md), [AUD-3](andres/AUD-3-audit-consulta.md), [STG-4](stefany/STG-4-stego-demo-y-calibracion.md) | Pendiente |
+| [CHAT-1](zaith/CHAT-1-chat-almacen-cifrado.md) | Esqueleto de `chat`, almacén cifrado y rotación (R2, R11) | Incremento 2 | [FND-4](zaith/FND-4-autenticacion-entre-servicios.md), [FND-5](zaith/FND-5-utilidades-de-bd-y-pruebas.md) | Pendiente |
+| [CHAT-2](zaith/CHAT-2-chat-conexion.md) | Conexión: identidad, membresía, `Origin`, *hello* firmado y presencia (R7, R16) | Incremento 2 | [CHAT-1](zaith/CHAT-1-chat-almacen-cifrado.md) | Pendiente |
+| [CHAT-3](zaith/CHAT-3-chat-tramas-y-mensajes.md) | Tramas, mensajes, silencio, borrado y `file_url` (R10, R14) | Incremento 2 | [CHAT-2](zaith/CHAT-2-chat-conexion.md) | Pendiente |
+| [CHAT-4](zaith/CHAT-4-chat-avisos-y-latidos.md) | Avisos internos, archivos publicados, latidos e inactividad (R16) | Incremento 2 | [CHAT-3](zaith/CHAT-3-chat-tramas-y-mensajes.md) | Pendiente |
+| [GW-2](zaith/GW-2-gateway-salas-media-ws.md) | Gateway: rutas de salas, media y WebSocket | Incremento 2 | [GW-1](zaith/GW-1-gateway-parcial.md), [ROOM-4](andres/ROOM-4-rooms-membresia-interna.md), [CHAT-4](zaith/CHAT-4-chat-avisos-y-latidos.md) | Pendiente |
+| [E2E-1](zaith/E2E-1-e2e-cuentas-y-gateway.md) | E2E: arnés, cuentas, RBAC y reglas del gateway (R4, R5, R13, R16) | Incremento 3 | [GW-2](zaith/GW-2-gateway-salas-media-ws.md), [ATH-5](andres/ATH-5-auth-suspension-y-latido.md) | Pendiente |
+| [E2E-2](zaith/E2E-2-e2e-chat-e-imagenes.md) | E2E: chat, moderación e imágenes (R6, R7, R12, R14) | Incremento 3 | [E2E-1](zaith/E2E-1-e2e-cuentas-y-gateway.md), [MED-4](stefany/MED-4-media-descarga-y-cuarentena.md), [CHAT-4](zaith/CHAT-4-chat-avisos-y-latidos.md) | Pendiente |
+| [E2E-3](zaith/E2E-3-cierre-final.md) | Calibración, VPS, trazabilidad final, informe de pruebas y demo | Incremento 3 | [E2E-2](zaith/E2E-2-e2e-chat-e-imagenes.md), [FE-5](andres/FE-5-frontend-panel-admin.md) | Pendiente |
+
+### Andrés · Identidad y salas
+
+| Ticket | Título | Incremento | Necesita | Estado |
+|---|---|---|---|---|
+| [FND-3](andres/FND-3-argon2-y-limites.md) | Contraseñas Argon2id y límites de intentos | Primer parcial | — | Pendiente |
+| [AUD-1](andres/AUD-1-audit-esqueleto.md) | Esqueleto de `audit`, migración y mínimo privilegio (R11) | Primer parcial | [FND-4](zaith/FND-4-autenticacion-entre-servicios.md), [FND-5](zaith/FND-5-utilidades-de-bd-y-pruebas.md) | Pendiente |
+| [AUD-2](andres/AUD-2-audit-ingesta-y-cadena.md) | Ingesta de eventos y cadena verificable (R3, R16) | Primer parcial | [AUD-1](andres/AUD-1-audit-esqueleto.md) | Pendiente |
+| [AUD-3](andres/AUD-3-audit-consulta.md) | Consulta y verificación para el admin global (R5) | Primer parcial | [AUD-2](andres/AUD-2-audit-ingesta-y-cadena.md) | Pendiente |
+| [ATH-1](andres/ATH-1-auth-esqueleto-y-jwt.md) | Esqueleto de `auth`, catálogo de permisos, roles semilla y firma de JWT (R11) | Primer parcial | [FND-3](andres/FND-3-argon2-y-limites.md), [FND-4](zaith/FND-4-autenticacion-entre-servicios.md), [FND-5](zaith/FND-5-utilidades-de-bd-y-pruebas.md) | Pendiente |
+| [ATH-2](andres/ATH-2-auth-registro-login-verify.md) | Registro, login, JWT y sesión de dispositivo único, `verify`, `me` y `logout` (R4, R5, R13, R16) | Primer parcial | [ATH-1](andres/ATH-1-auth-esqueleto-y-jwt.md) | Pendiente |
+| [ATH-3](andres/ATH-3-auth-totp-y-admin.md) | TOTP para los permisos de admin y alta del admin global por CLI (R4) | Primer parcial | [ATH-2](andres/ATH-2-auth-registro-login-verify.md) | Pendiente |
+| [ATH-4](andres/ATH-4-auth-roles-y-permisos.md) | Roles, permisos y administración de cuentas (R5) | Primer parcial | [ATH-3](andres/ATH-3-auth-totp-y-admin.md) | Pendiente |
+| [ATH-5](andres/ATH-5-auth-suspension-y-latido.md) | Suspensión, reactivación, cambio de contraseña y latido de sesiones (R5, R13) | Incremento 2 | [ATH-4](andres/ATH-4-auth-roles-y-permisos.md) | Pendiente |
+| [ATH-6](andres/ATH-6-auth-rotacion-kek.md) | Rotación de la KEK de auth (R2) | Incremento 2 | [ATH-4](andres/ATH-4-auth-roles-y-permisos.md) | Pendiente |
+| [ROOM-1](andres/ROOM-1-rooms-crear-y-mis-salas.md) | Esqueleto de `rooms`, crear sala y *Mis salas* (R1, R5, R8, R11, R15) | Incremento 2 | [FND-4](zaith/FND-4-autenticacion-entre-servicios.md), [FND-5](zaith/FND-5-utilidades-de-bd-y-pruebas.md) | Pendiente |
+| [ROOM-2](andres/ROOM-2-rooms-ingreso-y-salida.md) | Ingreso, salida y miembros (R8, R15) | Incremento 2 | [ROOM-1](andres/ROOM-1-rooms-crear-y-mis-salas.md) | Pendiente |
+| [ROOM-3](andres/ROOM-3-rooms-moderacion.md) | Administración de la sala por el dueño y el admin global (R5) | Incremento 2 | [ROOM-2](andres/ROOM-2-rooms-ingreso-y-salida.md) | Pendiente |
+| [ROOM-4](andres/ROOM-4-rooms-membresia-interna.md) | Membresía interna y latido (R16) | Incremento 2 | [ROOM-1](andres/ROOM-1-rooms-crear-y-mis-salas.md) | Pendiente |
+| [FE-5](andres/FE-5-frontend-panel-admin.md) | Frontend: panel del admin global | Incremento 3 | [FE-3](stefany/FE-3-frontend-chat-y-dueno.md), [ATH-5](andres/ATH-5-auth-suspension-y-latido.md), [MED-4](stefany/MED-4-media-descarga-y-cuarentena.md) | Pendiente |
+
+### Stefany · Contenido, cliente y entrega
+
+| Ticket | Título | Incremento | Necesita | Estado |
+|---|---|---|---|---|
+| [STG-1](stefany/STG-1-stego-esqueleto-y-analisis.md) | Esqueleto de `stego` sin BD, estegoanálisis y sanitización (R6) | Primer parcial | [FND-4](zaith/FND-4-autenticacion-entre-servicios.md), [FND-5](zaith/FND-5-utilidades-de-bd-y-pruebas.md) | Pendiente |
+| [STG-2](stefany/STG-2-stego-formatos-y-veredicto.md) | Formatos, validación previa y veredicto (R6, R9) | Primer parcial | [STG-1](stefany/STG-1-stego-esqueleto-y-analisis.md) | Pendiente |
+| [STG-3](stefany/STG-3-stego-api.md) | API pública e interna con análisis aislado (R5, R9, R10, R16) | Primer parcial | [STG-2](stefany/STG-2-stego-formatos-y-veredicto.md) | Pendiente |
+| [STG-4](stefany/STG-4-stego-demo-y-calibracion.md) | Imágenes de la demo y calibración rápida | Primer parcial | [STG-3](stefany/STG-3-stego-api.md) | Pendiente |
+| [PAR-1](stefany/PAR-1-postman.md) | Colección de Postman del flujo del docente (RP-11) | Primer parcial | [GW-1](zaith/GW-1-gateway-parcial.md) | Pendiente |
+| [PAR-2](stefany/PAR-2-informe-parcial.md) | Informe del primer parcial (RP-10) | Primer parcial | [GW-1](zaith/GW-1-gateway-parcial.md) | Pendiente |
+| [PAR-3](stefany/PAR-3-demo-y-ensayo.md) | Guion de la demo y ensayo desde un clon limpio (RP-11) | Primer parcial | [PAR-1](stefany/PAR-1-postman.md), [PAR-2](stefany/PAR-2-informe-parcial.md) | Pendiente |
+| [FE-1](stefany/FE-1-frontend-esqueleto-y-cripto.md) | Frontend: esqueleto, criptografía con vectores y SPA en el gateway | Incremento 2 | [GW-1](zaith/GW-1-gateway-parcial.md) | Pendiente |
+| [FE-2](stefany/FE-2-frontend-cuenta-y-salas.md) | Frontend: cuenta, *Mis salas*, crear sala e ingresar | Incremento 2 | [FE-1](stefany/FE-1-frontend-esqueleto-y-cripto.md), [ATH-4](andres/ATH-4-auth-roles-y-permisos.md), [ROOM-2](andres/ROOM-2-rooms-ingreso-y-salida.md) | Pendiente |
+| [FE-3](stefany/FE-3-frontend-chat-y-dueno.md) | Frontend: chat cifrado y controles del dueño | Incremento 2 | [FE-2](stefany/FE-2-frontend-cuenta-y-salas.md), [ROOM-3](andres/ROOM-3-rooms-moderacion.md), [CHAT-3](zaith/CHAT-3-chat-tramas-y-mensajes.md), [GW-2](zaith/GW-2-gateway-salas-media-ws.md) | Pendiente |
+| [MED-1](stefany/MED-1-media-archivos-cifrados.md) | Esqueleto de `media`, archivos cifrados y rotación (R2, R11) | Incremento 3 | [FND-4](zaith/FND-4-autenticacion-entre-servicios.md), [FND-5](zaith/FND-5-utilidades-de-bd-y-pruebas.md) | Pendiente |
+| [MED-2](stefany/MED-2-media-subida-y-clamav.md) | Subida: membresía, límites y ClamAV (R9) | Incremento 3 | [MED-1](stefany/MED-1-media-archivos-cifrados.md) | Pendiente |
+| [MED-3](stefany/MED-3-media-politica-y-publicacion.md) | Política con `stego`, sanitización y publicación (R6, R9) | Incremento 3 | [MED-2](stefany/MED-2-media-subida-y-clamav.md), [STG-3](stefany/STG-3-stego-api.md) | Pendiente |
+| [MED-4](stefany/MED-4-media-descarga-y-cuarentena.md) | Descarga firmada y cuarentena del admin global (R5, R12) | Incremento 3 | [MED-3](stefany/MED-3-media-politica-y-publicacion.md) | Pendiente |
+| [FE-4](stefany/FE-4-frontend-imagenes.md) | Frontend: imágenes en el chat | Incremento 3 | [FE-3](stefany/FE-3-frontend-chat-y-dueno.md), [MED-3](stefany/MED-3-media-politica-y-publicacion.md) | Pendiente |
+
+Las tareas del *Primer parcial* son el corte definitivo; las del *Incremento 2*, salas y chat, y las del *Incremento 3*, imágenes en las salas y cierre.
