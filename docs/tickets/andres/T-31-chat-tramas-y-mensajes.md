@@ -23,6 +23,7 @@ La tarea está **por tareas**: el plan fija archivos, interfaces y tests, pero n
 - [ ] 2000 emojis no cierran la conexión y 2001 caracteres → 4400 (`test_mensaje_largo_multibyte_no_cierra`)
 - [ ] El remitente sale del alias de `rooms`; un campo `from` → 4400
 - [ ] Silenciado → trama `error muted` y la conexión sigue; borrar un mensaje ajeno sin ser dueño → 4403
+- [ ] Guardar y difundir van bajo un candado por sala: 3 participantes con 90 mensajes ven el mismo orden que el historial (`test_rnf14_*`)
 
 ## Entregables
 

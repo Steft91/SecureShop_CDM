@@ -18,6 +18,7 @@ Consulta paginada y verificación de la cadena, solo con el permiso `audit:read`
 - [ ] `GET /api/admin/audit` con `audit:read` → eventos con `id > after_id`, del más nuevo al más viejo
 - [ ] Sin el permiso → 403, y el intento queda registrado
 - [ ] `GET /api/admin/audit/verify` → `{ok, broken_at}`; si la cadena está rota, registra `audit.chain.broken` (critical)
+- [ ] La consulta por severidad con 100 000 eventos responde en ≤ 2 s (RNF-07)
 
 ## Entregables
 

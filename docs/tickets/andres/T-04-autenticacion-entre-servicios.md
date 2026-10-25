@@ -20,15 +20,17 @@ Tokens de servicio con allowlist por hash, identidad del gateway (`X-User-*`), `
 - [ ] Las cabeceras `X-User-*` sin el token del gateway se ignoran (401)
 - [ ] `require_perm` responde `403 "permiso insuficiente"` y audita `perm.denied`
 - [ ] `/health` responde sin token; con `engine=None`, sin BD
+- [ ] Correlación (RNF-19): el `X-Request-ID` del gateway llega al código, a `ServiceClient` y a `AuditClient`; uno ausente o inválido se reemplaza por uno de 32 hex (`test_observabilidad.py`, 7 tests)
+- [ ] Una línea de registro JSON por petición, con `status` y `ms` y **sin query string** (RNF-18)
 
 ## Entregables
 
-- `services/shared/shared/{service_auth,identity,audit_client,web,testing}.py`
-- `services/shared/tests/test_r16_service_auth.py`
+- `services/shared/shared/{service_auth,identity,audit_client,web,observability,testing}.py`
+- `services/shared/tests/test_r16_service_auth.py`, `test_observabilidad.py`
 
 ## Documentación a actualizar
 
-- Fila R16 de la trazabilidad
+- Fila R16 de la trazabilidad (y R3: la correlación llega a audit)
 
 ## Verificación
 

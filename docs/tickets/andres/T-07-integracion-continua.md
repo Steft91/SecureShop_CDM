@@ -17,11 +17,13 @@ Workflow de GitHub Actions con la matriz de servicios, SAST (CodeQL) y detecció
 
 - [ ] `.github/workflows/ci.yml` tiene los jobs `services` (matriz `[shared]`), `codeql` y `secrets`
 - [ ] El job `services` corre ruff, pytest, bandit y pip-audit
+- [ ] El job falla si un servicio baja del 80 % de cobertura de líneas (RNF-10) o si una función supera la complejidad 10 (RNF-11)
 - [ ] Cuando el equipo autorice el primer `push`, la CI queda en verde (no se hace `push` sin autorización)
+- [ ] Quien administra el repositorio protege `main`: PR con 1 aprobación y los jobs en verde (Step 4; anotar la fecha en la trazabilidad)
 
 ## Entregables
 
-- `.github/workflows/ci.yml`
+- `.github/workflows/ci.yml`, `.coveragerc`
 
 ## Documentación a actualizar
 

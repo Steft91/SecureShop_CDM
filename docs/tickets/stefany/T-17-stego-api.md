@@ -19,6 +19,7 @@
 - [ ] Más de 10 análisis por minuto por usuario → 429 y `stego.ratelimited`
 - [ ] Si el análisis supera `STEGO_TIMEOUT_S` → `revision_manual`
 - [ ] Se audita `stego.analyzed` (info si es `limpia`; warning en los demás casos); `/internal/analyze` y `/internal/sanitize` solo aceptan a `media` (`test_r16_internas.py`)
+- [ ] Si el sanitizador deja residuos estructurales, `/internal/sanitize` responde 503 y audita `stego.sanitize.failed` (critical) (A3-RS-36)
 
 ## Entregables
 

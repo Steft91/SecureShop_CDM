@@ -18,6 +18,8 @@ Servicio `stego` sin estado, con chi² (Westfeld), RS (Fridrich), entropía LSB,
 - [ ] Un PNG con LSB secuencial al 10 % → chi² o RS por encima del umbral; un PNG natural → por debajo (`test_r06_estego.py`)
 - [ ] Datos después de `IEND` o `FFD9` → anomalía estructural
 - [ ] Después de sanitizar, el plano LSB cambia y se conserva el alfa
+- [ ] Ninguna función pasa de complejidad 10: `jpeg.structure` se parte con `skip_entropy` (RNF-11)
+- [ ] La salida de `sanitize` no tiene residuos estructurales (`png.residual` y `jpeg.residual` vacíos)
 - [ ] `stego` en estado `healthy` en compose (sin BD, solo en la red `apps`) y en la matriz de la CI
 
 ## Entregables

@@ -20,10 +20,13 @@ Dejar el repo listo para trabajar: ignorados, lint, reglas de seguridad, hook de
 - [ ] `.claude/settings.json` niega leer `deploy/secrets/**`, `deploy/certs/**` y `**/.env`
 - [ ] `docs/trazabilidad-riesgos.md` tiene R1–R16 en *Pendiente*, con su columna ISO
 - [ ] `CLAUDE.md` enlaza el spec, el índice, `docs/tickets/` y la trazabilidad, y tiene la lista *Estado actual*
+- [ ] `ruff.toml` incluye la regla `C90` con complejidad ≤ 10 por función (RNF-11)
+- [ ] `.github/pull_request_template.md` trae la lista de verificación de seguridad
 
 ## Entregables
 
 - `.gitignore`, `.gitattributes`, `.dockerignore`, `ruff.toml`
+- `.github/pull_request_template.md`
 - `CLAUDE.md`, `.claude/**`
 - `docs/trazabilidad-riesgos.md`
 

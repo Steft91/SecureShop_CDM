@@ -22,6 +22,7 @@ La tarea está **por tareas**: el plan fija archivos, interfaces y tests, pero n
 - [ ] `docs/calibracion-estego.md` con ≥ 30 fotos reales y los umbrales finales
 - [ ] El VPS responde por https con un certificado válido y rechaza TLS 1.2
 - [ ] `docs/informe-pruebas.md` y la trazabilidad con R1–R16 en *Implementado*
+- [ ] Respaldo cifrado con `age` y simulacro de restauración: `audit/verify` da `ok` y el historial se descifra (Step 2b)
 - [ ] `docs/demo.md` ensayada una vez completa; `CLAUDE.md` con todo marcado
 
 ## Entregables

@@ -19,6 +19,7 @@ El único punto de entrada: TLS 1.3, cabeceras de seguridad, rate limit y `auth_
 - [ ] http → 301; TLS 1.2 rechazado; `/internal/verify` → 404; HSTS y CSP presentes
 - [ ] `X-User-*` falsificadas sin JWT → 401; `auth` caído → 503
 - [ ] El admin entra con contraseña + TOTP vía curl, analiza `2-problema-zip-al-final.png` (`problema`) y ve los eventos en `/api/admin/audit`
+- [ ] `X-Request-ID`: una sola cabecera en la respuesta, que sobrescribe la del cliente, y el mismo id en los registros JSON de `gateway` y `auth`
 - [ ] Queda anotado si Postman conserva `__Host-device` (Step 7)
 
 ## Entregables

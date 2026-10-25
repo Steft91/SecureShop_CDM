@@ -23,6 +23,7 @@ La tarea está **por tareas**: el plan fija archivos, interfaces y tests, pero n
 - [ ] Un rol con solo `audit:read` ve una sola pestaña
 - [ ] El `409` del último admin se muestra tal como lo devuelve el servidor
 - [ ] Las 4 verificaciones manuales del plan
+- [ ] Pestaña *Estado* con las métricas y la alerta `resource.high`; prueba de contraste y Lighthouse de accesibilidad ≥ 90 (ver el recuadro de la Actividad 3 en el plan)
 
 ## Entregables
 

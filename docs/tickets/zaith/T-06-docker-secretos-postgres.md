@@ -18,6 +18,7 @@ Dockerfile único por servicio, generador de secretos (con la clave del JWT) y P
 - [ ] `python deploy/gen_secrets.py` crea los 30 secretos y `deploy/public/chat-key.json`, y nunca sobrescribe; `--rotate` regenera uno
 - [ ] `jwt_signing_key` es RSA de 3072 bits y el hash de `stego` coincide con su token (`test_gen_secrets.py`)
 - [ ] `docker compose up -d db` crea las 5 BD con su `<svc>_owner`, y `rooms_app` **no** puede conectarse a `auth` (`f`)
+- [ ] El `Dockerfile` fija `LOG_FORMAT=json` y arranca uvicorn con `--no-access-log`
 
 ## Entregables
 

@@ -19,6 +19,7 @@
 - [ ] Una alteración hecha con el owner la detecta `verify` (`broken_at`)
 - [ ] `audit_app` no puede `UPDATE`, `DELETE` ni `TRUNCATE`
 - [ ] El gateway u otro llamador fuera de la allowlist → 403 (lo registra `audit` directamente en su BD)
+- [ ] `request_id` (`^[A-Za-z0-9-]{8,64}$`, si no 422) se guarda en `details` y el hash de la cadena lo cubre (`test_rnf19_*`)
 
 ## Entregables
 
