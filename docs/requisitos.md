@@ -84,7 +84,7 @@
 
 | ID | Requisito | Primer parcial | Plan | Verificación |
 |---|---|---|---|---|
-| RS-01 | Autenticación segura del administrador (segundo factor y bloqueo) | **Parcial:** contraseña Argon2id, bloqueo tras 5 fallos y retraso progresivo; el TOTP de los admins llega en un parcial posterior | FND-3, ATH-2, ATH-3 | `test_r04_bloqueo_tras_5_fallos_por_usuario`, `test_el_admin_entra_con_su_contraseña` |
+| RS-01 | Autenticación segura del administrador (segundo factor y bloqueo) | **Parcial:** contraseña Argon2id, bloqueo tras 5 fallos y retraso progresivo; el TOTP de los admins queda fuera del primer parcial y llega después | FND-3, ATH-2, ATH-3 | `test_r04_bloqueo_tras_5_fallos_por_usuario`, `test_el_admin_entra_con_su_contraseña` |
 | RS-02 | Autorización del administrador en cada operación | **Sí** | FND-4, ATH-4 | `test_r05_sin_roles_manage_403`, `test_r05_sin_el_permiso_403_y_se_registra` |
 | RS-03 | Clave de sala protegida | No | — | — |
 | RS-04 | Ingreso controlado por intentos | No | — | — |

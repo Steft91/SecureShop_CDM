@@ -17,11 +17,11 @@ La colección que recorre el flujo del docente por el gateway, con un test por p
 
 ## Cómo trabajar sin esperar
 
-Arma las carpetas, las 16 peticiones y sus `pm.test` con la tabla del plan antes de que el gateway esté arriba; solo la corrida del Runner espera a GW-1.
+Arma las carpetas, las 30 peticiones y sus `pm.test` con la tabla del plan antes de que el gateway esté arriba; solo la corrida del Runner espera a GW-1.
 
 ## Criterios de aceptación
 
-- [ ] Las 16 peticiones del plan, con sus `pm.test`, en verde dos veces seguidas en el Runner
+- [ ] Las 30 peticiones del plan, con sus `pm.test`, en verde dos veces seguidas en el Runner
 - [ ] El admin entra con `admin_username` y `admin_password`, variables de entorno solo locales
 - [ ] La colección no contiene contraseñas reales ni tokens (Step 3)
 - [ ] Captura del Runner en `docs/evidencias/parcial-1-runner.png`

@@ -22,7 +22,7 @@ El guion (quién habla y qué petición se ejecuta) se escribe con la tabla de P
 ## Criterios de aceptación
 
 - [ ] `docs/demo-parcial-1.md` con los 5 pasos, quién habla y qué petición se ejecuta
-- [ ] Ensayo desde un clon limpio: Runner 16/16 y demo en ≤ 8 minutos cronometrados
+- [ ] Ensayo desde un clon limpio: Runner 30/30 y demo en ≤ 8 minutos cronometrados
 - [ ] `pytest` de `shared`, `auth` y `stego` en verde y la CI de la rama en verde
 - [ ] `CLAUDE.md`: primer parcial cerrado
 

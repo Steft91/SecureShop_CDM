@@ -63,7 +63,7 @@ Construir la aplicación de **salas de chat seguras** del proyecto integrador co
 - Modelo criptográfico **B** (cifrado en capa de aplicación sobre TLS). Se descartaron A (solo TLS) y C (E2E puro, que impide el estegoanálisis en el servidor).
 - *(Rev. 4)* **Salas estilo Discord:** cualquiera crea salas y queda como dueño; la membresía es persistente; hay un solo dueño por sala y puede cederla; no hay moderadores ni reportes.
 - *(Rev. 4)* **`stego` es un servicio propio:** nace en el primer parcial y luego `media` lo usa por la red interna.
-- *(Rev. 4)* **El primer parcial es un corte definitivo:** fundaciones, `audit`, gateway, `auth` y `stego` tal como quedan en el sistema final; no se escribe código provisional.
+- *(Rev. 4)* **El primer parcial es un corte definitivo:** gateway, `auth` y `stego` tal como quedan en el sistema final; `audit` y TOTP quedan fuera; no se escribe código provisional.
 
 ---
 
@@ -127,7 +127,7 @@ Navegador (React SPA + WebCrypto) · Postman (primer parcial)
 |---|---|---|---|
 | **gateway** | Único punto de entrada: TLS, cabeceras de seguridad, rate limit perimetral, enrutamiento, autenticación delegada (`auth_request` a `auth`), SPA estática | — | 7, 10, 16 |
 | **auth** | Registro, login, TOTP para permisos de admin, JWT y sesiones (un dispositivo por cuenta), roles y permisos, suspensión; `verify`; CLI `create_admin`; rotación de su KEK | `auth`: `users`, `permissions`, `roles`, `role_permissions`, `user_roles`, `user_sessions`, `failed_attempts` | 4, 5, 13 |
-| **rooms** | Salas con dueño (máximo 2 activas), ingreso con clave, membresía y alias por sala, cupo atómico, expulsión con veto, silencio, cesión y cierre; membresía para chat y media | `rooms`: `rooms`, `room_members`, `failed_attempts` | 1, 5, 8, 15 |
+| **rooms** | Salas con dueño (máximo 2 activas), ingreso con clave, membresía, alias de cuenta, cupo atómico, expulsión con veto, silencio, cesión y cierre; membresía para chat y media | `rooms`: `rooms`, `room_members`, `failed_attempts` | 1, 5, 8, 15 |
 | **chat** | WebSocket, handshake ECDH firmado, cifrado de tramas, mensajes cifrados en reposo (DEK por sala), historial, borrado de mensajes, silencio, inactividad y latidos de sesión y membresía | `chat`: `room_keys`, `messages` | 2, 7, 10, 14 |
 | **media** | Subida, tope de tamaño, ClamAV, política (cuarentena, rechazo o publicación), cifrado de archivos en reposo, descarga con URL firmada, panel de cuarentena | `media`: `files` + volumen de archivos cifrados | 2, 6, 9, 12 |
 | **stego** | Firma real, validación con Pillow, estegoanálisis (estructura, chi², RS) y sanitización; API pública de análisis | — (sin estado) | 6, 9 |
@@ -351,7 +351,6 @@ CREATE INDEX rooms_by_owner ON rooms (owner_id) WHERE active;
 CREATE TABLE room_members (
   room_id      uuid NOT NULL REFERENCES rooms(id),
   user_id      uuid NOT NULL,
-  alias        text NOT NULL,                     -- NFKC, 2–24 caracteres
   joined_at    timestamptz NOT NULL DEFAULT now(),
   left_at      timestamptz,                       -- NULL = miembro actual
   left_reason  text CHECK (left_reason IN ('left','kicked')),
@@ -359,7 +358,6 @@ CREATE TABLE room_members (
   muted_until  timestamptz,                       -- silencio
   PRIMARY KEY (room_id, user_id)
 );
-CREATE UNIQUE INDEX alias_per_room ON room_members (room_id, lower(alias));  -- el alias sigue reservado aunque su dueño salga
 CREATE TABLE failed_attempts (
   id         bigserial PRIMARY KEY,
   key        text NOT NULL,                     -- 'ip:<ip>' | 'user:<id>' | 'room:<id>'
@@ -469,9 +467,9 @@ Para cada servicio con BD `<svc>` ∈ {auth, rooms, chat, media, audit}:
 | GET / POST | `/api/admin/roles` | auth | `roles:manage` | Listar / crear `{name, description?, permissions: [...]}` |
 | PUT | `/api/admin/roles/{id}/permissions` | auth | `roles:manage` | `{permissions: [...]}`. El rol `admin` no se edita |
 | DELETE | `/api/admin/roles/{id}` | auth | `roles:manage` | Solo roles no semilla y sin usuarios asignados |
-| GET | `/api/rooms/mine` | rooms | usuario | Salas activas donde es miembro: `[{id, code, mode, alias, is_owner, member_count, max_members}]` |
-| POST | `/api/rooms` | rooms | `rooms:create` | `{code, key, max_members, mode, alias}` → crea la sala y la membresía del dueño. 409 si ya tiene 2 salas activas |
-| POST | `/api/rooms/join` | rooms | usuario | `{code, key, alias}` → membresía + `{room: {id, code, mode}}` |
+| GET | `/api/rooms/mine` | rooms | usuario | Salas activas donde es miembro: `[{id, code, mode, alias, is_owner, member_count, max_members}]`; `alias` proviene de la cuenta (RF-20) |
+| POST | `/api/rooms` | rooms | `rooms:create` | `{code, key, max_members, mode}` → crea la sala y la membresía del dueño usando su alias de cuenta. 409 si ya tiene 2 salas activas |
+| POST | `/api/rooms/join` | rooms | usuario | `{code, key}` → membresía usando el alias de cuenta + `{room: {id, code, mode}}` |
 | POST | `/api/rooms/{id}/leave` | rooms | miembro | 204. El dueño recibe 409 hasta que ceda la sala |
 | GET | `/api/rooms/{id}/members` | rooms | miembro o dueño | `[{user_id, alias, is_owner, muted}]` |
 | PATCH | `/api/rooms/{id}` | rooms | dueño | `{key?, max_members?, mode?}`: cupo ≥ miembros actuales; la clave solo la cambia el dueño |
@@ -513,7 +511,7 @@ Para cada servicio con BD `<svc>` ∈ {auth, rooms, chat, media, audit}:
 |---|---|---|---|
 | auth | `GET /internal/verify` | gateway | Lee `Authorization: Bearer` o la cookie `__Host-session`, más `__Host-device` → `204` + `X-User-Id`, `X-User-Name`, `X-Session-Id`, `X-User-Perms` (separados por comas; sin los `requires_mfa` si la sesión no pasó por TOTP; ausente si no hay permisos). Desliza `last_seen` · `401` |
 | auth | `POST /internal/sessions/heartbeat` | chat | `{session_ids: [...]}` → `last_seen = now()` en las activas · `200 {ended: [...]}` con las que ya no lo están |
-| rooms | `POST /internal/membership` | chat, media | `{room_id, user_id}` → `200 {alias, mode, is_owner, muted_until}` si la sala está activa y es miembro actual · `404` |
+| rooms | `POST /internal/membership` | chat, media | `{room_id, user_id}` → `200 {alias, mode, is_owner, muted_until}`; `alias` es el alias de cuenta RF-20 y solo se devuelve si la sala está activa y es miembro actual · `404` |
 | rooms | `POST /internal/membership/heartbeat` | chat | `{members: [{room_id, user_id}]}` → `200 {states: [{room_id, user_id, member, muted_until}]}` |
 | chat | `POST /internal/users/{id}/disconnect` | auth | `{code}` → cierra todos los WS de ese usuario · `204` |
 | chat | `POST /internal/rooms/{room_id}/kick` | rooms | `{user_id, code}` → cierra su WS en la sala y avisa `leave` · `204` |
@@ -579,20 +577,19 @@ Todos los servicios exponen además `GET /health` sin token (`{"status": "ok"}` 
 1. Política de clave, código normalizado y alias válido.
 2. Transacción con `pg_advisory_xact_lock` sobre el `owner_id`: si ya tiene 2 salas activas → `409 "ya tienes 2 salas activas"` y `room.limit.reached`. Si no, inserta la sala (`member_count = 1`) y la membresía del dueño. Código repetido → `409 "código no disponible"`. Auditoría `room.created` (obligatoria).
 
-**Primer ingreso** (`POST /api/rooms/join {code, key, alias}`):
+**Primer ingreso** (`POST /api/rooms/join {code, key}`):
 1. Rate limit: ≥ 5 fallos en 10 min por `ip`, ≥ 10 por `user` o ≥ 20 por `room` → `429` y auditoría.
 2. Busca la sala activa por `code` y hace Argon2id verify (dummy si no existe). Si falla → registra el fallo en las tres claves y responde `401 "sala o clave inválida"`.
 3. Veto vigente (`banned_until > now()`) → `403 "no puedes entrar a esta sala"` y `room.join.banned`. Se comprueba **después** de la clave, para no revelar el veto a quien no la conoce.
-4. Si ya es miembro actual → 200 con la sala (idempotente; el alias no cambia).
+4. Si ya es miembro actual → 200 con la sala (idempotente; se muestra el alias vigente de la cuenta).
 5. **Transacción única:**
    ```sql
    UPDATE rooms SET member_count = member_count + 1
     WHERE id = :room AND active AND member_count < max_members
    RETURNING id;                        -- 0 filas → 409 "sala llena"
-   INSERT INTO room_members (room_id, user_id, alias) VALUES (:room, :user, :alias)
+   INSERT INTO room_members (room_id, user_id) VALUES (:room, :user)
    ON CONFLICT (room_id, user_id) DO UPDATE
-      SET alias = EXCLUDED.alias, joined_at = now(), left_at = NULL, left_reason = NULL;
-                                        -- choque con alias_per_room → rollback → 409 "alias en uso"
+      SET joined_at = now(), left_at = NULL, left_reason = NULL;
    ```
    En la misma transacción se emite `room.member.joined` (obligatorio; si `audit` falla, el ingreso falla con 503).
 
@@ -1002,14 +999,14 @@ Se ejecuta en local antes de cada hito.
 Los tickets de cada persona (Zaith, Andrés y Stefany), uno por archivo, están en `docs/tickets/`. Los planes por subsistema están en `docs/plans/`.
 
 ### 18.1 Primer parcial: corte definitivo
-**Contenido:** fundaciones (FND), `audit` (AUD), `auth` con RBAC, JWT, sesiones y TOTP (ATH), `stego` (STG), el gateway con las rutas de esos servicios (GW-1), la colección de Postman y el informe. Todo queda como en el sistema final.
+**Contenido:** únicamente `auth` con RBAC, JWT y sesiones, `stego` con los 9 formatos (STG-1–STG-7), el gateway, la colección de Postman y el informe. `audit`, la auditoría encadenada y TOTP quedan fuera del primer parcial.
 
-**Demo en vivo** (los 5 pasos del docente, desde Postman contra `https://localhost`):
+**Demo en vivo** (5 pasos y 30 peticiones desde Postman contra `https://localhost`):
 1. Crear un usuario nuevo con `POST /api/auth/register`.
-2. El admin inicia sesión (contraseña + TOTP), crea un rol nuevo con sus permisos (`POST /api/admin/roles` con `stego:analyze`) y se lo asigna al usuario (`PUT /api/admin/users/{id}/roles`).
+2. El admin inicia sesión con su contraseña, crea un rol con `stego:analyze` y lo asigna al usuario.
 3. El usuario inicia sesión y recibe el JWT.
-4. Con ese token, `POST /api/stego/analyze` con cuatro imágenes preparadas: inválida (un archivo que no es imagen), limpia, problema (un ZIP pegado al final) y revisión manual (LSB embebido).
-5. Casos negativos: sin token → 401; el mismo usuario antes de recibir el rol → 403; `GET /api/admin/audit` muestra todo lo anterior.
+4. Con ese token, analizar un archivo limpio y uno sospechoso de cada uno de los 9 formatos.
+5. Casos negativos: sin token → 401 y antes del rol → 403; los eventos JSON se muestran con `docker compose logs` (no hay API de auditoría en este parcial).
 
 ### 18.2 Incremento 2: salas y chat
 `rooms` completo, `chat` completo, `auth` con suspensión, cambio de contraseña y latido de sesiones, rutas de salas y WS en el gateway (GW-2) y la SPA con login, registro, *Mis salas*, chat y controles del dueño (FE-1…FE-3).
@@ -1095,11 +1092,11 @@ El docente redujo el primer parcial a **dos microservicios integrados, sin inter
 | Salas con dueño, membresía persistente, máximo 2 salas activas por persona, cesión de la sala | Decisión del equipo: modelo de Discord | §7.2, §9.2, §9.3 |
 | Admin global sin acceso a las conversaciones ni a la clave de salas ajenas | Privacidad de las salas (ISO 27001 A.5.34) | §3 (limitación 8), §9.3 |
 | Moderación: expulsión con veto, silencio y borrado de mensajes (propios y, para el dueño, ajenos) | La propuesta de roles mostró que el diseño solo permitía cerrar la sala entera | §9.3–§9.5, §10.2 |
-| Una sesión por cuenta (R13 pasa de `rooms` a `auth`); desaparecen la cookie de sala, `verify-session` y el barrido de sesiones | La cuenta reemplaza al alias como identidad | §4.3, §7.1, §9.1, §9.4 |
+| Una sesión por cuenta (R13 pasa de `rooms` a `auth`); desaparecen la cookie de sala, `verify-session` y el barrido de sesiones | La cuenta reemplaza al alias como identidad; el alias de cuenta RF-20 es el único nombre visible en las salas | §4.3, §7.1, §9.1, §9.4 |
 | Revocación inmediata: el gateway verifica el JWT y su sesión en cada request y pasa los permisos actuales | El spec había descartado JWT por no poder revocarse; con la sesión en el servidor sí se puede | §2, §4.3, §9.1 |
 | Nunca sin admin; el registro nunca da `admin`; cuerpos con `extra="forbid"` | Controles de escalamiento de privilegios que faltaban | §8.1, §9.1 |
 | Servicio `stego` separado de `media` | La API de esteganografía del parcial se reutiliza en las salas | §4, §9.6, §9.9, §12 |
-| Primer parcial como corte definitivo (fundaciones, audit, gateway, auth y stego) | Las fundaciones exigen el gateway y `audit`; así no hay código provisional | §2, §18.1 |
+| Primer parcial como corte definitivo (gateway, auth y stego) | El primer parcial se limita a los dos microservicios pedidos y su gateway; `audit` queda fuera | §2, §18.1 |
 | Fuera de alcance: reportes, edición de mensajes, moderadores, correo, notificaciones y estadísticas | YAGNI; se agregan si el docente los pide | §3 |
 
 ### 22.1 Requisitos de la Actividad 3 que se adoptan

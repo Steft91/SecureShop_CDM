@@ -45,3 +45,6 @@ Depende de tu STG-1 y de `shared.crypto.sha256` (FND-2). `verdict.py` y la tabla
 - [ ] La trazabilidad y los documentos de arriba están actualizados
 - [ ] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
 - [ ] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)
+
+
+> **Actualización de alcance:** STG-5, STG-6 y STG-7 completan en este parcial los 9 formatos (GIF, WAV, MP3, MP4, PDF, DOCX y TXT), además de PNG y JPEG.

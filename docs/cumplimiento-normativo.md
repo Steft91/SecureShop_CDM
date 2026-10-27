@@ -1,5 +1,7 @@
 # Cumplimiento normativo y enfoques de seguridad — Primer parcial
 
+> En el primer parcial solo se entregan `auth`, `stego` y el gateway. El servicio `audit`, la auditoría encadenada y TOTP quedan fuera de alcance.
+
 | | |
 |---|---|
 | **Qué demuestra** | Cómo ISO/IEC 27001, ISO/IEC 27034, Zero Trust, Secure by Design y Shift Left se aplican al primer parcial (gateway, `auth` y `stego`), y cómo se relacionan con sus riesgos y con los mecanismos implementados |

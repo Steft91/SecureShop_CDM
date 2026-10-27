@@ -17,7 +17,7 @@
 
 ## Cómo trabajar sin esperar
 
-Depende de tu STG-2, de `require_perm` y `audit.emit` (FND-4) y de `TokenBucket` (FND-3 de Andrés). La identidad del gateway se simula con las cabeceras de `shared.testing`: no esperas a `auth` ni al gateway.
+Depende de tu STG-2, de `require_perm` y del registro JSON local del servicio (sin `audit`) y de `TokenBucket` (FND-3 de Andrés). La identidad del gateway se simula con las cabeceras de `shared.testing`: no esperas a `auth` ni al gateway.
 
 ## Criterios de aceptación
 
@@ -45,3 +45,6 @@ Depende de tu STG-2, de `require_perm` y `audit.emit` (FND-4) y de `TokenBucket`
 - [ ] La trazabilidad y los documentos de arriba están actualizados
 - [ ] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
 - [ ] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)
+
+
+> **Actualización de alcance:** STG-5, STG-6 y STG-7 completan en este parcial los 9 formatos (GIF, WAV, MP3, MP4, PDF, DOCX y TXT), además de PNG y JPEG.

@@ -47,6 +47,10 @@ Solo existe el **primer parcial** (gateway, `auth` y `stego`, probados con Postm
 | C | [PAR-2: Informe del primer parcial (RP-10)](parcial-1/stefany/PAR-2-informe-parcial.md) | GW-1 | Pendiente |
 | C | [PAR-3: Guion de la demo y ensayo desde un clon limpio (RP-11)](parcial-1/stefany/PAR-3-demo-y-ensayo.md) | PAR-1, PAR-2 | Pendiente |
 
+| B | [STG-5: GIF y WAV](parcial-1/stefany/STG-5-gif-wav.md) | STG-2 | Pendiente |
+| B | [STG-6: MP3 y MP4](parcial-1/zaith/STG-6-mp3-mp4.md) | STG-2 | Pendiente |
+| B | [STG-7: PDF, DOCX y TXT](parcial-1/andres/STG-7-pdf-docx-txt.md) | STG-2 | Pendiente |
+
 ## Cruces entre personas
 
 | Quién espera | Qué | De quién | Mientras tanto |
