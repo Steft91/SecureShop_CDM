@@ -5,9 +5,11 @@
 | **Fecha** | 2026-10-12 · **Revisión 2:** 2026-10-13 (arquitectura de microservicios; reemplaza el monolito modular de la revisión 1) · **Revisión 3:** 2026-10-13 (cumplimiento del resumen del docente: normas, enfoques y cifrado de archivos en reposo; §21) · **Revisión 4:** 2026-10-25 (clase del 22/10: cuentas con RBAC y JWT, salas con dueño, servicio `stego` y primer parcial; §22) |
 | **Autores** | Zaith Alejandro Manangón Vinueza, Stefany Maricela Díaz Antun, Andrés Isaias Cedeño Cuenca |
 | **Asignatura** | Software Seguro — Proyecto Integrador |
-| **Estado** | Revisión 4 pendiente de aprobación del equipo. Siguiente paso: actualizar `docs/plans/` y crear `docs/tickets/` |
+| **Estado** | Revisión 4. Planes del primer parcial en `docs/plans/` y tickets en `docs/tickets/parcial-1/` |
 | **Fuente de requisitos** | `Documentación/Tarea 2/Actividad2_SGSI_Proyecto_Integrador.md` (enunciado + Tablas 1–4 de riesgos), `PROYECTO INTEGRADOR - RESUMEN.docx` (resumen del docente) y la clase del 22/10/2026 (alcance del primer parcial). Los requisitos con ID están en `docs/requisitos.md` |
-| **Plazo** | **Primer parcial:** corte definitivo con el gateway, `auth`, `stego` y `audit`, probado con Postman (meta de demo: 30 oct; fecha de la defensa por confirmar). **Después:** `rooms`, `chat`, `media` y el frontend, por incrementos durante el semestre (§18) |
+| **Plazo** | **Primer parcial:** corte definitivo con el gateway, `auth` y `stego`, probado con Postman (meta de demo: 30 oct; fecha de la defensa por confirmar). **Después:** lo que el docente pida para los parciales 2 y 3 |
+
+> **Alcance del primer parcial.** Solo se construyen el gateway, `auth` (cuentas, RBAC y JWT, con el admin global creado por CLI) y `stego`. No entran el servicio `audit`, el TOTP de los admins, la rotación de la KEK, `rooms`, `chat`, `media` ni el frontend: los eventos de seguridad son registros JSON en la salida de cada servicio. Las secciones de esta spec que describen esas piezas son el diseño de referencia para después. Donde la spec y los planes de `docs/plans/` difieren, mandan los planes.
 
 ---
 
