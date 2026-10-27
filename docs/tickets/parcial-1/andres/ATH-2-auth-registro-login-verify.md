@@ -1,4 +1,4 @@
-# ATH-2: Registro, login, JWT y sesión de dispositivo único, `verify`, `me` y `logout` (R4, R5, R10, R13, R16)
+# ATH-2: Registro con alias, login, JWT y sesión de dispositivo único, `verify`, `me` y `logout` (R4, R5, R10, R13, R16)
 
 | Campo | Valor |
 |---|---|
@@ -13,7 +13,7 @@
 
 ## Objetivo
 
-Cuentas con registro abierto y sin roles, un login con bloqueo que entrega el JWT, una sesión por cuenta ligada al dispositivo, y el `verify` que el gateway llama en cada petición.
+Cuentas con registro abierto (usuario, contraseña y alias visible) y sin roles, un login con bloqueo que entrega el JWT, una sesión por cuenta ligada al dispositivo, y el `verify` que el gateway llama en cada petición.
 
 ## Cómo trabajar sin esperar
 
@@ -21,7 +21,8 @@ Solo depende de tu ATH-1.
 
 ## Criterios de aceptación
 
-- [ ] El registro no asigna roles; un cuerpo con `role` → 422; `" ANA "` y `ana` son la misma cuenta (`test_usuario_normalizado_en_registro_y_login`)
+- [ ] El registro pide `alias` (RF-20) y no asigna roles; un cuerpo con `role` → 422; `" ANA "` y `ana` son la misma cuenta (`test_usuario_normalizado_en_registro_y_login`)
+- [ ] El alias se normaliza, es único sin distinguir mayúsculas y rechaza caracteres de control y `<>` (`test_alias_duplicado_sin_distinguir_mayusculas_409`, `test_alias_invalido_422`); `me` y la lista de cuentas lo devuelven
 - [ ] Tope de registros por IP (`test_r10_tope_de_registros_por_ip`)
 - [ ] 5 fallos en 15 min → 429 + `Retry-After`; el mismo mensaje si el usuario no existe
 - [ ] El login devuelve `{access_token, token_type: "Bearer", expires_in}`

@@ -28,7 +28,7 @@ Solo necesita tu FND-2. Es la pieza que más esperan Andrés (ATH-1) y Stefany (
 - [ ] `audit.emit` escribe una línea JSON con `"msg": <acción>` y el resto en `event`; `testing.events(caplog, acción)` la encuentra
 - [ ] `/health` responde sin token; con `engine=None`, sin BD
 - [ ] Correlación (RNF-19): el `X-Request-ID` del gateway llega al código y a los eventos; uno ausente o inválido se reemplaza por uno de 32 hex
-- [ ] Una línea de registro JSON por petición, con `status` y `ms` y **sin query string** (RNF-18)
+- [ ] Una línea de registro JSON por petición, con `status` y `ms` y **sin query string** (RNF-19)
 
 ## Entregables
 

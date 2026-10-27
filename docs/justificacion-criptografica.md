@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Requisito** | `docs/requisitos.md` RS-13…RS-15, RS-36, RP-06: *justificar los algoritmos, protocolos, mecanismos de gestión de claves y controles* |
+| **Requisito** | `docs/requisitos.md` RS-09, RS-13…RS-15, RS-38 y RC-01: *justificación criptográfica documentada que cubra algoritmos, protocolo y ciclo de vida de las claves* (RS-15) |
 | **Alcance** | El primer parcial: el gateway, `auth` y `stego`. El cifrado de mensajes y archivos (spec §10–§11) se justifica aquí cuando se construya |
 | **Implementación** | `services/shared/shared/{crypto,passwords,secrets}.py`, `services/auth/auth_svc/tokens.py`, `deploy/gen_secrets.py` y `gateway/nginx.conf` |
 

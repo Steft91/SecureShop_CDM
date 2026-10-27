@@ -50,7 +50,7 @@ Ninguno de los casos del índice cae en este archivo, pero las utilidades que se
   - El hook `guard.py`, que corre antes de cada `Edit|Write|MultiEdit` de Claude Code.
   - La tabla de trazabilidad que actualizan todas las tareas.
   - `ruff.toml` en la raíz, que aplica a todo `services/` y `deploy/`. Incluye la regla `C90` con complejidad ciclomática ≤ 10 por función (RNF-11): una función más compleja se parte en el mismo ticket, no se silencia.
-  - `.github/pull_request_template.md` con la lista de verificación de seguridad (A3-RS-32).
+  - `.github/pull_request_template.md` con la lista de verificación de seguridad (RS-37).
 
 - [ ] **Step 1: Escribir el hook con su autoprueba**
 
@@ -1037,7 +1037,7 @@ git commit -m "feat(shared): Argon2id con tope de concurrencia, política de cla
   - `shared.identity`: `UserIdentity(user_id, username, session_id, perms: frozenset[str])`, `client_ip(conn)`, `user_from_headers(conn)->UserIdentity|None`, `require_gateway`, `require_user`, `require_perm(*perms)` (403 `"permiso insuficiente"` y evento `perm.denied` si falta alguno).
   - `shared.audit`: `emit(severity, action, *, actor, target=None, ip=None, details=None)`. Escribe una línea en el logger `audit` con el nivel de `severity` (`info`, `warning` o `critical`), `msg = action` y el resto en el campo `event`. No hay servicio audit en el primer parcial: los eventos se leen con `docker compose logs`.
   - `shared.web`: `SESSION_COOKIE`, `DEVICE_COOKIE`, `set_cookie(response, name, value, max_age=None)`, `clear_cookie(response, name)`, `create_base_app(*, title, settings, engine, service_auth, lifespan=None)->FastAPI` (con `engine=None`, `/health` responde sin BD: lo usa `stego`). La app expone `app.state.settings/engine/service_auth` y `request.state.caller`. Instala `RequestContextMiddleware` como el más externo y llama a `configure_logging(title)`.
-  - `shared.observability` (RNF-18, RNF-19): `REQUEST_HEADER = "X-Request-ID"`, `REQUEST_ID: ContextVar[str | None]`, `JsonFormatter(service)`, `configure_logging(service)` (solo con `LOG_FORMAT=json`) y `RequestContextMiddleware`. El middleware toma el id que puso el gateway (si cumple `^[A-Za-z0-9-]{8,64}$`; si no, crea uno de 32 hex), lo deja en `REQUEST_ID` y registra **una línea por petición** con `method`, `path` (sin query string), `status` y `ms`. `JsonFormatter` agrega el id a cada línea, también a los eventos de `shared.audit`. Los servicios no devuelven el id al cliente: lo hace el gateway (GW-1).
+  - `shared.observability` (RNF-19): `REQUEST_HEADER = "X-Request-ID"`, `REQUEST_ID: ContextVar[str | None]`, `JsonFormatter(service)`, `configure_logging(service)` (solo con `LOG_FORMAT=json`) y `RequestContextMiddleware`. El middleware toma el id que puso el gateway (si cumple `^[A-Za-z0-9-]{8,64}$`; si no, crea uno de 32 hex), lo deja en `REQUEST_ID` y registra **una línea por petición** con `method`, `path` (sin query string), `status` y `ms`. `JsonFormatter` agrega el id a cada línea, también a los eventos de `shared.audit`. Los servicios no devuelven el id al cliente: lo hace el gateway (GW-1).
   - `shared.testing`:
     - constantes `ORIGIN`, `TOKENS` (gateway, auth, stego), `ROLE_PASSWORD`, `USER_ID`, `SESSION_ID`;
     - `service_auth(name, callers)`;
@@ -1517,7 +1517,7 @@ def create_base_app(*, title: str, settings, engine, service_auth, lifespan=None
 Run: `pytest services/shared -q`
 Expected: PASS (incluye los 9 tests de `test_r16_service_auth.py`)
 
-- [ ] **Step 6: Correlación de peticiones y registros JSON (RNF-18, RNF-19)**
+- [ ] **Step 6: Correlación de peticiones y registros JSON (RNF-19)**
 
 Un mismo `X-Request-ID` recorre gateway → servicio y aparece en cada registro y en cada evento, así que una petición de la demo se reconstruye de punta a punta en los registros.
 
@@ -1598,7 +1598,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'shared.observability'`
 
 `services/shared/shared/observability.py`:
 ```python
-"""Correlación de peticiones y registros JSON (spec §21.1; RNF-18, RNF-19)."""
+"""Correlación de peticiones y registros JSON (spec §21.1; RNF-19)."""
 
 import json
 import logging

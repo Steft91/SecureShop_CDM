@@ -4,7 +4,7 @@
 |---|---|
 | **Qué demuestra** | Cómo ISO/IEC 27001, ISO/IEC 27034, Zero Trust, Secure by Design y Shift Left se aplican al primer parcial (gateway, `auth` y `stego`), y cómo se relacionan con sus riesgos y con los mecanismos implementados |
 | **Riesgos del parcial** | R2, R4, R5, R6, R7, R9, R10, R11, R13 y R16. Los demás (R1, R3, R8, R12, R14, R15) son de salas, chat, archivos y auditoría, y entran cuando se construyan esas piezas |
-| **Requisito** | `docs/requisitos.md` RS-30…RS-34, RP-07, RP-08 |
+| **Requisito** | `docs/requisitos.md` RS-30…RS-34 (Actividad 3) |
 | **Fuentes del proyecto** | `docs/specs/2026-10-12-chat-seguro-design.md` · `docs/plans/` · `docs/trazabilidad-riesgos.md` · Tarea 2 (Tablas 1–4) |
 | **Estado de la evidencia** | Los mecanismos están **planificados y con test especificado**. La columna *Evidencia* cita el test o la prueba manual; el estado real vive en `docs/trazabilidad-riesgos.md` |
 

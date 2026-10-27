@@ -1,143 +1,140 @@
-# Requisitos funcionales y de seguridad — Primer parcial
+# Requisitos funcionales, no funcionales y de seguridad
 
 | | |
 |---|---|
-| **Fuente** | El enunciado de la Tarea 2 (`Documentación/Tarea 2/Actividad2_SGSI_Proyecto_Integrador.md`), el resumen del docente y la clase del 22/10/2026 (alcance del primer parcial) |
-| **Fecha** | 2026-10-26 (recortado al primer parcial) |
-| **Alcance** | Solo el primer parcial: el gateway, `auth` (cuentas, roles, RBAC y JWT) y `stego`, probados con Postman. La lista completa de requisitos del proyecto llegará en un Excel aparte; los requisitos de salas, chat, multimedia, auditoría encadenada y TOTP se agregan cuando el docente defina los parciales 2 y 3 |
-| **Uso** | Cada requisito tiene un ID estable (RF-, RS-, RP-, RNF-). Los planes, los tickets y `docs/trazabilidad-riesgos.md` se refieren a ellos |
+| **Fuente oficial** | [Actividad 3 aprobada](../Documentación/Tarea%203/Díaz_Cedeño_Manangón_Actividad3.md): 21 RF, 19 RNF y 39 RS, con su criterio de aceptación, prioridad y la trazabilidad con los riesgos R1–R15 (Tabla 7). Ese documento manda en el texto y el criterio de cada requisito; aquí solo se resumen |
+| **Además** | Lo que pidió el docente en la clase del 22/10/2026 para el primer parcial (RC- y RP-) |
+| **Fecha** | 2026-10-26 |
+| **Uso** | Los planes, los tickets y `docs/trazabilidad-riesgos.md` se refieren a estos IDs. La columna *Primer parcial* dice qué cubre la entrega actual (gateway, `auth` y `stego`) |
 
-**Origen** usa estas referencias:
-- **¶n:** el párrafo n de la descripción del documento del docente.
-- **M-n:** la n-ésima *funcionalidad mínima esperada* de su lista de 16.
-- **Clase:** lo que pidió el docente en la clase del 22/10/2026.
-- **Equipo:** decisión del equipo.
-
-**Estado:**
-- **Planificado:** una tarea del plan lo construye y tiene un test (o una evidencia manual) especificado.
-- **Implementado:** el test está en verde. PAR-2 actualiza esta columna al cerrar el parcial.
-- **Documental:** el entregable no es código; el archivo ya existe en `docs/`.
+**Primer parcial:**
+- **Sí:** el parcial lo cumple completo. *Plan* dice qué tarea lo construye y *Verificación*, qué test lo prueba.
+- **Parcial:** el parcial cubre la parte indicada; el resto llega con las salas, el chat, los archivos o la auditoría.
+- **No:** depende de piezas que todavía no se construyen. Queda para los parciales 2 y 3.
 
 ---
 
-## 1. Requisitos funcionales
+## 1. Requisitos del docente para el primer parcial (clase del 22/10)
 
-### 1.1 Cuentas, roles y permisos (`auth`)
-| ID | Requisito | Origen | Spec | Plan | Verificación | Estado |
-|---|---|---|---|---|---|---|
-| RF-31 | Registrarse con usuario y contraseña; la cuenta nace sin roles | Clase | §9.1 | ATH-2 | `test_registro_crea_cuenta_sin_roles`, `test_r05_registro_con_campo_role_422` | Planificado |
-| RF-01 | Iniciar sesión con usuario y contraseña; el login entrega un JWT | ¶2, M-1, Clase | §9.1 | ATH-2 | `test_login_entrega_jwt_y_sesion` | Planificado |
-| RF-35 | Consultar la propia cuenta con sus roles y permisos actuales | Clase | §8.1 | ATH-2 | `test_me_y_logout`, `test_verify_devuelve_identidad_y_permisos_actuales` | Planificado |
-| RF-02 | Cerrar la sesión: el token queda invalidado | M-14 | §9.1 | ATH-2 | `test_me_y_logout`, `test_jwt_de_sesion_terminada_401` | Planificado |
-| RF-17 | Una cuenta se conecta desde un único dispositivo; el login desde otro se rechaza mientras la sesión siga viva | ¶3, M-6 | §9.1 | ATH-2 | `test_r13_login_desde_otro_dispositivo_409` | Planificado |
-| RF-19 | Las sesiones vencen por inactividad (30 min) y por tiempo absoluto (8 h) | M-14 | §9.1 | ATH-2 | `test_sesion_inactiva_libera_el_dispositivo`, `test_sesion_vencida_por_tiempo_absoluto_401` | Planificado |
-| RF-41 | El admin global se crea por línea de comandos, sin credenciales por defecto | Equipo | §9.1 | ATH-3 | `test_crea_admin_con_argon2id_y_rol_admin`, `test_el_admin_entra_con_su_contraseña` | Planificado |
-| RF-32 | El admin global crea roles, les asigna permisos del catálogo y asigna roles a los usuarios | Clase | §9.1 | ATH-4 | `test_crear_rol_con_permisos`, `test_r05_rol_asignado_vale_en_la_siguiente_peticion` | Planificado |
-
-### 1.2 Análisis de imágenes (`stego`)
-| ID | Requisito | Origen | Spec | Plan | Verificación | Estado |
-|---|---|---|---|---|---|---|
-| RF-40 | Analizar una imagen con la API de esteganografía usando el token que emite `auth`; la respuesta dice si es inválida, limpia, con problema o para revisión manual | Clase | §9.9, §12.7 | STG-3, GW-1 | `test_imagen_limpia`, `test_r06_archivo_pegado_al_final_es_problema` y la colección de Postman | Planificado |
-| RF-25 | Validar cada archivo antes de analizarlo: tipo real, tamaño y decodificación | ¶5, M-11 | §12.1 | STG-2 | `test_r09_contenido_que_no_coincide_con_la_firma`, `test_r09_bomba_de_descompresion_rechazada`, `test_r09_archivo_demasiado_grande` | Planificado |
-| RF-27 | Detectar imágenes modificadas con esteganografía | ¶5, M-12, Clase | §12 | STG-1, STG-2 | `test_r06_*` | Planificado |
-| RF-29 | Extender los formatos aceptados sin reescribir el análisis | Equipo | §12.1, §12.6 | STG-2 | `test_deteccion_por_firma_ignora_la_extension` | Planificado |
-
-### 1.3 Eventos de seguridad
-| ID | Requisito | Origen | Spec | Plan | Verificación | Estado |
-|---|---|---|---|---|---|---|
-| RF-30 | Registrar los eventos relevantes de seguridad (logins, bloqueos, rechazos de permiso, cambios de roles, análisis) como registros JSON en la salida de cada servicio | M-13, ¶5 | §14.2 | FND-4, ATH-2…4, STG-3 | `test_formato_json_de_los_registros` y un `testing.events(caplog, …)` por evento | Planificado |
+| ID | Requisito | Plan | Verificación |
+|---|---|---|---|
+| RC-01 | El login entrega un **JWT** firmado (RS256) que solo `auth` emite; el gateway lo verifica con `auth` en cada petición junto con la sesión a la que apunta | ATH-1, ATH-2, GW-1 | `test_login_entrega_jwt_y_sesion`, `test_alg_none_y_hs256_con_la_clave_publica_se_rechazan`, `test_jwt_de_sesion_terminada_401` |
+| RC-02 | **Roles y RBAC:** el admin crea roles con permisos de un catálogo fijo (`users:manage`, `roles:manage`, `stego:analyze`) y los asigna; la cuenta nace sin roles; un cambio vale en la siguiente petición; el sistema nunca se queda sin admin | ATH-1, ATH-4 | `test_crear_rol_con_permisos`, `test_r05_rol_asignado_vale_en_la_siguiente_peticion`, `test_r05_no_se_quita_el_ultimo_admin` |
+| RC-03 | **API de esteganografía** que se usa con el token de `auth` y responde si la imagen es inválida, limpia, con problema o para revisión manual | STG-1…STG-4, GW-1 | `test_imagen_limpia`, `test_r06_archivo_pegado_al_final_es_problema`, `test_r06_imagen_con_lsb_es_revision_manual`, `test_r09_archivo_que_no_es_imagen_es_invalida` |
+| RP-10 | **Informe:** descripción de la aplicación, cómo se construyó, tipo de API (REST), tecnologías, bibliotecas y herramientas, e integración con `auth` | PAR-2 | `docs/informe-parcial-1.md` |
+| RP-11 | **Demostración en vivo** con Postman: la API de esteganografía funcionando con el token de `auth` | PAR-1, PAR-3 | `docs/postman/parcial-1.postman_collection.json` y `docs/demo-parcial-1.md` |
 
 ---
 
-## 2. Requisitos de seguridad
+## 2. Requisitos funcionales (Tabla 1)
 
-### 2.1 Autenticación, autorización y sesiones
-| ID | Requisito | Origen | Spec | Plan | Verificación | Estado |
-|---|---|---|---|---|---|---|
-| RS-01 | Autenticación segura: contraseña con Argon2id, bloqueo tras 5 fallos en 15 min y el mismo error si el usuario no existe | M-1 | §9.1, §11.1 | FND-3, ATH-2 | `test_r04_*`, `test_error_generico_para_clave_mala_y_usuario_inexistente` | Planificado |
-| RS-02 | Toda operación se autoriza en el servidor, en cada servicio, por permiso (RBAC) y con los permisos **actuales** del usuario | Zero Trust, M-15, Clase | §4.3, §9.1 | FND-4, ATH-4, STG-3, GW-1 | `test_r05_sin_el_permiso_403_y_se_registra` (shared), `test_r05_sin_el_permiso_403` (stego), `test_r05_rol_asignado_vale_en_la_siguiente_peticion` | Planificado |
-| RS-05 | La sesión queda atada al dispositivo y se verifica en **cada** petición | ¶3, M-6 | §9.1 | ATH-2, GW-1 | `test_r13_jwt_con_otra_cookie_de_dispositivo_401` | Planificado |
-| RS-06 | Una sola sesión viva por cuenta, garantizada por la BD | ¶3, M-14 | §7.1, §9.1 | ATH-2 | `test_r13_el_indice_unico_impide_dos_sesiones_vivas` | Planificado |
-| RS-08 | Un token usado desde otro equipo, o un usuario sin el permiso, se rechazan | ¶3, Zero Trust | §4.3, §9.1 | ATH-2, STG-3 | `test_r13_*`, `test_r05_*` | Planificado |
-| RS-35 | Sin escalamiento de privilegios: el registro nunca da roles, los cuerpos rechazan campos de más y el sistema nunca se queda sin admin | Equipo | §8.1, §9.1 | ATH-2, ATH-4 | `test_r05_registro_con_campo_role_422`, `test_r05_cuerpo_con_campos_de_mas_422`, `test_r05_no_se_quita_el_ultimo_admin` | Planificado |
-| RS-36 | Token firmado y revocable: JWT RS256 que solo `auth` puede firmar, verificado en cada petición junto con la sesión a la que apunta | Clase | §2, §4.3, §8.1 | ATH-1, ATH-2, GW-1 | `test_alg_none_y_hs256_con_la_clave_publica_se_rechazan`, `test_jwt_alterado_401`, `test_jwt_de_sesion_terminada_401` | Planificado |
-
-### 2.2 Criptografía y gestión de claves
-| ID | Requisito | Origen | Spec | Plan | Verificación | Estado |
-|---|---|---|---|---|---|---|
-| RS-13 | Gestión de claves: secretos solo en `/run/secrets`, el JWT nunca se guarda, la cookie de dispositivo y los tokens de servicio se guardan como hash, y cada secreto se puede rotar | ¶4 | §11 | FND-2, FND-6 | `test_secreto_ausente_detiene_el_servicio`, `test_rotar_token_del_gateway_regenera_hash_y_conf` | Planificado |
-| RS-14 | Solo TLS 1.3 hacia el cliente; http redirige a https; HSTS | ¶4, M-8 | §13 | GW-1 | Verificación manual de GW-1: TLS 1.2 rechazado, http → 301 | Planificado |
-| RS-15 | Justificación documentada de algoritmos, protocolos y gestión de claves | ¶4 | §11 | — | `docs/justificacion-criptografica.md` | Documental |
-
-### 2.3 Análisis de imágenes
-| ID | Requisito | Origen | Spec | Plan | Verificación | Estado |
-|---|---|---|---|---|---|---|
-| RS-16 | Carga segura: firma real (*magic bytes*), decodificación segura, tope de tamaño y de píxeles | M-10, M-11 | §12.1 | STG-2 | `test_r09_*` | Planificado |
-| RS-18 | Detección de esteganografía (chi², RS y estructura) con umbrales calibrados con imágenes reales | ¶5, M-12 | §12 | STG-1, STG-4 | `test_r06_*`, tabla TPR/FPR en `docs/calibracion-estego.md` | Planificado |
-
-### 2.4 Registros
-| ID | Requisito | Origen | Spec | Plan | Verificación | Estado |
-|---|---|---|---|---|---|---|
-| RS-23 | Los registros no contienen contraseñas, claves, tokens ni query strings | M-13 | §14.1 | FND-4, todos | `test_una_linea_por_peticion_sin_query_string`; revisión con `security-auditor` | Planificado |
-
-### 2.5 Zero Trust, mínimo privilegio y diseño seguro
-| ID | Requisito | Origen | Spec | Plan | Verificación | Estado |
-|---|---|---|---|---|---|---|
-| RS-25 | Ningún componente es confiable por defecto: `auth_request` a `auth` en cada petición, token de servicio con allowlist y cabeceras de identidad que solo valen si las trae el gateway | Zero Trust | §4.3 | FND-4, ATH-2, STG-3, GW-1 | `test_identidad_solo_vale_si_la_trae_el_gateway`, `test_ruta_interna_respeta_la_allowlist`, `test_r16_verify_solo_para_el_gateway`, `test_r16_solo_acepta_el_token_del_gateway` | Planificado |
-| RS-26 | Mínimo privilegio: BD propia de `auth`, rol `auth_app` sin DDL, `cap_drop: ALL`, FS de solo lectura y redes internas | M-15 | §4.5, §7.6 | FND-6, ATH-1 | `test_r11_*` | Planificado |
-| RS-27 | Toda entrada se valida: esquema con `extra="forbid"`, longitud, normalización y SQL parametrizado | Zero Trust | §8.1, §15 | todos | `test_politica_de_claves`, `test_usuario_normalizado_en_registro_y_login`, `test_r05_cuerpo_con_campos_de_mas_422`, bandit, CodeQL | Planificado |
-| RS-28 | Resistencia a abuso: rate limit en Nginx, tope de registros por IP y de análisis por minuto por usuario | (R10) | §13, §9.9 | GW-1, ATH-2, STG-3 | `test_r10_tope_de_registros_por_ip`, `test_r10_limite_de_analisis_por_minuto` | Planificado |
-| RS-29 | Errores genéricos al cliente; el detalle va solo a los registros; todo falla cerrado | Secure by Design | §15 | FND-4 | `test_errores_genericos` | Planificado |
-
-### 2.6 Normas y enfoques
-| ID | Requisito | Origen | Spec | Plan | Verificación | Estado |
-|---|---|---|---|---|---|---|
-| RS-30 | **Secure by Design**: los controles forman parte de la arquitectura desde el diseño | ¶ enfoques | §4, §16.3 | FND-1 | `docs/cumplimiento-normativo.md` §4 | Documental |
-| RS-31 | **Zero Trust**: ninguna petición, dispositivo, sesión o servicio es confiable por defecto | ¶ enfoques | §4.3 | FND-4, GW-1 | `docs/cumplimiento-normativo.md` §3 | Documental |
-| RS-32 | **Shift Left**: modelo de amenazas, revisión de código, pruebas y detección de vulnerabilidades desde la primera tarea | ¶ enfoques, M-16 | §16.5, §17 | FND-1, FND-7 | CI (ruff, bandit, pip-audit, CodeQL, gitleaks) | Planificado |
-| RS-33 | **ISO/IEC 27001:2022**: controles del Anexo A relacionados con riesgos y mecanismos | ¶ normas | — | FND-1 | `docs/cumplimiento-normativo.md` §1 y la columna ISO de `docs/trazabilidad-riesgos.md` | Documental |
-| RS-34 | **ISO/IEC 27034**: marco normativo de la aplicación (ONF/ANF/ASC) y verificación de los controles | ¶ normas | — | FND-1 | `docs/cumplimiento-normativo.md` §2 | Documental |
-
----
-
-## 3. Requisitos de proceso y entregables
-
-| ID | Requisito | Origen | Dónde está | Estado |
+| ID | Requisito | Primer parcial | Plan | Verificación |
 |---|---|---|---|---|
-| RP-01 | Análisis de activos, amenazas, vulnerabilidades y riesgos | ¶ proyecto | Tarea 2 (Tablas 1–4) y R16 (spec §16.3) | Documental |
-| RP-02 | Requisitos funcionales y de seguridad definidos | ¶ proyecto | Este documento | Documental |
-| RP-03 | Arquitectura diseñada | ¶ proyecto | `docs/specs/2026-10-12-chat-seguro-design.md` (rev. 4) | Documental |
-| RP-04 | Aplicación implementada y funcional | Resultado esperado | `docs/plans/` y `docs/tickets/parcial-1/` → `services/`, `gateway/` | Planificado |
-| RP-05 | Pruebas que demuestren la eficacia de los controles | ¶ proyecto | Un `test_rNN_*` por riesgo y la sección de evidencias de `docs/informe-parcial-1.md` | Planificado |
-| RP-06 | Justificar algoritmos, protocolos, gestión de claves y controles | ¶4 | `docs/justificacion-criptografica.md` | Documental |
-| RP-07 | Demostrar cómo los controles ISO se relacionan con riesgos y mecanismos | ¶ normas | `docs/cumplimiento-normativo.md` y `docs/trazabilidad-riesgos.md` | Documental |
-| RP-08 | Documentación técnica que evidencie ISO 27001, ISO 27034, Zero Trust, Secure by Design y Shift Left | Resultado esperado | `docs/cumplimiento-normativo.md` | Documental |
-| RP-10 | Informe del primer parcial: descripción de la aplicación, cómo se construyó, tipo de API (REST), tecnologías, bibliotecas y herramientas, e integración con `auth` | Clase | `docs/informe-parcial-1.md` (PAR-2) | Planificado |
-| RP-11 | Demostración en vivo del primer parcial: la API de esteganografía funcionando con el token de `auth` | Clase | `docs/postman/parcial-1.postman_collection.json` (PAR-1) y `docs/demo-parcial-1.md` (PAR-3) | Planificado |
-
-### 3.1 Requisitos no funcionales de la Actividad 3 que se adoptan
-
-Los IDs RNF y A3- son los de la transcripción de la Actividad 3 que hizo el equipo el 20/10. Los demás no entran en el primer parcial (spec §22.1).
-
-| ID | Requisito | Plan | Verificación | Estado |
-|---|---|---|---|---|
-| RNF-10 | Cobertura de líneas ≥ 80 % por servicio | FND-7 | CI (`--cov-fail-under=80`) | Planificado |
-| RNF-11 | Complejidad ciclomática ≤ 10 por función | FND-1, STG-1 | CI (`ruff` con `C90`) | Planificado |
-| RNF-18 | Un registro JSON por petición | FND-4, GW-1 | `test_una_linea_por_peticion_sin_query_string`; curl de GW-1 | Planificado |
-| RNF-19 | Id de correlación de punta a punta, del gateway a los eventos | FND-4, GW-1 | `test_el_id_del_gateway_llega_al_codigo_y_a_los_eventos`, `test_id_ausente_o_invalido_se_reemplaza` | Planificado |
-| A3-RS-32 | Cambios controlados: PR con aprobación, plantilla y CI en verde | FND-1, FND-7 | Regla de `main` en GitHub | Planificado |
+| RF-01 | Cierre de sesión del administrador | **Sí** | ATH-2 | `test_me_y_logout`, `test_jwt_de_sesion_terminada_401` |
+| RF-02 | Crear una sala con identificador único | No | — | — |
+| RF-03 | Clave de acceso propia por sala | No | — | — |
+| RF-04 | Número máximo de participantes | No | — | — |
+| RF-05 | Tipo de comunicación de la sala | No | — | — |
+| RF-06 | Consultar salas | No | — | — |
+| RF-07 | Modificar una sala | No | — | — |
+| RF-08 | Cerrar una sala | No | — | — |
+| RF-09 | Consultar los eventos de seguridad, filtrando por severidad | **Parcial:** los eventos salen como registros JSON con su nivel y se filtran con `docker compose logs`; la consulta desde el panel llega con la auditoría | FND-4, PAR-3 | `test_formato_json_de_los_registros` |
+| RF-10 | Revisión de la cuarentena | No | — | — |
+| RF-11 | Ingreso autenticado a salas | No (la cuenta autenticada ya existe: RF-20, RF-21) | — | — |
+| RF-12 | Salida voluntaria de la sala | No | — | — |
+| RF-13 | Cierre automático de sesiones inactivas o caídas | **Parcial:** la sesión de la cuenta vence por inactividad (30 min) y por tiempo absoluto (8 h); el cierre de conexiones del chat (15 min) llega con el chat | ATH-2 | `test_sesion_inactiva_libera_el_dispositivo`, `test_sesion_vencida_por_tiempo_absoluto_401` |
+| RF-14 | Chat de texto en tiempo real | No | — | — |
+| RF-15 | Avisos de entrada y salida, e historial | No | — | — |
+| RF-16 | Respeto del tipo de sala | No | — | — |
+| RF-17 | Subir documentos e imágenes | No (el parcial analiza PNG y JPEG sin publicarlos: RC-03) | — | — |
+| RF-18 | Ver y descargar archivos autorizados | No | — | — |
+| RF-19 | Formatos ampliables con análisis específico | **Parcial:** el punto de extensión `FORMATS` con PNG y JPEG; los demás formatos llegan con los archivos | STG-2 | `test_deteccion_por_firma_ignora_la_extension` |
+| RF-20 | Registro obligatorio con identificador único, contraseña y alias visible | **Sí** | ATH-2 | `test_registro_crea_cuenta_sin_roles`, `test_usuario_duplicado_409`, `test_alias_duplicado_sin_distinguir_mayusculas_409`, `test_alias_invalido_422` |
+| RF-21 | Inicio y cierre de sesión del participante | **Sí** (sin conexiones de chat que liberar todavía) | ATH-2 | `test_login_entrega_jwt_y_sesion`, `test_me_y_logout` |
 
 ---
 
-## 4. Decisiones de interpretación
+## 3. Requisitos no funcionales (Tabla 2)
 
-1. **"Usuario" = cuenta registrada.** El registro es abierto y la cuenta nace sin permisos: los da el admin global con un rol.
-2. **"Único dispositivo" = una sesión viva por cuenta, ligada a la cookie de dispositivo.** Se rechaza el login desde otro dispositivo. El vínculo es una cookie `HttpOnly`, no un identificador de hardware; es una limitación declarada (spec §3, limitación 7).
-3. **"Agregarle propiedades al rol"** (clase del 22/10) = asignarle permisos del catálogo fijo: `users:manage`, `roles:manage` y `stego:analyze`. El único rol de fábrica es `admin`, con los tres.
-4. **"Administrador" = admin global**, creado por CLI. No hay credenciales por defecto.
-5. **"Multimedia" = imágenes PNG y JPEG.** `FORMATS` es el punto de extensión (RF-29).
-6. **"Registrar eventos" = registros JSON** en la salida de cada servicio (`docker compose logs`). La bitácora encadenada y su consulta quedan para después.
-7. **Veredictos de `stego`** (RF-40):
+| ID | Atributo | Requisito | Primer parcial | Plan | Verificación |
+|---|---|---|---|---|---|
+| RNF-01 | Rendimiento | Latencia de entrega de mensajes | No | — | — |
+| RNF-02 | Rendimiento | Tiempo de respuesta del ingreso a una sala | No | — | — |
+| RNF-03 | Rendimiento | Tiempo de análisis de documentos e imágenes | **Parcial:** el análisis corre en otro proceso con tiempo máximo (`STEGO_TIMEOUT_S`); los objetivos por formato llegan con los archivos | STG-3 | `test_timeout_del_analisis_es_revision_manual` |
+| RNF-04 | Disponibilidad | Disponibilidad mensual del servicio de chat | No | — | — |
+| RNF-05 | Disponibilidad | Aislamiento de fallos del análisis multimedia | No | — | — |
+| RNF-06 | Escalabilidad | Conexiones simultáneas | No | — | — |
+| RNF-07 | Escalabilidad | Crecimiento del registro de auditoría | No | — | — |
+| RNF-08 | Usabilidad | Primer ingreso sin ayuda | No (sin interfaz gráfica en el parcial) | — | — |
+| RNF-09 | Usabilidad | Accesibilidad de la interfaz | No | — | — |
+| RNF-10 | Mantenibilidad | Cobertura de pruebas ≥ 80 % por servicio | **Sí** | FND-7 | CI (`--cov-fail-under=80`) |
+| RNF-11 | Mantenibilidad | Calidad estática: sin hallazgos altos o medios y complejidad ≤ 10 | **Sí** | FND-1, FND-7 | CI (`ruff` con `C90`, bandit, CodeQL) |
+| RNF-12 | Mantenibilidad | Despliegue reproducible con un comando en ≤ 15 min | **Sí** | FND-6, PAR-3 | Ensayo de PAR-3 desde un clon limpio |
+| RNF-13 | Interoperabilidad | Compatibilidad con navegadores | No | — | — |
+| RNF-14 | Confiabilidad | Entrega completa y ordenada de mensajes | No | — | — |
+| RNF-15 | Confiabilidad | Persistencia de las salas ante reinicios | No | — | — |
+| RNF-16 | Recuperación | Respaldo y restauración | No | — | — |
+| RNF-17 | Recuperación | Reinicio automático de servicios | **Parcial:** `restart: unless-stopped` y `healthcheck` en compose; la prueba de los 60 s llega después | FND-6 | `docker compose config` |
+| RNF-18 | Monitoreo | Métricas y alertas de consumo | **Parcial:** comprobación de salud (`/health`) en cada servicio; métricas y alertas después | FND-4 | `test_health` (auth), `test_health_sin_bd` (stego) |
+| RNF-19 | Monitoreo | Registros estructurados y trazables: fecha, servicio, nivel e id de correlación | **Sí** | FND-4, GW-1 | `test_formato_json_de_los_registros`, `test_el_id_del_gateway_llega_al_codigo_y_a_los_eventos`, `test_una_linea_por_peticion_sin_query_string`; curl de GW-1 |
+
+---
+
+## 4. Requisitos de seguridad (Tabla 3)
+
+| ID | Requisito | Primer parcial | Plan | Verificación |
+|---|---|---|---|---|
+| RS-01 | Autenticación segura del administrador (segundo factor y bloqueo) | **Parcial:** contraseña Argon2id, bloqueo tras 5 fallos y retraso progresivo; el TOTP de los admins llega en un parcial posterior | FND-3, ATH-2, ATH-3 | `test_r04_bloqueo_tras_5_fallos_por_usuario`, `test_el_admin_entra_con_su_contraseña` |
+| RS-02 | Autorización del administrador en cada operación | **Sí** | FND-4, ATH-4 | `test_r05_sin_roles_manage_403`, `test_r05_sin_el_permiso_403_y_se_registra` |
+| RS-03 | Clave de sala protegida | No | — | — |
+| RS-04 | Ingreso controlado por intentos | No | — | — |
+| RS-05 | Sesión ligada al dispositivo | **Sí** | ATH-2, GW-1 | `test_r13_jwt_con_otra_cookie_de_dispositivo_401` |
+| RS-06 | Control de sesiones por cuenta | **Parcial:** una sola sesión viva por cuenta; el cupo de las salas llega con las salas | ATH-2 | `test_r13_login_desde_otro_dispositivo_409`, `test_r13_el_indice_unico_impide_dos_sesiones_vivas` |
+| RS-07 | Cierre seguro de conexiones y cuentas | **Parcial:** cerrar sesión invalida el token; la salida de salas llega con las salas | ATH-2 | `test_me_y_logout`, `test_jwt_de_sesion_terminada_401` |
+| RS-08 | Rechazo de credenciales mal usadas | **Parcial:** un token sin el permiso o desde otro dispositivo se rechaza; la cookie de sala llega con las salas | ATH-2, STG-3 | `test_r05_sin_el_permiso_403` (stego), `test_r13_jwt_con_otra_cookie_de_dispositivo_401` |
+| RS-09 | Confidencialidad en tránsito | **Parcial:** TLS 1.3 entre el cliente y el gateway; el cifrado de cada mensaje llega con el chat | GW-1 | Verificación manual de GW-1 |
+| RS-10 | Integridad de los mensajes | No | — | — |
+| RS-11 | Autenticidad de las comunicaciones | No | — | — |
+| RS-12 | Información protegida en reposo | No | — | — |
+| RS-13 | Gestión de claves | **Parcial:** secretos solo en `/run/secrets`, el servicio no arranca sin ellos y los secretos se rotan con `gen_secrets.py --rotate`; la KEK llega con el cifrado en reposo | FND-2, FND-6 | `test_secreto_ausente_detiene_el_servicio`, `test_rotar_token_del_gateway_regenera_hash_y_conf` |
+| RS-14 | Solo TLS 1.3 hacia el cliente | **Sí** | GW-1 | Verificación manual de GW-1: TLS 1.2 rechazado, http → 301 |
+| RS-15 | Justificación criptográfica documentada | **Sí** (lo que existe en el parcial) | — | `docs/justificacion-criptografica.md` |
+| RS-16 | Carga segura multiformato | **Parcial:** firma real, decodificación, topes de tamaño y de píxeles para PNG y JPEG | STG-2 | `test_r09_contenido_que_no_coincide_con_la_firma`, `test_r09_bomba_de_descompresion_rechazada`, `test_r09_archivo_demasiado_grande` |
+| RS-17 | Descarga autorizada de documentos e imágenes | No | — | — |
+| RS-18 | Detección de contenido oculto o sospechoso | **Parcial:** chi², RS y estructura en PNG y JPEG, con falsos positivos y negativos medidos | STG-1, STG-2, STG-4 | `test_r06_*`, tabla TPR/FPR en `docs/calibracion-estego.md` |
+| RS-19 | Cuarentena y liberación controlada | No | — | — |
+| RS-20 | Alerta oportuna de eventos de seguridad en el panel | No (los eventos `warning` quedan en los registros) | — | — |
+| RS-21 | Bloqueo seguro ante fallas del análisis | No | — | — |
+| RS-22 | Integridad verificable del registro de eventos | No | — | — |
+| RS-23 | Protección de datos sensibles en registros | **Sí** | FND-4, todos | `test_una_linea_por_peticion_sin_query_string`; revisión con `security-auditor` |
+| RS-24 | Registro obligatorio de operaciones críticas | No (necesita el servicio de auditoría) | — | — |
+| RS-25 | Autenticación y autorización entre servicios | **Sí** | FND-4, ATH-2, STG-3 | `test_ruta_interna_respeta_la_allowlist`, `test_r16_verify_solo_para_el_gateway`, `test_r16_solo_acepta_el_token_del_gateway` |
+| RS-26 | Mínimo privilegio de componentes | **Sí** | FND-6, ATH-1 | `test_r11_rol_app_confinado`, `test_r11_la_app_no_borra_cuentas_ni_edita_el_catalogo` |
+| RS-27 | Rechazo de entradas no válidas | **Sí** | todos | `test_r05_cuerpo_con_campos_de_mas_422`, `test_politica_de_registro`, `test_alias_invalido_422`, bandit, CodeQL |
+| RS-28 | Protección frente al abuso de recursos | **Sí** (en el gateway, `auth` y `stego`) | GW-1, ATH-2, STG-3 | `test_r10_tope_de_registros_por_ip`, `test_r10_limite_de_analisis_por_minuto` |
+| RS-29 | Errores seguros sin filtración de información | **Sí** | FND-4 | `test_errores_genericos`, `test_error_generico_para_clave_mala_y_usuario_inexistente` |
+| RS-30 | Revisión de riesgos desde el diseño | **Sí** | FND-1 | Spec §4 y §16, modelo de amenazas en `docs/cumplimiento-normativo.md` §5.3 |
+| RS-31 | Verificación continua de identidad y permisos | **Sí** | FND-4, ATH-2, GW-1 | `test_identidad_solo_vale_si_la_trae_el_gateway`, `test_verify_devuelve_identidad_y_permisos_actuales` |
+| RS-32 | Detección temprana de vulnerabilidades | **Sí** | FND-1, FND-7 | CI (ruff, bandit, pip-audit, CodeQL, gitleaks) |
+| RS-33 | Asociación de riesgos con controles ISO/IEC 27001 | **Sí** | FND-1 | `docs/cumplimiento-normativo.md` §1 y la columna ISO de `docs/trazabilidad-riesgos.md` |
+| RS-34 | Verificación documentada de controles de aplicación (ISO/IEC 27034) | **Sí** | FND-1 | `docs/cumplimiento-normativo.md` §2 |
+| RS-35 | Respuestas de ingreso que no revelan el estado de la sala | No | — | — |
+| RS-36 | Revisión de archivos después de su saneamiento | No | — | — |
+| RS-37 | Revisión obligatoria de cambios de código | **Sí** | FND-1, FND-7 | Plantilla de PR y regla de `main` en GitHub |
+| RS-38 | Registro y autenticación obligatorios de participantes | **Sí** | FND-3, ATH-2, GW-1 | `test_registro_crea_cuenta_sin_roles`, `test_hash_es_argon2id_con_parametros_rfc9106`, `test_r04_*` |
+| RS-39 | Autorización por cuenta para salas y archivos | **Parcial:** el análisis exige una cuenta con sesión activa y el permiso; las salas y los archivos llegan después | STG-3, GW-1 | `test_sin_identidad_del_gateway_401`, `test_r05_sin_el_permiso_403` (stego) |
+
+---
+
+## 5. Decisiones de interpretación del primer parcial
+
+1. **"Usuario" = cuenta registrada.** El registro es abierto y la cuenta nace sin permisos: los da el admin con un rol (RC-02).
+2. **El alias (RF-20) es solo el nombre visible.** Es único sin distinguir mayúsculas, no autentica ni autoriza nada (RS-39) y no se transfiere. El alias del admin creado por CLI es su usuario.
+3. **"Único dispositivo" = una sesión viva por cuenta, ligada a la cookie de dispositivo.** El vínculo es una cookie `HttpOnly`, no un identificador de hardware (spec §3, limitación 7).
+4. **"Administrador" = admin global**, creado por CLI; no hay credenciales por defecto. Su segundo factor (RS-01) queda para un parcial posterior por decisión del equipo.
+5. **"Registrar eventos" = registros JSON** en la salida de cada servicio (RNF-19). La cadena verificable (RS-22), el registro obligatorio (RS-24) y las alertas en el panel (RS-20) llegan con el servicio de auditoría.
+6. **Formatos.** La Actividad 3 admite PNG, JPEG, GIF, MP3, WAV, MP4, PDF, DOCX y TXT. El primer parcial analiza PNG y JPEG; `FORMATS` es el punto de extensión para los demás (RF-19).
+7. **Veredictos de `stego`** (RC-03):
 
 | Hallazgo | Veredicto | Respuesta |
 |---|---|---|
@@ -148,8 +145,9 @@ Los IDs RNF y A3- son los de la transcripción de la Actividad 3 que hizo el equ
 
 Si coinciden estructura y estadística, gana `problema`.
 
----
+## 6. Diferencias con la spec que hay que resolver antes de las salas
 
-## 5. Fuera del primer parcial
-
-No se construyen ahora: salas, chat y cifrado de mensajes, subida y descarga de archivos, ClamAV, el servicio `audit` con su cadena verificable, el TOTP de los admins, la rotación de la KEK, la suspensión de cuentas, el frontend y el despliegue en VPS. Están diseñados en la spec y vuelven como requisitos cuando el docente defina los parciales 2 y 3.
+La Actividad 3 aprobada difiere de la spec rev. 4 en puntos que no afectan al primer parcial:
+- **Quién crea y administra las salas.** La Actividad 3 dice que lo hace el administrador (RF-02…RF-08); la spec rev. 4 propone salas con dueño, como en Discord.
+- **Formatos.** La Actividad 3 pide 9 formatos con inspección propia (PDF, DOCX, audio y video); la spec solo cubre PNG y JPEG.
+- **Inactividad.** La Actividad 3 cierra la conexión del chat a los 15 min sin mensajes (RF-13).

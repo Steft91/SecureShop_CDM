@@ -9,7 +9,7 @@
 | **Fuente de requisitos** | `Documentación/Tarea 2/Actividad2_SGSI_Proyecto_Integrador.md` (enunciado + Tablas 1–4 de riesgos), `PROYECTO INTEGRADOR - RESUMEN.docx` (resumen del docente) y la clase del 22/10/2026 (alcance del primer parcial). Los requisitos con ID están en `docs/requisitos.md` |
 | **Plazo** | **Primer parcial:** corte definitivo con el gateway, `auth` y `stego`, probado con Postman (meta de demo: 30 oct; fecha de la defensa por confirmar). **Después:** lo que el docente pida para los parciales 2 y 3 |
 
-> **Alcance del primer parcial.** Solo se construyen el gateway, `auth` (cuentas, RBAC y JWT, con el admin global creado por CLI) y `stego`. No entran el servicio `audit`, el TOTP de los admins, la rotación de la KEK, `rooms`, `chat`, `media` ni el frontend: los eventos de seguridad son registros JSON en la salida de cada servicio. Las secciones de esta spec que describen esas piezas son el diseño de referencia para después. Donde la spec y los planes de `docs/plans/` difieren, mandan los planes.
+> **Alcance del primer parcial.** Solo se construyen el gateway, `auth` (cuentas, RBAC y JWT, con el admin global creado por CLI) y `stego`. No entran el servicio `audit`, el TOTP de los admins, la rotación de la KEK, `rooms`, `chat`, `media` ni el frontend: los eventos de seguridad son registros JSON en la salida de cada servicio. Las secciones de esta spec que describen esas piezas son el diseño de referencia para después. Donde la spec y los planes de `docs/plans/` difieren, mandan los planes. Los IDs de requisitos vigentes (RF, RNF y RS) son los de la Actividad 3 aprobada, resumidos en `docs/requisitos.md`; los que cita esta spec son de una versión anterior.
 
 ---
 
@@ -454,7 +454,7 @@ Para cada servicio con BD `<svc>` ∈ {auth, rooms, chat, media, audit}:
 
 | Método | Ruta | Servicio | Identidad | Descripción |
 |---|---|---|---|---|
-| POST | `/api/auth/register` | auth | — | `{username, password}` → `201 {id, username}`. Siempre con el rol `user` |
+| POST | `/api/auth/register` | auth | — | `{username, password, alias}` → `201 {id, username, alias}`. Sin roles; el alias es único y solo es el nombre visible (RF-20) |
 | POST | `/api/auth/login` | auth | — | `{username, password}` → `200 {access_token, token_type: "Bearer", expires_in}` + cookies `__Host-session` (y `__Host-device` si faltaba). Con un permiso de admin → `200 {mfa: "required" \| "setup"}` + cookie de etapa `preauth` |
 | POST | `/api/auth/totp/setup` | auth | cookie `preauth`, sin TOTP confirmado | → `{otpauth_uri}` |
 | POST | `/api/auth/totp` | auth | cookie `preauth` | `{code}` → sesión `full` con id nuevo; mismo cuerpo y cookies que el login |
