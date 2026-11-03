@@ -18,7 +18,7 @@ Solo existe el **primer parcial** (gateway, `auth` y `stego`, probados con Postm
 | Fase | Ticket | Necesita | Estado |
 |---|---|---|---|
 | A | [FND-1: Higiene del repo y contexto de Claude Code](parcial-1/zaith/FND-1-higiene-y-claude-code.md) | — | Cerrado (2026-11-02, `c9ac9af`) |
-| A | [FND-2: Paquete `shared`: secretos y utilidades criptográficas](parcial-1/zaith/FND-2-shared-cripto-y-secretos.md) | — | Pendiente |
+| A | [FND-2: Paquete `shared`: secretos y utilidades criptográficas](parcial-1/zaith/FND-2-shared-cripto-y-secretos.md) | — | Cerrado (2026-11-02, `0fc6e32`) |
 | A | [FND-4: Autenticación entre servicios, identidad, eventos de seguridad y base web (R16)](parcial-1/zaith/FND-4-autenticacion-entre-servicios.md) | FND-2 | Pendiente |
 | A | [FND-5: Utilidades de BD para pruebas y migraciones comunes](parcial-1/zaith/FND-5-utilidades-de-bd-y-pruebas.md) | FND-2 | Pendiente |
 | A | [FND-6: Plantilla Docker, generación de secretos y PostgreSQL de `auth`](parcial-1/zaith/FND-6-docker-secretos-postgres.md) | FND-2 | Pendiente |
