@@ -1,0 +1,24 @@
+# Entorno local de Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Datos locales de calibración: no subir imágenes personales ni descargadas
+services/stego/tools/calibracion/*
+!services/stego/tools/calibracion/.gitkeep
+
+# Evidencias y salidas locales de demo
+docs/demo-imagenes/*
+!docs/demo-imagenes/.gitkeep
+
+# Harness local del proyecto (estado de trabajo y decisiones)
+decision.md
+progress.md
+
+# Artefactos de empaquetado
+*.egg-info/
+dist/
+build/
