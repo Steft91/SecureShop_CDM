@@ -44,6 +44,23 @@ services:
     networks: [data]
     restart: unless-stopped
 
+  gateway:
+    build: {context: .., dockerfile: gateway/Dockerfile}
+    image: chat-seguro/gateway
+    ports: ["80:80", "443:443"]
+    secrets: [gateway_token_conf]
+    volumes:
+      - ./certs:/etc/nginx/certs:ro
+    read_only: true
+    tmpfs: ["/var/cache/nginx:size=128m", /var/run, /tmp]  # con tope: ahí van los cuerpos de 20 MB (R10)
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    networks:
+      public: {}
+      apps: {ipv4_address: 172.30.10.10}  # la única IP cuyo X-Forwarded-For creen los servicios (FND-6)
+    restart: unless-stopped
+
 networks:
   public: {}
   apps:
