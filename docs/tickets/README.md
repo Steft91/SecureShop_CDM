@@ -23,7 +23,7 @@ Solo existe el **primer parcial** (gateway, `auth` y `stego`, probados con Postm
 | A | [FND-5: Utilidades de BD para pruebas y migraciones comunes](parcial-1/zaith/FND-5-utilidades-de-bd-y-pruebas.md) | FND-2 | Cerrado (2026-11-03, `c62543e`) |
 | A | [FND-6: Plantilla Docker, generación de secretos y PostgreSQL de `auth`](parcial-1/zaith/FND-6-docker-secretos-postgres.md) | FND-2 | Cerrado (2026-11-03, `c090a11`) |
 | B | [FND-7: Integración continua](parcial-1/zaith/FND-7-integracion-continua.md) | FND-3, FND-6 | Pendiente |
-| C | [GW-1: Gateway Nginx con TLS 1.3, `auth_request` y las rutas del parcial (R5, R7, R10, R16)](parcial-1/zaith/GW-1-gateway-parcial.md) | FND-6, ATH-4, STG-4 | Pendiente |
+| C | [GW-1: Gateway Nginx con TLS 1.3, `auth_request` y las rutas del parcial (R5, R7, R10, R16)](parcial-1/zaith/GW-1-gateway-parcial.md) | FND-6, ATH-4, STG-4 | En progreso (pasos 1–4, `b48ed79`) |
 
 ## Andrés
 

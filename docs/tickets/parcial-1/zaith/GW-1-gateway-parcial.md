@@ -9,7 +9,7 @@
 | Necesita | [FND-6](../zaith/FND-6-docker-secretos-postgres.md) (Zaith), [ATH-4](../andres/ATH-4-auth-roles-y-permisos.md) (Andrés), [STG-4](../stefany/STG-4-stego-demo-y-calibracion.md) (Stefany) |
 | Lo necesitan | [PAR-1](../stefany/PAR-1-postman.md) (Stefany), [PAR-2](../stefany/PAR-2-informe-parcial.md) (Stefany) |
 | Plan | [`docs/plans/2026-10-13-04-gateway.md`](../../../plans/2026-10-13-04-gateway.md), sección *Task GW-1* |
-| Estado | Pendiente |
+| Estado | En progreso: pasos 1–4 (2026-11-03, `b48ed79`); faltan 5–8, que esperan a ATH-4 y STG-4 |
 
 > Es el punto donde se juntan los tres: avisa en el grupo cuando `auth` y `stego` estén `healthy` en compose.
 
@@ -23,7 +23,7 @@ Los Steps 1–4 (`nginx.conf`, los snippets, el `Dockerfile` y `nginx -t`) no ne
 
 ## Criterios de aceptación
 
-- [ ] `nginx -t` → `test is successful`
+- [x] `nginx -t` → `test is successful`
 - [ ] http → 301; TLS 1.2 rechazado; `/internal/verify` → 404; HSTS y CSP presentes
 - [ ] `X-User-*` falsificadas sin JWT → 401; `auth` caído → 503
 - [ ] El admin creado por CLI entra con su contraseña vía curl, analiza `2-problema-zip-al-final.png` (`problema`) y los eventos `auth.login.ok` y `stego.analyzed` aparecen en `docker compose logs` (Step 6)
