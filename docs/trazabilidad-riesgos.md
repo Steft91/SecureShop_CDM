@@ -6,7 +6,7 @@ La columna *ISO/IEC 27001:2022* relaciona cada control con el Anexo A; el detall
 
 | R | Riesgo | Control en el primer parcial | ISO/IEC 27001:2022 | Servicio / archivos | Tests | Estado |
 |---|---|---|---|---|---|---|
-| R2 | Claves criptográficas en el código fuente | Docker secrets (`/run/secrets`); la clave de firma del JWT nunca está en el código | A.8.24, A.8.9, A.8.12 | shared, auth | — | Pendiente |
+| R2 | Claves criptográficas en el código fuente | Docker secrets (`/run/secrets`); la clave de firma del JWT nunca está en el código | A.8.24, A.8.9, A.8.12 | shared (`services/shared/shared/secrets.py`), auth | `services/shared/tests/test_r02_secretos.py` | En progreso (faltan `gen_secrets.py`, FND-6, y la clave de firma del JWT, ATH-1) |
 | R4 | Fuerza bruta contra las cuentas | Bloqueo + retraso progresivo del login | A.8.5, A.5.17 | auth | — | Pendiente |
 | R5 | Operaciones sin verificación de permisos | `auth_request` con permisos actuales + `require_perm` en cada servicio; el registro no asigna roles; nunca sin admin | A.5.15, A.8.2, A.5.18 | gateway, auth, stego | — | Pendiente |
 | R6 | Imágenes con esteganografía | chi², RS y estructura (`stego`) con veredicto | A.8.7, A.8.16 | stego | — | Pendiente |
