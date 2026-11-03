@@ -15,7 +15,7 @@ La columna *ISO/IEC 27001:2022* relaciona cada control con el Anexo A; el detall
 | R10 | Agotamiento de recursos | Rate limit en Nginx + token bucket por usuario en `stego` + tope de registros por IP | A.8.6, A.8.20 | gateway, auth, stego | — | Pendiente |
 | R11 | Credenciales de BD con privilegios excesivos | Rol `auth_app` sin DDL, BD propia de `auth` | A.8.2, A.5.18, A.8.22 | auth | — | Pendiente |
 | R13 | Sesiones simultáneas de una cuenta | Índice único parcial en `user_sessions` + sesión ligada a la cookie de dispositivo + vencimiento por inactividad | A.5.16, A.5.15, A.8.5 | auth | — | Pendiente |
-| R16 | Suplantación entre microservicios | Token por servicio con hash, allowlist, gateway sobrescribe identidad | A.5.15, A.8.21, A.8.22 | shared, gateway, auth, stego | — | Pendiente |
+| R16 | Suplantación entre microservicios | Token por servicio con hash, allowlist, gateway sobrescribe identidad | A.5.15, A.8.21, A.8.22 | shared (`services/shared/shared/service_auth.py`, `identity.py`, `web.py`, `observability.py`), gateway, auth, stego | `services/shared/tests/test_r16_service_auth.py`, `test_observabilidad.py` | En progreso (falta e2e del gateway) |
 
 Quedan fuera del primer parcial, hasta que el docente defina los siguientes entregables: R1, R3 (por ahora los eventos de seguridad son registros JSON, sin cadena de hashes), R8, R12, R14 y R15.
 
