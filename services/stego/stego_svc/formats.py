@@ -29,6 +29,12 @@ def validate(data, max_bytes=5 * 1024 * 1024, max_pixels=20_000_000):
             with Image.open(__import__("io").BytesIO(data)) as image:
                 if image.width * image.height > max_pixels: reasons.append("demasiados píxeles")
                 image.verify()
+            if kind == "image/gif":
+                from stego_svc.gif import structural_reasons, structure
+                reasons.extend(structural_reasons(structure(data)))
+        elif kind == "audio/wav":
+            from stego_svc.wav import structural_reasons, structure
+            reasons.extend(structural_reasons(structure(data)))
     except Exception:
         reasons.append("archivo truncado o no decodificable")
     return (kind if not reasons else None), reasons
