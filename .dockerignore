@@ -8,5 +8,10 @@
 services/shared/shared/testing.py
 deploy/secrets
 deploy/certs
+**/*.pem
+**/*.key
+**/.env
+# Imágenes personales de calibración (STG-4)
+services/stego/tools/calibracion
 Documentación
 docs

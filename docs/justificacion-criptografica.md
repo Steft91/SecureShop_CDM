@@ -52,7 +52,7 @@
 |---|---|---|---|---|---|
 | `jwt_signing_key` | `gen_secrets.py` (RSA de 3072 bits, PKCS#8) | Docker secret, solo en `auth` | Firma los JWT; `auth` los verifica con la pública | `gen_secrets.py --rotate jwt_signing_key` y reiniciar `auth` | Rotarla invalida todos los JWT: todos vuelven a iniciar sesión |
 | `svc_token_gateway` | `gen_secrets.py` (256 bits) | Solo en el gateway (`gateway_token.conf`); `auth` y `stego` guardan el SHA-256 (`svc_hash_gateway`) | Cabecera `X-Service-Token` | `gen_secrets.py --rotate svc_token_gateway` (regenera el token, el hash y el `.conf`) y reiniciar | Quitar el hash de los receptores |
-| Contraseñas de BD | `gen_secrets.py` | Docker secrets: `postgres_password` solo en `db`, `db_auth_owner` solo en el job de migración, `db_auth_app` solo en `auth` | Conexión a PostgreSQL | `--rotate` y reiniciar | — |
+| Contraseñas de BD | `gen_secrets.py` | Docker secrets: `postgres_password` solo en `db`, `db_auth_owner` solo en el job de migración, `db_auth_app` solo en `auth` | Conexión a PostgreSQL | A mano: `ALTER ROLE ... PASSWORD` en la BD, luego el archivo y reiniciar (Postgres solo las lee al crear el volumen, por eso `gen_secrets.py --rotate` no las acepta) | — |
 | Sesión de la cuenta (JWT) y cookie de dispositivo | JWT firmado por `auth`; cookie de 128 bits (`secrets`) | En la BD solo el id de la sesión y el SHA-256 de la cookie; en el cliente, la cookie `__Host-device` `HttpOnly` | Autenticación en cada petición | Cada login crea una sesión con `sid` nuevo | `ended_at` al cerrar la sesión; vencen por inactividad (30 min) y por tiempo absoluto (8 h) |
 | Certificado TLS | mkcert (local) | `deploy/certs/` (ignorado por git) | Gateway | Volver a generarlo con mkcert | Desinstalar la CA local |
 
