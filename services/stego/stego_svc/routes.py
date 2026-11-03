@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import time
 from collections import defaultdict, deque
 from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
@@ -32,6 +33,6 @@ async def analyze(request: Request, file: UploadFile = File(...), x_user_id: str
         result = await asyncio.wait_for(asyncio.to_thread(formats.FORMATS[kind].analyze, data, {"chi2_p": .995, "rs_rate": .15, "entropy_trigger": None, "max_pixels": max_pixels}), timeout=timeout)
     except asyncio.TimeoutError:
         result = {"suspicious": True, "reasons": ["análisis excedió el tiempo límite"], "metrics": {}}
-    response = {"verdict": classify(result), "mime": kind, "motivos": result["reasons"], "checks": result["metrics"]}
+    response = {"verdict": classify(result), "mime": kind, "sha256": hashlib.sha256(data).hexdigest(), "motivos": result["reasons"], "checks": result["metrics"]}
     _events.append({"event": "stego.analyzed", "user_id": x_user_id, "verdict": response["verdict"]})
     return response
