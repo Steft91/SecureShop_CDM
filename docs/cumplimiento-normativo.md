@@ -172,5 +172,6 @@ Principio del documento: *ningún usuario, dispositivo, sesión o recurso es con
 | Justificación criptográfica | `docs/justificacion-criptografica.md` |
 | Pruebas ejecutadas y sus resultados | Sección de evidencias de `docs/informe-parcial-1.md` (PAR-2) |
 | Calibración del estegoanálisis | `docs/calibracion-estego.md` (STG-4) |
+| Validación API de Stego | `services/stego/tests/test_api.py`, `services/stego/tests/test_gif_wav.py`; evidencia manual de `/health`, permisos, veredictos y rate limit |
 | Colección y corrida de Postman | `docs/postman/parcial-1.postman_collection.json` y `docs/evidencias/parcial-1-runner.png` (PAR-1) |
 | Guion de la demostración | `docs/demo-parcial-1.md` (PAR-3) |
