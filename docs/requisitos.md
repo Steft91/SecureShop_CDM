@@ -30,7 +30,7 @@
 
 | ID | Requisito | Primer parcial | Plan | Verificación |
 |---|---|---|---|---|
-| RF-01 | Cierre de sesión del administrador | **Sí** | ATH-2 | `test_me_y_logout`, `test_jwt_de_sesion_terminada_401` |
+| RF-01 | Cierre de sesión del administrador | **Sí** | ATH-2 | `test_profile_y_logout`, `test_jwt_de_sesion_terminada_401` |
 | RF-02 | Crear una sala con identificador único | No | — | — |
 | RF-03 | Clave de acceso propia por sala | No | — | — |
 | RF-04 | Número máximo de participantes | No | — | — |
@@ -50,7 +50,7 @@
 | RF-18 | Ver y descargar archivos autorizados | No | — | — |
 | RF-19 | Formatos ampliables con análisis específico | **Parcial:** el punto de extensión `FORMATS` con PNG y JPEG; los demás formatos llegan con los archivos | STG-2 | `test_deteccion_por_firma_ignora_la_extension` |
 | RF-20 | Registro obligatorio con identificador único, contraseña y alias visible | **Parcial:** la cuenta (usuario y correo únicos, contraseña) la crea ADMIN con `POST /api/users` (spec §23.4); el alias llega con las salas | ATH-2 | `test_admin_crea_cuenta_sin_roles`, `test_usuario_o_correo_duplicado_409` |
-| RF-21 | Inicio y cierre de sesión del participante | **Sí** (sin conexiones de chat que liberar todavía) | ATH-2 | `test_login_entrega_jwt_y_sesion`, `test_me_y_logout` |
+| RF-21 | Inicio y cierre de sesión del participante | **Sí** (sin conexiones de chat que liberar todavía) | ATH-2 | `test_login_entrega_jwt_y_sesion`, `test_profile_y_logout` |
 
 ---
 
@@ -84,13 +84,13 @@
 
 | ID | Requisito | Primer parcial | Plan | Verificación |
 |---|---|---|---|---|
-| RS-01 | Autenticación segura del administrador (segundo factor y bloqueo) | **Parcial:** contraseña Argon2id, bloqueo tras 5 fallos y retraso progresivo; el TOTP de los admins queda fuera del primer parcial y llega después | FND-3, ATH-2, ATH-3 | `test_r04_bloqueo_tras_5_fallos_por_usuario`, `test_el_admin_entra_con_su_contraseña` |
-| RS-02 | Autorización del administrador en cada operación | **Sí** | FND-4, ATH-4 | `test_r05_sin_roles_manage_403`, `test_r05_sin_el_permiso_403_y_se_registra` |
+| RS-01 | Autenticación segura del administrador (segundo factor y bloqueo) | **Parcial:** contraseña Argon2id, bloqueo tras 5 fallos y retraso progresivo; el TOTP de los admins queda fuera del primer parcial y llega después | FND-3, ATH-2, ATH-3 | `test_r04_bloqueo_tras_5_fallos_por_usuario`, `test_el_admin_entra_con_su_contraseña_y_tiene_todos_los_permisos` |
+| RS-02 | Autorización del administrador en cada operación | **Sí** | FND-4, ATH-4 | `test_sin_roles_manage_403`, `test_r05_sin_el_permiso_403_y_se_registra` |
 | RS-03 | Clave de sala protegida | No | — | — |
 | RS-04 | Ingreso controlado por intentos | No | — | — |
 | RS-05 | Sesión ligada al dispositivo | **No en el parcial:** el enunciado excluye la restricción de dispositivos (spec §23.1) | — | — |
 | RS-06 | Control de sesiones por cuenta | **Parcial:** cada sesión se revoca con logout o al desactivar la cuenta; la sesión única y el cupo de las salas llegan con las salas | ATH-2 | `test_jwt_de_sesion_terminada_401`, `test_cuenta_inactiva_401` |
-| RS-07 | Cierre seguro de conexiones y cuentas | **Parcial:** cerrar sesión invalida el token; la salida de salas llega con las salas | ATH-2 | `test_me_y_logout`, `test_jwt_de_sesion_terminada_401` |
+| RS-07 | Cierre seguro de conexiones y cuentas | **Parcial:** cerrar sesión invalida el token; la salida de salas llega con las salas | ATH-2 | `test_profile_y_logout`, `test_jwt_de_sesion_terminada_401` |
 | RS-08 | Rechazo de credenciales mal usadas | **Parcial:** un token sin el permiso, alterado o vencido se rechaza; la cookie de sala llega con las salas | ATH-2, STG-3 | `test_r05_sin_el_permiso_403` (stego), `test_jwt_alterado_401`, `test_jwt_vencido_401` |
 | RS-09 | Confidencialidad en tránsito | **Parcial:** TLS 1.3 entre el cliente y el gateway; el cifrado de cada mensaje llega con el chat | GW-1 | Verificación manual de GW-1 |
 | RS-10 | Integridad de los mensajes | No | — | — |
