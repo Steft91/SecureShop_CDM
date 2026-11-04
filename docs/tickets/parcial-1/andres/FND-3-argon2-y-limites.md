@@ -9,7 +9,7 @@
 | Necesita | Nada: puedes empezar ya |
 | Lo necesitan | [FND-7](../zaith/FND-7-integracion-continua.md) (Zaith), [ATH-1](../andres/ATH-1-auth-esqueleto-y-jwt.md) (Andrés), [STG-3](../stefany/STG-3-stego-api.md) (Stefany) |
 | Plan | [`docs/plans/2026-10-13-01-fundaciones.md`](../../../plans/2026-10-13-01-fundaciones.md), sección *Task FND-3* |
-| Estado | Pendiente |
+| Estado | Cerrado (2026-11-03, `5a55e6b`) |
 
 ## Objetivo
 
@@ -21,10 +21,10 @@ Son dos módulos sueltos (`passwords.py` y `ratelimit.py`) que no importan nada 
 
 ## Criterios de aceptación
 
-- [ ] El hash empieza con `$argon2id$` y usa `m=64 MiB, t=3, p=4`
-- [ ] Nunca hay más de 4 cálculos Argon2id concurrentes por proceso
-- [ ] `strong_enough` exige ≥ 12 caracteres, 3 de 4 clases y que la clave sea distinta del valor `forbid`
-- [ ] `TokenBucket` deja pasar la ráfaga y después limita al ritmo configurado (reloj inyectable)
+- [x] El hash empieza con `$argon2id$` y usa `m=64 MiB, t=3, p=4`
+- [x] Nunca hay más de 4 cálculos Argon2id concurrentes por proceso
+- [x] `strong_enough` exige ≥ 12 caracteres, 3 de 4 clases y que la clave sea distinta del valor `forbid`
+- [x] `TokenBucket` deja pasar la ráfaga y después limita al ritmo configurado (reloj inyectable)
 
 ## Entregables
 
@@ -41,7 +41,7 @@ Son dos módulos sueltos (`passwords.py` y `ratelimit.py`) que no importan nada 
 
 ## Al cerrar
 
-- [ ] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada
-- [ ] La trazabilidad y los documentos de arriba están actualizados
-- [ ] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
-- [ ] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)
+- [x] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada
+- [x] La trazabilidad y los documentos de arriba están actualizados
+- [x] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
+- [x] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)

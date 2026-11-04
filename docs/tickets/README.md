@@ -29,7 +29,7 @@ Solo existe el **primer parcial** (gateway, `auth` y `stego`, probados con Postm
 
 | Fase | Ticket | Necesita | Estado |
 |---|---|---|---|
-| A | [FND-3: Contraseñas Argon2id y límites de intentos](parcial-1/andres/FND-3-argon2-y-limites.md) | — | Pendiente |
+| A | [FND-3: Contraseñas Argon2id y límites de intentos](parcial-1/andres/FND-3-argon2-y-limites.md) | — | Cerrado (2026-11-03, `5a55e6b`) |
 | B | [ATH-1: Esqueleto de `auth`, catálogo de permisos, rol `admin` y firma de JWT (R11)](parcial-1/andres/ATH-1-auth-esqueleto-y-jwt.md) | FND-2, FND-3, FND-4, FND-5 | Pendiente |
 | B | [ATH-2: Registro con alias, login, JWT y sesión de dispositivo único, `verify`, `me` y `logout` (R4, R5, R10, R13, R16)](parcial-1/andres/ATH-2-auth-registro-login-verify.md) | ATH-1 | Pendiente |
 | B | [ATH-3: Alta del admin global por CLI (R4)](parcial-1/andres/ATH-3-auth-admin-por-cli.md) | ATH-2 | Pendiente |
