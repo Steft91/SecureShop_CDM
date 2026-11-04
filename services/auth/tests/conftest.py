@@ -28,9 +28,9 @@ JWT_KEY = (
 RESET = [
     "DELETE FROM user_sessions",
     "DELETE FROM user_roles",
+    "DELETE FROM roles WHERE NOT builtin",
     "DELETE FROM users",
     "DELETE FROM failed_attempts",
-    "DELETE FROM roles WHERE NOT builtin",
 ]
 
 
