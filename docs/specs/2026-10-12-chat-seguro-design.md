@@ -495,7 +495,7 @@ Para cada servicio con BD `<svc>` ∈ {auth, rooms, chat, media, audit}:
 
 **Cookies:** `__Host-session` (el JWT), con prefijo `__Host-` (Secure, Path=/, sin Domain), `HttpOnly` y `SameSite=Strict`. Ningún token es accesible desde JavaScript; la SPA no lee el `access_token` del cuerpo. Los clientes de API (Postman) mandan el token en `Authorization: Bearer`. En el primer parcial no hay cookies (§23.1).
 
-**CSRF:** además de SameSite=Strict, la dependencia `require_gateway` de la librería compartida rechaza con 403 (y audita `http.reject.origin`) los `POST/PUT/PATCH/DELETE` públicos cuyo `Origin` no esté en `ALLOWED_ORIGINS`. La colección de Postman manda `Origin: https://localhost`; la protección es para navegadores, que no permiten falsificar esa cabecera.
+**CSRF:** además de SameSite=Strict, la dependencia `require_gateway` de la librería compartida rechaza con 403 (y audita `http.reject.origin`) los `POST/PUT/PATCH/DELETE` públicos cuyo `Origin` no esté en `ALLOWED_ORIGINS`. La protección es para navegadores, que no permiten falsificar esa cabecera. **Primer parcial:** sin cookies no hay CSRF, así que una petición **sin** `Origin` (Postman, curl) pasa; solo se rechaza un `Origin` presente y ajeno (§23.1).
 
 **Validaciones de entrada:**
 - **Todos los cuerpos** usan modelos Pydantic con `extra="forbid"`: un campo de más (`role`, `roles`, `owner_id`, `suspended_until`…) → 422. Así no hay asignación masiva.
@@ -1252,7 +1252,7 @@ CREATE INDEX ON failed_attempts (key, created_at);
 | `/api/steganography/results/` | stego | sí | `api` |
 | cualquier otra `/api/…` o `/internal/…` | — | — | `404` JSON |
 
-- `/_auth/user` llama a `POST /internal/authorization/check` (`proxy_method POST`, sin cuerpo). Las cookies no pasan a ningún servicio (`Cookie ""` también en las rutas públicas).
+- `/_auth/user` llama a `POST /internal/authorization/check` (`proxy_method POST`, sin cuerpo). Las cookies no pasan a ningún servicio (`Cookie ""` también en las rutas públicas). Los servicios aceptan peticiones sin `Origin` y rechazan uno ajeno (`require_gateway`).
 - La respuesta de `check` decide: 2xx → enruta con las `X-User-*` que devolvió; 401 → 401; 403 → 403; cualquier otra cosa o `auth` caído → 503 (T08).
 
 ### 23.6 API interna de `auth`
@@ -1282,7 +1282,7 @@ CREATE INDEX ON failed_attempts (key, created_at);
 | `status` | Cuándo | `action` | Archivo |
 |---|---|---|---|
 | `sin_indicios` | Ningún detector supera su umbral | `ninguna` | Se descarta |
-| `sospechoso` | Anomalía estructural (datos tras `IEND`/`FFD9`, chunks de texto o desconocidos, metadatos excesivos) o un detector estadístico ≥ umbral. Es un **indicio**, no una prueba | `cuarentena` | Se guarda en el volumen `stego_quarantine` (`noexec`, archivos `0600`) con el nombre `<analysis_id>`; ninguna ruta lo sirve |
+| `sospechoso` | Anomalía estructural (datos tras `IEND`/`FFD9`, chunks de texto o desconocidos, metadatos excesivos) o un detector estadístico ≥ umbral. Es un **indicio**, no una prueba | `cuarentena` | Se guarda en el volumen `stego_quarantine` (montado en `/data`, `0700`, archivos `0600`) con el nombre `<analysis_id>`; solo `stego` lo monta y ninguna ruta lo sirve |
 | `no_concluyente` | El análisis se pasó de tiempo o falló, o la imagen tiene menos de 1000 píxeles para los estadísticos. Nunca `sin_indicios` (fallar cerrado) | `advertencia` | Se descarta; evento `warning` |
 | `error` | 415 o 422 | `rechazo` | Se descarta sin analizar |
 

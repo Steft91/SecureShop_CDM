@@ -33,7 +33,7 @@ La BD de pruebas sale de `deploy/docker-compose.test.yml` con `testing.prepare_d
 - [ ] Cada análisis queda en `analyses` con id, usuario, `sha256`, técnica, indicadores, fecha, `status` y `action`; `stego_app` solo tiene `SELECT` e `INSERT` (`test_r11_privilegios_stego`)
 - [ ] La respuesta trae las claves del JSON de spec §23.7
 - [ ] `GET /api/steganography/results/{id}`: el dueño → 200; otro ANALYST → 403 y `perm.denied` (T11, `test_r05_resultado_ajeno_403`); con `steganography.results.read_any` → 200; inexistente → 404
-- [ ] Un `sospechoso` deja el archivo en `stego_quarantine/<analysis_id>` (`0600`, volumen `noexec`), escrito antes del `INSERT`; si falla la escritura o el `INSERT` → 503; los demás no dejan archivo
+- [ ] Un `sospechoso` deja el archivo en `stego_quarantine/<analysis_id>` (`STEGO_QUARANTINE_DIR=/data`, archivos `0600`), escrito antes del `INSERT`; si falla la escritura o el `INSERT` → 503; los demás no dejan archivo
 - [ ] `filename` saneado (basename, NFC, sin caracteres de control, ≤ 255) y nunca en los eventos; un nombre de 300 caracteres no da 500 (`test_nombre_largo_se_trunca`)
 - [ ] El 413 también emite `stego.rejected`
 - [ ] Más de 10 análisis por minuto por usuario → 429 y `stego.ratelimited`; tiempo excedido → `no_concluyente` (`test_timeout_del_analisis_es_no_concluyente`)

@@ -1277,7 +1277,10 @@ def client_ip(conn: HTTPConnection) -> str | None:
 
 
 async def require_gateway(request: Request) -> None:
-    """Rutas públicas: solo el gateway puede llamarlas, y las que cambian estado exigen Origin permitido (CSRF)."""
+    """Rutas públicas: solo el gateway puede llamarlas; un Origin ajeno en las que cambian estado → 403 (CSRF).
+
+    Sin Origin pasa (ajuste de la spec §23.1: sin cookies no hay CSRF; ver services/shared/shared/identity.py).
+    """
     ip = client_ip(request)
     if request.state.caller != "gateway":
         audit.emit(

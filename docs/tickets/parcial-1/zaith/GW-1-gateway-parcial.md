@@ -27,7 +27,7 @@ Los Steps 1–4 ya están (`b48ed79`). Antes de los Steps 5–7: rutas de §23.5
 
 - [x] `nginx -t` → `test is successful`
 - [ ] Rutas de §23.5: `= /api/auth/login`, `/api/auth/`, `/api/users`, `/api/roles`, `/api/user-roles`, `= /api/steganography/analyze` (6m) y `/api/steganography/results/`; sin `/api/auth/register` ni `/api/admin/`; ningún servicio recibe cookies
-- [ ] BD de `stego`: `init.sh` (`for svc in auth stego`), `gen_secrets.py` (`SERVICES`), compose (`stego`, `stego-migrate`, volumen `stego_quarantine` y secretos `db_stego_*`) y `.claude/rules/microservices.md`
+- [x] BD de `stego`: `init.sh` (`for svc in auth stego`), `gen_secrets.py` (`SERVICES`), compose (`stego`, `stego-migrate`, volumen `stego_quarantine` en `/data` y secretos `db_stego_*`) y `.claude/rules/microservices.md` (2026-11-04; `stego` arranca cuando STG-3 agregue su `requirements.lock`, `alembic.ini` y su migración: hasta entonces `up --build` falla en `stego`. `init.sh` solo corre al crear `pgdata`: quien ya tenía el volumen hace `docker compose -f deploy/docker-compose.yml down -v`)
 - [ ] http → 301; TLS 1.2 rechazado; `/internal/authorization/check` → 404 desde afuera; HSTS y CSP presentes
 - [ ] `X-User-*` falsificadas sin JWT → 401; token de USER con `X-User-Perms: steganography.analyze` falsificada → 403
 - [ ] `auth` caído → 503 y ningún `stego.analyzed` (T08); `stego` caído → 503 en su ruta mientras `auth` sigue respondiendo (T01); más de 5 MB → 413

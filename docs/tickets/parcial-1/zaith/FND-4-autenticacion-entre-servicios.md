@@ -22,6 +22,7 @@ Solo necesita tu FND-2. Es la pieza que más esperan Andrés (ATH-1) y Stefany (
 ## Criterios de aceptación
 
 - [x] `test_r16_service_auth.py` (9 tests) y `test_observabilidad.py` (6 tests) pasan
+- [x] *Ajuste por la spec §23 (2026-11-04):* sin cookies no hay CSRF, así que `require_gateway` deja pasar una petición sin `Origin` y solo rechaza uno ajeno (`test_sin_origin_pasa_porque_no_hay_cookies`, `test_csrf_rechaza_origin_ajeno`)
 - [x] Sin token → 401; un llamador fuera de la allowlist → 403 y el evento `svc.reject.token`
 - [x] Las cabeceras `X-User-*` sin el token del gateway se ignoran (401)
 - [x] `require_perm` responde `403 "permiso insuficiente"` y emite `perm.denied`
