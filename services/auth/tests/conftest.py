@@ -141,3 +141,12 @@ def identity(client, token: str, uri: str = "/api/auth/profile") -> dict:
     if "x-user-perms" in r.headers:
         headers["X-User-Perms"] = r.headers["x-user-perms"]
     return headers
+
+
+@pytest.fixture
+def admin(app) -> str:
+    """El admin global 'root' (contraseña PASSWORD), creado como lo haría el CLI."""
+    from auth_svc.accounts import create_admin
+
+    testing.run(create_admin(app.state.engine, "root", PASSWORD, "root@example.com"))
+    return "root"

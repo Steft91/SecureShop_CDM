@@ -4,9 +4,10 @@ import re
 from uuid import uuid4
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncConnection
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
-from shared.passwords import strong_enough
+from shared import audit
+from shared.passwords import hash_secret_async, strong_enough
 
 USERNAME_RE = re.compile(r"^[a-z0-9_.-]{3,32}$")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+$")
@@ -90,3 +91,36 @@ async def active_role_names(conn: AsyncConnection, user_id: str) -> list[str]:
 async def active_permissions(conn: AsyncConnection, user_id: str) -> set[str]:
     """Conjunto de códigos de permisos vigentes a través de roles activos."""
     return set((await conn.execute(ACTIVE_PERMISSIONS, {"user": user_id})).scalars())
+
+
+async def create_admin(
+    engine: AsyncEngine,
+    username: str,
+    password: str,
+    email: str | None = None,
+) -> str:
+    """Admin global (spec §9.1, §23.4): creado solo por CLI. Devuelve su ID."""
+    username = normalize(username)
+    email = normalize_email(email) if email else f"{username}@localhost"
+
+    if not valid_credentials(username, password):
+        raise ValueError(
+            "usuario de 3–32 caracteres a-z, 0-9, '_', '.' o '-' y contraseña de ≥ 12 caracteres "
+            "con 3 tipos (minúsculas, mayúsculas, dígitos, símbolos), distinta del usuario"
+        )
+    if not valid_email(email):
+        raise ValueError("correo electrónico inválido (debe cumplir formato RFC 5321)")
+
+    password_hash = await hash_secret_async(password)
+    async with engine.begin() as conn:
+        user_id = await insert_user(conn, username, email, password_hash, status="active")
+        await conn.execute(
+            text(
+                "INSERT INTO user_roles (id, user_id, role_id) "
+                "SELECT CAST(:ur_id AS uuid), CAST(:user_id AS uuid), id "
+                "FROM roles WHERE name = 'ADMIN'"
+            ),
+            {"ur_id": str(uuid4()), "user_id": user_id},
+        )
+    audit.emit("info", "admin.create", actor="system", target=username)
+    return user_id
