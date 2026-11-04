@@ -1,7 +1,7 @@
 #!/bin/sh
 # Se ejecuta una sola vez, al crear el volumen. Crea una BD y dos roles por servicio (spec §7.6).
 set -eu
-for svc in auth; do
+for svc in auth stego; do
   owner_file="/run/secrets/db_${svc}_owner"
   app_file="/run/secrets/db_${svc}_app"
   for f in "$owner_file" "$app_file"; do
