@@ -9,7 +9,7 @@
 | Necesita | [FND-2](../zaith/FND-2-shared-cripto-y-secretos.md) (Zaith), [FND-3](../andres/FND-3-argon2-y-limites.md) (Andrés), [FND-4](../zaith/FND-4-autenticacion-entre-servicios.md) (Zaith), [FND-5](../zaith/FND-5-utilidades-de-bd-y-pruebas.md) (Zaith) |
 | Lo necesitan | [ATH-2](../andres/ATH-2-auth-registro-login-verify.md) (Andrés) |
 | Plan | [`docs/plans/2026-10-13-03-auth.md`](../../../plans/2026-10-13-03-auth.md), sección *Task ATH-1* |
-| Estado | Pendiente |
+| Estado | Cerrado (2026-11-03, `c4597f1`) |
 
 > El paso de compose necesita además FND-6; los tests no.
 
@@ -23,10 +23,10 @@ Mientras Zaith cierra FND-4 y FND-5: escribe la migración `0001_cuentas.py` y `
 
 ## Criterios de aceptación
 
-- [ ] La migración carga los permisos `users:manage`, `roles:manage` y `stego:analyze`, y el rol `admin` con los tres (`test_catalogo_y_rol_semilla`)
-- [ ] `Signer` solo acepta `RS256`: un token `alg: none` o firmado con HS256 usando la clave pública se rechaza (`test_tokens.py`)
-- [ ] `auth_app` no puede `CREATE TABLE`, ni borrar cuentas, ni editar el catálogo (`test_r11_privilegios.py`)
-- [ ] `auth` en estado `healthy` en compose y en la matriz de la CI
+- [x] La migración carga los permisos `users:manage`, `roles:manage` y `stego:analyze`, y el rol `admin` con los tres (`test_catalogo_y_rol_semilla`)
+- [x] `Signer` solo acepta `RS256`: un token `alg: none` o firmado con HS256 usando la clave pública se rechaza (`test_tokens.py`)
+- [x] `auth_app` no puede `CREATE TABLE`, ni borrar cuentas, ni editar el catálogo (`test_r11_privilegios.py`)
+- [x] `auth` en estado `healthy` en compose y en la matriz de la CI
 
 ## Entregables
 
@@ -44,7 +44,7 @@ Mientras Zaith cierra FND-4 y FND-5: escribe la migración `0001_cuentas.py` y `
 
 ## Al cerrar
 
-- [ ] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada
-- [ ] La trazabilidad y los documentos de arriba están actualizados
-- [ ] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
-- [ ] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)
+- [x] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada
+- [x] La trazabilidad y los documentos de arriba están actualizados
+- [x] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
+- [x] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)
