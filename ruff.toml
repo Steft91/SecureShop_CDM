@@ -1,0 +1,27 @@
+line-length = 100
+target-version = "py313"
+extend-exclude = ["*.md"]  # los planes y la spec traen código de referencia; se formatea al llegar a un .py
+
+[lint]
+select = ["E", "F", "I", "B", "S", "UP", "C90"]  # C90: complejidad ciclomática (RNF-11)
+ignore = ["E501"]  # ruff format ajusta el código; SQL y comentarios largos no se parten a la fuerza
+
+[lint.mccabe]
+max-complexity = 10
+
+[lint.isort]
+known-first-party = ["shared", "auth_svc", "stego_svc"]
+
+[lint.flake8-bugbear]
+# FastAPI declara dependencias y parámetros con llamadas en los valores por defecto.
+extend-immutable-calls = [
+  "fastapi.Depends", "fastapi.Query", "fastapi.params.Depends", "fastapi.params.Query",
+  "shared.identity.require_perm", "shared.service_auth.allow",  # Depends(require_perm("x"))
+]
+
+[lint.per-file-ignores]
+"**/tests/**" = ["S101", "S105", "S106", "S311", "S603"]  # S603: los tests corren scripts del repo
+"services/shared/shared/testing.py" = ["S101", "S105", "S106", "S311", "S603", "S608"]
+"services/*/tools/**" = ["S311"]
+"deploy/**" = ["S603", "S607"]
+".claude/hooks/guard.py" = ["S101"]  # la autoprueba usa assert, como un test
