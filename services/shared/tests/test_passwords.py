@@ -1,4 +1,5 @@
 import pytest
+
 from shared.passwords import hash_secret, strong_enough, verify_secret
 
 
