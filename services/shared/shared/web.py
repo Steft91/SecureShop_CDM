@@ -10,7 +10,6 @@ from shared.observability import RequestContextMiddleware, configure_logging
 from shared.service_auth import ServiceTokenMiddleware
 
 SESSION_COOKIE = "__Host-session"  # el JWT (spec §8.1)
-DEVICE_COOKIE = "__Host-device"
 
 
 def set_cookie(response: Response, name: str, value: str, max_age: int | None = None) -> None:
