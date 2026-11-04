@@ -1,4 +1,4 @@
-# STG-3: API de análisis aislado en otro proceso (R5, R9, R10, R16)
+# STG-3: API de análisis con persistencia, resultados y análisis aislado (R5, R9, R10, R11, R16)
 
 | Campo | Valor |
 |---|---|
@@ -11,29 +11,44 @@
 | Plan | [`docs/plans/2026-10-13-10-stego.md`](../../../plans/2026-10-13-10-stego.md), sección *Task STG-3* |
 | Estado | Pendiente |
 
+> **Rev. 5 (2026-11-03): manda la spec §23** (enunciado oficial; entrega el 04/11/2026). Este ticket ya está ajustado a ella; si el plan dice otra cosa, vale el ticket.
+
 ## Objetivo
 
-`POST /api/stego/analyze` con el permiso `stego:analyze`, con el análisis en un pool de procesos con timeout.
+`POST /api/steganography/analyze` (`steganography.analyze`) y `GET /api/steganography/results/{id}` (`steganography.results.read` y propiedad), sobre `shared`, con BD propia, la cuarentena en un volumen aislado y el análisis en un pool de procesos con timeout (spec §23.7).
 
 ## Cómo trabajar sin esperar
 
-Depende de tu STG-2, de `require_perm` y del registro JSON local del servicio (sin `audit`) y de `TokenBucket` (FND-3 de Andrés). La identidad del gateway se simula con las cabeceras de `shared.testing`: no esperas a `auth` ni al gateway.
+Parte de `routes.py` de `feat/stefany-stego` y corrige:
+1. Montar la app con `shared.web.create_base_app` y usar `require_perm`. Hoy confía en una cabecera `X-Service-Name: gateway` que cualquiera puede mandar y lee `X-User-*` a mano (R16).
+2. Cambiar la lista `_events` por `shared.audit.emit`: hoy los eventos nunca llegan a los registros (T12).
+3. Leer los umbrales de `Settings`: hoy `.995` y `.15` están fijos en la ruta.
+4. Cambiar `asyncio.to_thread` por `ProcessPoolExecutor`: un hilo que se pasa del tiempo sigue corriendo.
+
+La BD de pruebas sale de `deploy/docker-compose.test.yml` con `testing.prepare_database("stego", …)` (FND-5). La BD `stego` del stack (`init.sh`, `gen_secrets.py` y compose) la agrega Zaith en GW-1.
 
 ## Criterios de aceptación
 
-- [ ] Sin identidad del gateway → 401; sin `stego:analyze` → 403 y `perm.denied`; solo acepta el token del gateway (`test_r05_api.py`)
-- [ ] Más de 10 análisis por minuto por usuario → 429 y `stego.ratelimited`; el límite es por usuario
-- [ ] Si el análisis supera `STEGO_TIMEOUT_S` → `revision_manual`
-- [ ] Se emite `stego.analyzed` (info si es `limpia`; warning en los demás casos)
+- [ ] Sin el token del gateway → 401 (middleware); sin identidad → 401; sin `steganography.analyze` → 403 y `perm.denied` (`test_r05_api.py`)
+- [ ] Cada análisis queda en `analyses` con id, usuario, `sha256`, técnica, indicadores, fecha, `status` y `action`; `stego_app` solo tiene `SELECT` e `INSERT` (`test_r11_privilegios_stego`)
+- [ ] La respuesta trae las claves del JSON de spec §23.7
+- [ ] `GET /api/steganography/results/{id}`: el dueño → 200; otro ANALYST → 403 y `perm.denied` (T11, `test_r05_resultado_ajeno_403`); con `steganography.results.read_any` → 200; inexistente → 404
+- [ ] Un `sospechoso` deja el archivo en `stego_quarantine/<analysis_id>` (`STEGO_QUARANTINE_DIR=/data`, archivos `0600`), escrito antes del `INSERT`; si falla la escritura o el `INSERT` → 503; los demás no dejan archivo
+- [ ] `filename` saneado (basename, NFC, sin caracteres de control, ≤ 255) y nunca en los eventos; un nombre de 300 caracteres no da 500 (`test_nombre_largo_se_trunca`)
+- [ ] El 413 también emite `stego.rejected`
+- [ ] Más de 10 análisis por minuto por usuario → 429 y `stego.ratelimited`; tiempo excedido → `no_concluyente` (`test_timeout_del_analisis_es_no_concluyente`)
+- [ ] Eventos con `shared.audit.emit` (`stego.analyzed`, `stego.rejected`, `stego.result.read`), sin el contenido del archivo
+- [ ] `services/stego/.env.example`, la migración `0001_analisis.py` y `docs/openapi/stego.json` (exportado con `app.openapi()`)
 
 ## Entregables
 
-- `services/stego/stego_svc/{pipeline,routes}.py`
-- `services/stego/tests/test_r05_api.py`
+- `services/stego/stego_svc/{pipeline,routes}.py` y `services/stego/migrations/`
+- `services/stego/tests/test_r05_api.py`, `services/stego/tests/test_resultados.py`
+- `services/stego/.env.example`, `docs/openapi/stego.json`
 
 ## Documentación a actualizar
 
-- Filas R5, R9, R10 y R16 de la trazabilidad
+- Filas R5, R9, R10, R11 y R16 de la trazabilidad
 
 ## Verificación
 
@@ -47,4 +62,4 @@ Depende de tu STG-2, de `require_perm` y del registro JSON local del servicio (s
 - [ ] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)
 
 
-> **Actualización de alcance:** STG-5, STG-6 y STG-7 completan en este parcial los 9 formatos (GIF, WAV, MP3, MP4, PDF, DOCX y TXT), además de PNG y JPEG.
+> **Alcance (spec §23.1):** PNG con análisis de píxeles y estructura es lo obligatorio; JPEG, GIF y WAV entran con lo que ya tienen. STG-6 y STG-7 no bloquean la entrega.

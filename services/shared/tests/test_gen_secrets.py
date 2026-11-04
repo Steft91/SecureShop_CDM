@@ -21,6 +21,8 @@ def test_genera_todo_y_no_sobrescribe(tmp_path):
     assert sorted(p.name for p in secrets.iterdir()) == [
         "db_auth_app",
         "db_auth_owner",
+        "db_stego_app",
+        "db_stego_owner",
         "gateway_token.conf",
         "jwt_signing_key",
         "postgres_password",

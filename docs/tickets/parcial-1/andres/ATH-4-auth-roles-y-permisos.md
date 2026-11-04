@@ -1,4 +1,4 @@
-# ATH-4: Roles, permisos y administración de cuentas (R5)
+# ATH-4: Usuarios, roles y asignaciones N:M (R5)
 
 | Campo | Valor |
 |---|---|
@@ -11,26 +11,33 @@
 | Plan | [`docs/plans/2026-10-13-03-auth.md`](../../../plans/2026-10-13-03-auth.md), sección *Task ATH-4* |
 | Estado | Pendiente |
 
+> **Rev. 5 (2026-11-03): manda la spec §23** (enunciado oficial; entrega el 04/11/2026). Este ticket ya está ajustado a ella; si el plan dice otra cosa, vale el ticket.
+
 ## Objetivo
 
-CRUD de roles con permisos del catálogo, asignación de roles a usuarios y la protección del último admin.
+Las rutas de administración de la spec §23.4 (`/api/users`, `/api/roles` y `/api/user-roles`), la protección del último ADMIN y el OpenAPI de `auth`.
 
 ## Cómo trabajar sin esperar
 
-Solo depende de tu ATH-3. Al cerrarla, avisa a Zaith: es lo que GW-1 espera de ti.
+Solo depende de tu ATH-3. Al cerrarla, avisa a Zaith: es lo que GW-1 espera de ti. El plan (Task ATH-4) sirve de base: sus rutas `/api/admin/*` pasan a las de §23.4.
 
 ## Criterios de aceptación
 
-- [ ] Crear un rol con `["stego:analyze"]` y asignarlo: vale en la **siguiente** petición sin volver a entrar (`test_r05_rol_asignado_vale_en_la_siguiente_peticion`)
-- [ ] Un permiso fuera del catálogo → 422; el rol `admin` no se edita ni se borra; un rol con usuarios no se borra
-- [ ] Quitarle `admin` al último admin → 409 y `admin.guard.last_admin` (con `pg_advisory_xact_lock`)
-- [ ] Sin `roles:manage` o `users:manage` → 403
-- [ ] Cada cambio emite su evento después del commit (`role.created`, `role.permissions.changed`, `role.deleted`, `user.roles.changed`)
+- [ ] `POST` y `GET /api/users` y `PATCH /api/users/{id}` con `users.manage`: la cuenta nace sin roles; usuario o correo repetido → 409 (`test_admin_crea_cuenta_sin_roles`, `test_usuario_o_correo_duplicado_409`); `status = inactive` termina sus sesiones
+- [ ] `POST` y `GET /api/roles` y `PATCH /api/roles/{id}` con `roles.manage`: permiso fuera del catálogo → 422; ADMIN no se edita (409); un rol `inactive` no da permisos
+- [ ] `POST /api/user-roles`: una cuenta con dos roles y un rol en dos cuentas (T05, `test_n_m_dos_roles_y_dos_usuarios`); repetir la asignación → 409 sin fila nueva (T06, `test_asignacion_repetida_409`)
+- [ ] `DELETE /api/user-roles/{id}`: el mismo JWT pierde el permiso en la siguiente petición (T07, `test_r05_rol_retirado_deja_de_valer_con_el_mismo_jwt`); asignar vale igual de rápido (`test_r05_rol_asignado_vale_en_la_siguiente_peticion`)
+- [ ] Retirarle ADMIN o desactivar al último ADMIN activo → 409 y `admin.guard.last_admin` (con `pg_advisory_xact_lock`); nadie se desactiva a sí mismo
+- [ ] Sin escalada: sin el rol ADMIN no se asigna ni retira ADMIN, ni se crea o edita un rol con `users.manage` o `roles.manage` → 403 y `authz.denied` (`test_r05_sin_admin_no_concede_permisos_de_admin`)
+- [ ] Sin el permiso → 403; un campo de más en el cuerpo → 422
+- [ ] Eventos `user.created`, `user.updated`, `role.created`, `role.updated`, `user_role.assigned` y `user_role.revoked` después del commit (`actor` = el admin)
+- [ ] `docs/openapi/auth.json` exportado con `app.openapi()`, con `/internal/authorization/check` incluido
 
 ## Entregables
 
 - `services/auth/auth_svc/admin.py`
-- `services/auth/tests/test_r05_roles.py`
+- `services/auth/tests/test_r05_roles.py`, `services/auth/tests/test_usuarios.py`
+- `docs/openapi/auth.json`
 
 ## Documentación a actualizar
 

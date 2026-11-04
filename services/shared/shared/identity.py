@@ -24,7 +24,10 @@ def client_ip(conn: HTTPConnection) -> str | None:
 
 
 async def require_gateway(request: Request) -> None:
-    """Rutas públicas: solo el gateway puede llamarlas, y las que cambian estado exigen Origin permitido (CSRF)."""
+    """Rutas públicas: solo el gateway puede llamarlas; un Origin ajeno en las que cambian estado → 403 (CSRF).
+
+    Sin Origin pasa: Postman y curl no lo mandan, y sin cookies no hay CSRF (spec §23.1).
+    """
     ip = client_ip(request)
     if request.state.caller != "gateway":
         audit.emit(
@@ -38,6 +41,7 @@ async def require_gateway(request: Request) -> None:
     origin = request.headers.get("origin")
     if (
         request.method in UNSAFE_METHODS
+        and origin is not None
         and origin not in request.app.state.settings.allowed_origins
     ):
         audit.emit(

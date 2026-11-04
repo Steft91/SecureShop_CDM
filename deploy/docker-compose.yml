@@ -29,7 +29,7 @@ services:
     image: postgres:17
     environment:
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
-    secrets: [postgres_password, db_auth_owner, db_auth_app]
+    secrets: [postgres_password, db_auth_owner, db_auth_app, db_stego_owner, db_stego_app]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
@@ -61,6 +61,26 @@ services:
     image: chat-seguro/auth
     secrets: [db_auth_owner]
 
+  # stego guarda cada análisis en su BD y los archivos sospechosos en stego_quarantine (spec §23.7).
+  stego:
+    <<: *python-service
+    build: {context: .., dockerfile: services/Dockerfile, args: {SERVICE: stego}}
+    image: chat-seguro/stego
+    environment:
+      STEGO_QUARANTINE_DIR: /data
+    secrets: [db_stego_app, svc_hash_gateway]
+    volumes:
+      - stego_quarantine:/data  # solo stego lo monta; ninguna ruta lo sirve
+    networks: [apps, data]
+    depends_on:
+      stego-migrate: {condition: service_completed_successfully}
+
+  stego-migrate:
+    <<: *migrate
+    build: {context: .., dockerfile: services/Dockerfile, args: {SERVICE: stego}}
+    image: chat-seguro/stego
+    secrets: [db_stego_owner]
+
   gateway:
     build: {context: .., dockerfile: gateway/Dockerfile}
     image: chat-seguro/gateway
@@ -69,7 +89,7 @@ services:
     volumes:
       - ./certs:/etc/nginx/certs:ro
     read_only: true
-    tmpfs: ["/var/cache/nginx:size=128m", /var/run, /tmp]  # con tope: ahí van los cuerpos de 20 MB (R10)
+    tmpfs: ["/var/cache/nginx:size=128m", /var/run, /tmp]  # con tope: ahí van los cuerpos de hasta 6 MB (R10)
     cap_drop: [ALL]
     cap_add: [CHOWN, SETUID, SETGID, NET_BIND_SERVICE]
     security_opt: ["no-new-privileges:true"]
@@ -91,11 +111,14 @@ networks:
 
 volumes:
   pgdata: {}
+  stego_quarantine: {}
 
 secrets:
   postgres_password: {file: ./secrets/postgres_password}
   db_auth_owner: {file: ./secrets/db_auth_owner}
   db_auth_app: {file: ./secrets/db_auth_app}
+  db_stego_owner: {file: ./secrets/db_stego_owner}
+  db_stego_app: {file: ./secrets/db_stego_app}
   jwt_signing_key: {file: ./secrets/jwt_signing_key}
   gateway_token_conf: {file: ./secrets/gateway_token.conf}
   svc_hash_gateway: {file: ./secrets/svc_hash_gateway}

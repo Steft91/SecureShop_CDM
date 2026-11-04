@@ -15,7 +15,7 @@ from pathlib import Path
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-SERVICES = ("auth",)  # los que tienen BD (stego no)
+SERVICES = ("auth", "stego")  # los que tienen BD (spec §23.7)
 CALLERS = ("gateway",)  # quienes llaman a los servicios; en el primer parcial, solo el gateway
 RANDOM = (
     "postgres_password",

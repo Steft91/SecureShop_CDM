@@ -6,6 +6,8 @@ ARG SERVICE
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 SERVICE=${SERVICE} LOG_FORMAT=json \
     FORWARDED_ALLOW_IPS=172.30.10.10
 RUN useradd --uid 10001 --no-create-home app
+# /data: archivos del servicio (la cuarentena de stego). Un volumen montado aquí hereda dueño y 0700.
+RUN mkdir /data && chown app:app /data && chmod 0700 /data
 WORKDIR /srv
 COPY services/${SERVICE}/requirements.lock /srv/requirements.lock
 RUN pip install --no-cache-dir -r /srv/requirements.lock

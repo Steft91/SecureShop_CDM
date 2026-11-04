@@ -85,14 +85,18 @@ def test_ruta_publica_solo_desde_el_gateway(client, caplog):
     assert testing.events(caplog, "svc.reject.token")[0]["actor"] == "svc:stego"
 
 
-def test_csrf_exige_origin_permitido(client, caplog):
-    sin_origin = {"X-Service-Token": testing.TOKENS["gateway"]}
-    assert client.post("/api/publico", json={"n": 1}, headers=sin_origin).status_code == 403
-    assert testing.events(caplog, "http.reject.origin")
-    ajeno = {**sin_origin, "origin": "https://evil.example"}
+def test_csrf_rechaza_origin_ajeno(client, caplog):
+    ajeno = {"X-Service-Token": testing.TOKENS["gateway"], "origin": "https://evil.example"}
     assert client.post("/api/publico", json={"n": 1}, headers=ajeno).status_code == 403
+    assert testing.events(caplog, "http.reject.origin")
     r = client.post("/api/publico", json={"n": 2}, headers=testing.gateway_headers())
     assert r.json() == {"n": 2}
+
+
+def test_sin_origin_pasa_porque_no_hay_cookies(client):
+    # Postman, curl e Insomnia no mandan Origin; sin cookies no hay CSRF (spec §23.1).
+    sin_origin = {"X-Service-Token": testing.TOKENS["gateway"]}
+    assert client.post("/api/publico", json={"n": 3}, headers=sin_origin).json() == {"n": 3}
 
 
 def test_ruta_interna_respeta_la_allowlist(client):
