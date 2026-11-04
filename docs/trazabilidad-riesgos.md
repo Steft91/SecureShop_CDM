@@ -22,9 +22,9 @@ Quedan fuera del primer parcial, hasta que el docente defina los siguientes entr
 ## Verificación manual (evidencia para el informe)
 | Prueba | Comando | Resultado esperado | Fecha / resultado |
 |---|---|---|---|
-| TLS 1.2 rechazado | `curl --tlsv1.2 --tls-max 1.2 https://localhost/` | error de handshake | — |
+| TLS 1.2 rechazado | `curl --tlsv1.2 --tls-max 1.2 https://localhost/` | error de handshake | 2026-11-04: rechazado (gateway solo, certificado de prueba) |
 | http → https | `curl -I http://localhost/` | `301` | — |
-| /internal no enrutado | `curl -X POST https://localhost/internal/authorization/check` | `404` JSON | — |
+| /internal no enrutado | `curl -X POST https://localhost/internal/authorization/check` | `404` JSON | 2026-11-04: `404` (gateway solo) |
 | Cabeceras de identidad falsificadas | `curl -H "X-User-Id: x" -H "X-User-Perms: roles.manage" https://localhost/api/roles` | `401` JSON | — |
-| AUTH caído (T08) | `docker compose stop auth` y analizar con un JWT válido | `503` y ningún `stego.analyzed` | — |
+| AUTH caído (T08) | `docker compose stop auth` y analizar con un JWT válido | `503` y ningún `stego.analyzed` | 2026-11-04: `503` con el gateway solo (sin `auth`); falta repetirlo con el stack completo |
 | Flujo del parcial (Postman, T01–T12) | Runner de `docs/postman/parcial-1.postman_collection.json` | todas las pruebas en verde | — |
