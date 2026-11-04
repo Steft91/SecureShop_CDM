@@ -453,7 +453,7 @@ La columna *ISO/IEC 27001:2022* relaciona cada control con el Anexo A; el detall
 | R9 | Archivos maliciosos | Magic bytes, Pillow, tope de tamaño y de píxeles (`stego`) | A.8.7, A.8.28 | stego | — | Pendiente |
 | R10 | Agotamiento de recursos | Rate limit en Nginx + token bucket por usuario en `stego` + tope de registros por IP | A.8.6, A.8.20 | gateway, auth, stego | — | Pendiente |
 | R11 | Credenciales de BD con privilegios excesivos | Rol `auth_app` sin DDL, BD propia de `auth` | A.8.2, A.5.18, A.8.22 | auth | — | Pendiente |
-| R13 | Sesiones simultáneas de una cuenta | Índice único parcial en `user_sessions` + sesión ligada a la cookie de dispositivo + vencimiento por inactividad | A.5.16, A.5.15, A.8.5 | auth | — | Pendiente |
+| R13 | Sesiones simultáneas de una cuenta | Fuera del primer parcial: el enunciado excluye la restricción de dispositivos (spec §23.1). Mientras tanto, cada sesión se revoca con logout o al desactivar la cuenta, y el JWT vence a los 15 min | A.5.16, A.5.15, A.8.5 | auth | — | Fuera del parcial |
 | R16 | Suplantación entre microservicios | Token por servicio con hash, allowlist, gateway sobrescribe identidad | A.5.15, A.8.21, A.8.22 | shared, gateway, auth, stego | — | Pendiente |
 
 Quedan fuera del primer parcial, hasta que el docente defina los siguientes entregables: R1, R3 (por ahora los eventos de seguridad son registros JSON, sin cadena de hashes), R8, R12, R14 y R15.
@@ -487,8 +487,8 @@ Proyecto integrador de **Software Seguro** con **microservicios**. El primer par
 | Pieza | Qué hace | BD |
 |---|---|---|
 | gateway (Nginx) | Único punto de entrada: TLS 1.3, rate limit, `auth_request` a `auth` en cada petición y enrutamiento a `auth` y `stego` | — |
-| auth | Registro, login (Argon2id, bloqueo progresivo), JWT RS256 + sesión por dispositivo, roles y permisos; `GET /internal/verify`; CLI `create_admin` | auth |
-| stego | Firma, Pillow, chi²/RS/estructura y veredicto; `POST /api/stego/analyze` con el permiso `stego:analyze` | — |
+| auth | Login (Argon2id, bloqueo progresivo), JWT RS256 + sesión revocable, usuarios, roles ADMIN/ANALYST/USER y la N:M `user_roles`; `POST /internal/authorization/check`; CLI `create_admin` | auth |
+| stego | Firma, Pillow, chi²/RS/estructura, veredicto y política; guarda cada análisis; `POST /api/steganography/analyze` y `GET /api/steganography/results/{id}` | stego |
 
 Confianza: el gateway pregunta a `auth` en cada request y sobrescribe `X-User-*` con la identidad y los permisos actuales. Cada servicio exige `X-Service-Token` (guarda solo hashes) y acepta esas cabeceras únicamente si el llamador es `gateway`. Detalle en `.claude/rules/microservices.md`.
 
@@ -1036,7 +1036,7 @@ git commit -m "feat(shared): Argon2id con tope de concurrencia, política de cla
   - `shared.service_auth`: `TOKEN_HEADER = "X-Service-Token"`; `ServiceAuth(name, callers)` con `from_secrets(name)` e `identify(token)->str|None`; `ServiceTokenMiddleware`; `allow(*callers)` (dependencia que devuelve el llamador). En el primer parcial los servicios no se llaman entre sí: el único llamador es el gateway.
   - `shared.identity`: `UserIdentity(user_id, username, session_id, perms: frozenset[str])`, `client_ip(conn)`, `user_from_headers(conn)->UserIdentity|None`, `require_gateway`, `require_user`, `require_perm(*perms)` (403 `"permiso insuficiente"` y evento `perm.denied` si falta alguno).
   - `shared.audit`: `emit(severity, action, *, actor, target=None, ip=None, details=None)`. Escribe una línea en el logger `audit` con el nivel de `severity` (`info`, `warning` o `critical`), `msg = action` y el resto en el campo `event`. No hay servicio audit en el primer parcial: los eventos se leen con `docker compose logs`.
-  - `shared.web`: `SESSION_COOKIE`, `DEVICE_COOKIE`, `set_cookie(response, name, value, max_age=None)`, `clear_cookie(response, name)`, `create_base_app(*, title, settings, engine, service_auth, lifespan=None)->FastAPI` (con `engine=None`, `/health` responde sin BD: lo usa `stego`). La app expone `app.state.settings/engine/service_auth` y `request.state.caller`. Instala `RequestContextMiddleware` como el más externo y llama a `configure_logging(title)`.
+  - `shared.web`: `SESSION_COOKIE`, `set_cookie(response, name, value, max_age=None)`, `clear_cookie(response, name)`, `create_base_app(*, title, settings, engine, service_auth, lifespan=None)->FastAPI` (con `engine=None`, `/health` responde sin BD: lo usa `stego`). La app expone `app.state.settings/engine/service_auth` y `request.state.caller`. Instala `RequestContextMiddleware` como el más externo y llama a `configure_logging(title)`.
   - `shared.observability` (RNF-19): `REQUEST_HEADER = "X-Request-ID"`, `REQUEST_ID: ContextVar[str | None]`, `JsonFormatter(service)`, `configure_logging(service)` (solo con `LOG_FORMAT=json`) y `RequestContextMiddleware`. El middleware toma el id que puso el gateway (si cumple `^[A-Za-z0-9-]{8,64}$`; si no, crea uno de 32 hex), lo deja en `REQUEST_ID` y registra **una línea por petición** con `method`, `path` (sin query string), `status` y `ms`. `JsonFormatter` agrega el id a cada línea, también a los eventos de `shared.audit`. Los servicios no devuelven el id al cliente: lo hace el gateway (GW-1).
   - `shared.testing`:
     - constantes `ORIGIN`, `TOKENS` (gateway, auth, stego), `ROLE_PASSWORD`, `USER_ID`, `SESSION_ID`;
@@ -1466,7 +1466,6 @@ from shared.service_auth import ServiceTokenMiddleware
 log = logging.getLogger("web")
 
 SESSION_COOKIE = "__Host-session"  # el JWT (spec §8.1)
-DEVICE_COOKIE = "__Host-device"
 
 
 def set_cookie(response: Response, name: str, value: str, max_age: int | None = None) -> None:

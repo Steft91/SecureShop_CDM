@@ -13,31 +13,36 @@
 
 > Es el punto donde se juntan los tres: avisa en el grupo cuando `auth` y `stego` estén `healthy` en compose.
 
+> **Rev. 5 (2026-11-03): manda la spec §23** (enunciado oficial; entrega el 04/11/2026). Este ticket ya está ajustado a ella; si el plan dice otra cosa, vale el ticket.
+
 ## Objetivo
 
-El único punto de entrada, que habla con los dos microservicios: TLS 1.3, cabeceras de seguridad, rate limit, `auth_request` a `auth` y rutas a `auth` y `stego`, con la identidad imposible de falsificar.
+El único punto de entrada, que habla con los dos microservicios: TLS 1.3, cabeceras de seguridad, rate limit, `auth_request` a `POST /internal/authorization/check` y las rutas de la spec §23.5, con la identidad imposible de falsificar. Suma la infraestructura de la BD de `stego`.
 
 ## Cómo trabajar sin esperar
 
-Los Steps 1–4 (`nginx.conf`, los snippets, el `Dockerfile` y `nginx -t`) no necesitan ningún servicio: hazlos en cuanto cierres la fase A. Los Steps 5–7 esperan a que `auth` y `stego` estén arriba.
+Los Steps 1–4 ya están (`b48ed79`). Antes de los Steps 5–7: rutas de §23.5, `proxy_method POST` en `/_auth/user`, cookies vaciadas en todas las rutas (hecho en los snippets) y la BD de `stego`. Lo que falta espera a que `auth` y `stego` estén arriba.
 
 ## Criterios de aceptación
 
 - [x] `nginx -t` → `test is successful`
-- [ ] http → 301; TLS 1.2 rechazado; `/internal/verify` → 404; HSTS y CSP presentes
-- [ ] `X-User-*` falsificadas sin JWT → 401; `auth` caído → 503
-- [ ] El admin creado por CLI entra con su contraseña vía curl, analiza `2-problema-zip-al-final.png` (`problema`) y los eventos `auth.login.ok` y `stego.analyzed` aparecen en `docker compose logs` (Step 6)
+- [ ] Rutas de §23.5: `= /api/auth/login`, `/api/auth/`, `/api/users`, `/api/roles`, `/api/user-roles`, `= /api/steganography/analyze` (6m) y `/api/steganography/results/`; sin `/api/auth/register` ni `/api/admin/`; ningún servicio recibe cookies
+- [ ] BD de `stego`: `init.sh` (`for svc in auth stego`), `gen_secrets.py` (`SERVICES`), compose (`stego`, `stego-migrate`, volumen `stego_quarantine` y secretos `db_stego_*`) y `.claude/rules/microservices.md`
+- [ ] http → 301; TLS 1.2 rechazado; `/internal/authorization/check` → 404 desde afuera; HSTS y CSP presentes
+- [ ] `X-User-*` falsificadas sin JWT → 401; token de USER con `X-User-Perms: steganography.analyze` falsificada → 403
+- [ ] `auth` caído → 503 y ningún `stego.analyzed` (T08); `stego` caído → 503 en su ruta mientras `auth` sigue respondiendo (T01); más de 5 MB → 413
+- [ ] El admin del CLI entra vía curl, analiza `lsb.png` (`sospechoso`) y los eventos `auth.login.ok` y `stego.analyzed` aparecen en `docker compose logs` (Step 6)
 - [ ] `X-Request-ID`: una sola cabecera en la respuesta, que sobrescribe la del cliente, y el mismo id en los registros JSON de `gateway` y `auth`
-- [ ] Queda anotado si Postman conserva `__Host-device` (Step 7)
+- [ ] Postman con la CA de mkcert y Bearer → 200 en `/api/auth/profile` (Step 7)
 
 ## Entregables
 
 - `gateway/nginx.conf`, `gateway/snippets/*.conf`, `gateway/Dockerfile`
-- Servicio `gateway` en compose
+- `deploy/docker-compose.yml`, `deploy/postgres/init.sh`, `deploy/gen_secrets.py`
 
 ## Documentación a actualizar
 
-- Filas R7, R10 y R16 y la *Verificación manual* de la trazabilidad
+- Filas R7, R10, R11 y R16 y la *Verificación manual* de la trazabilidad
 - `CLAUDE.md`: marcar GW-1
 
 ## Verificación

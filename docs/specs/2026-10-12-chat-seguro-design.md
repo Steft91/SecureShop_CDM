@@ -2,13 +2,15 @@
 
 | | |
 |---|---|
-| **Fecha** | 2026-10-12 · **Revisión 2:** 2026-10-13 (arquitectura de microservicios; reemplaza el monolito modular de la revisión 1) · **Revisión 3:** 2026-10-13 (cumplimiento del resumen del docente: normas, enfoques y cifrado de archivos en reposo; §21) · **Revisión 4:** 2026-10-25 (clase del 22/10: cuentas con RBAC y JWT, salas con dueño, servicio `stego` y primer parcial; §22) |
+| **Fecha** | 2026-10-12 · **Revisión 2:** 2026-10-13 (arquitectura de microservicios; reemplaza el monolito modular de la revisión 1) · **Revisión 3:** 2026-10-13 (cumplimiento del resumen del docente: normas, enfoques y cifrado de archivos en reposo; §21) · **Revisión 4:** 2026-10-25 (clase del 22/10: cuentas con RBAC y JWT, salas con dueño, servicio `stego` y primer parcial; §22) · **Revisión 5:** 2026-11-03 (enunciado oficial del primer parcial: contrato de AUTH y STEGO, sin cookie de dispositivo; §23) |
 | **Autores** | Zaith Alejandro Manangón Vinueza, Stefany Maricela Díaz Antun, Andrés Isaias Cedeño Cuenca |
 | **Asignatura** | Software Seguro — Proyecto Integrador |
-| **Estado** | Revisión 4. Planes del primer parcial en `docs/plans/` y tickets en `docs/tickets/parcial-1/` |
-| **Fuente de requisitos** | `Documentación/Tarea 2/Actividad2_SGSI_Proyecto_Integrador.md` (enunciado + Tablas 1–4 de riesgos), `PROYECTO INTEGRADOR - RESUMEN.docx` (resumen del docente) y la clase del 22/10/2026 (alcance del primer parcial). Los requisitos con ID están en `docs/requisitos.md` |
-| **Plazo** | **Primer parcial:** corte definitivo con el gateway, `auth` y `stego`, probado con Postman (meta de demo: 30 oct; fecha de la defensa por confirmar). **Después:** lo que el docente pida para los parciales 2 y 3 |
+| **Estado** | Revisión 5. Planes del primer parcial en `docs/plans/` y tickets en `docs/tickets/parcial-1/` |
+| **Fuente de requisitos** | `Documentación/Tarea 2/Actividad2_SGSI_Proyecto_Integrador.md` (enunciado + Tablas 1–4 de riesgos), `PROYECTO INTEGRADOR - RESUMEN.docx` (resumen del docente), la clase del 22/10/2026 y el enunciado `Proyecto_Integrador_Primer_Parcial.pdf` (primer parcial, §23). Los requisitos con ID están en `docs/requisitos.md` |
+| **Plazo** | **Primer parcial:** corte definitivo con el gateway, `auth` y `stego`, probado con Postman; entrega y demo el **04/11/2026** (§23). **Después:** lo que el docente pida para los parciales 2 y 3 |
 
+> **Primer parcial: manda la §23.** El enunciado oficial del docente (2026-11-03) fija el contrato de `auth` y `stego`, el modelo de datos, los veredictos y los entregables. La §23 manda sobre el resto de esta spec y sobre los planes y tickets.
+>
 > **Alcance del primer parcial.** Solo se construyen el gateway, `auth` (cuentas, RBAC y JWT, con el admin global creado por CLI) y `stego`. No entran el servicio `audit`, el TOTP de los admins, la rotación de la KEK, `rooms`, `chat`, `media` ni el frontend: los eventos de seguridad son registros JSON en la salida de cada servicio. Las secciones de esta spec que describen esas piezas son el diseño de referencia para después. Donde la spec y los planes de `docs/plans/` difieren, mandan los planes. Los IDs de requisitos vigentes (RF, RNF y RS) son los de la Actividad 3 aprobada, resumidos en `docs/requisitos.md`; los que cita esta spec son de una versión anterior.
 
 ---
@@ -20,7 +22,7 @@ Construir la aplicación de **salas de chat seguras** del proyecto integrador co
 **Criterios de éxito (definición de "terminado"):**
 1. **Cuentas y RBAC:** cualquiera se registra. Los permisos se asignan a roles que el admin global crea y edita, y cada operación se autoriza en el servidor con los permisos **actuales** del usuario, no con los que tenía al iniciar sesión. El login entrega un JWT. Quien tiene un permiso de admin entra además con TOTP.
 2. **Salas con dueño:** un usuario con `rooms:create` crea hasta 2 salas activas con ID único, clave, cupo y tipo (texto / multimedia / ambos), y las administra: las edita, las cierra, las cede, expulsa, silencia y borra mensajes.
-3. Dos o más navegadores intercambian mensajes cifrados en una sala. Una cuenta no puede estar activa desde dos dispositivos.
+3. Dos o más navegadores intercambian mensajes cifrados en una sala. Una cuenta no puede estar activa desde dos dispositivos (el mecanismo se define con las salas; el primer parcial no lo incluye, §23.1).
 4. **Esteganografía:** `POST /api/stego/analyze` responde *inválida*, *limpia*, *problema* o *revisión manual* a quien tenga el permiso `stego:analyze`. En las salas, una imagen con LSB embebido termina en **cuarentena**, genera una alerta y queda en auditoría; una imagen limpia se entrega sanitizada.
 5. **Microservicios:** un gateway como único punto de entrada y 6 servicios (`auth`, `rooms`, `chat`, `media`, `stego`, `audit`). Cada servicio con datos tiene su propia BD (`stego` no guarda estado), su propia imagen y su propio job de migración, y se despliega por separado (`docker compose up -d --build <servicio>`).
 6. Los **16 riesgos** (R1–R15 de la Tarea 2 + R16) tienen al menos un test automatizado en verde, mapeado en `docs/trazabilidad-riesgos.md`.
@@ -39,7 +41,7 @@ Construir la aplicación de **salas de chat seguras** del proyecto integrador co
 | *(Docente, 22/10)* API de esteganografía a la que se entra con el token que emite `auth` | Servicio `stego`, sin estado: `POST /api/stego/analyze` exige `stego:analyze` y responde inválida / limpia / problema / revisión manual (§9.9, §12.7) |
 | Administrador autenticado que gestiona las salas | Dos niveles. El **dueño** administra su sala (§9.3). El **admin global** (como el personal de Discord) gestiona cuentas, roles y cualquier sala, pero **no lee conversaciones**. TOTP obligatorio para todo permiso de admin; el primer admin se crea por CLI, sin credenciales por defecto |
 | Sala: ID único, clave, cupo máximo, tipo | Tabla `rooms` (BD `rooms`): `code` UNIQUE (normalizado a minúsculas), `key_hash` Argon2id, `max_members`, `mode` y `owner_id`. Máximo **2 salas activas por dueño** |
-| Un usuario se conecta desde un único dispositivo | Una sesión `full` activa por cuenta (índice único parcial en `user_sessions`), ligada a la cookie de dispositivo y verificada en **cada** request. **Política: se rechaza el login desde otro dispositivo** mientras la sesión siga viva; desde el mismo dispositivo, la reemplaza |
+| Un usuario se conecta desde un único dispositivo | Queda para el incremento de las salas: el enunciado del primer parcial excluye la restricción de dispositivos (§23.1). El mecanismo se diseña entonces |
 | Acceso condicionado a ID + clave | El **primer** ingreso exige ID + clave (Argon2id, límite de intentos por IP, usuario y sala, error genérico) y crea la membresía. Después, la sala se abre desde *Mis salas* sin volver a pedir la clave |
 | Confidencialidad, integridad y autenticidad; justificar algoritmos, protocolos y gestión de claves | TLS 1.3 hasta el gateway + **cifrado por conexión en capa de aplicación** entre navegador y `chat` (ECDH P-256 con *hello* firmado → HKDF-SHA256 → AES-256-GCM con AAD) + envelope encryption en reposo (DEK por sala, KEK propia de `chat`) |
 | Análisis de archivos y estegoanálisis con alertas, auditoría y política | `media` (tope de tamaño, ClamAV, política, cifrado) + `stego` (firma, validación, estegoanálisis, sanitización) → **cuarentena** / rechazo / sanitización. Alertas en el servicio `audit` |
@@ -59,7 +61,7 @@ Construir la aplicación de **salas de chat seguras** del proyecto integrador co
 - Comunicación interna: **REST síncrono + un token por servicio** (sin broker).
 - BD: **un contenedor PostgreSQL, una base de datos y un par de roles por cada servicio con datos** (`stego` no tiene BD).
 - Gateway: **Nginx con `auth_request` hacia `auth`**, que verifica el JWT **y** la sesión a la que apunta en cada request (revocación inmediata). Se descartaron: verificar el JWT solo en cada servicio (no se puede revocar al instante), un gateway propio en FastAPI (habría que reimplementar el proxy de WebSocket) y Traefik/Kong (otra herramienta que aprender).
-- **Token: JWT RS256**, porque lo pide el docente. Es una referencia firmada a una sesión del servidor: la revocación, la inactividad y el dispositivo los decide la sesión, no el `exp` del token.
+- **Token: JWT RS256**, porque lo pide el docente. Es una referencia firmada a una sesión del servidor: la revocación y la inactividad las decide la sesión, no el `exp` del token.
 - Modelo criptográfico **B** (cifrado en capa de aplicación sobre TLS). Se descartaron A (solo TLS) y C (E2E puro, que impide el estegoanálisis en el servidor).
 - *(Rev. 4)* **Salas estilo Discord:** cualquiera crea salas y queda como dueño; la membresía es persistente; hay un solo dueño por sala y puede cederla; no hay moderadores ni reportes.
 - *(Rev. 4)* **`stego` es un servicio propio:** nace en el primer parcial y luego `media` lo usa por la red interna.
@@ -96,7 +98,7 @@ Construir la aplicación de **salas de chat seguras** del proyecto integrador co
 4. Una instancia por servicio: las claves de conexión viven en memoria de `chat` y la difusión ocurre dentro de ese proceso.
 5. El estegoanálisis es estadístico. Esquemas adaptativos o LSB-matching (±1) pueden evadir chi²; la **sanitización** (§12.5) destruye payloads LSB aunque no se detecten.
 6. `audit` es un punto único de falla para las operaciones que otorgan acceso (fallan cerradas con 503 si `audit` no responde, §14.4). Es una decisión deliberada a favor de la trazabilidad. Las operaciones que **quitan** acceso nunca se bloquean por la auditoría.
-7. **El "único dispositivo" es una cookie.** La sesión queda ligada a la cookie `__Host-device` (`HttpOnly`); no es un identificador de hardware. Quien copie las dos cookies de un navegador puede usarlas desde otro equipo mientras la sesión esté viva. Borrar las cookies equivale a cambiar de dispositivo: el login se rechaza hasta que la sesión anterior venza por inactividad (30 min).
+7. **Sin restricción de dispositivos en el primer parcial.** Una cuenta puede tener varias sesiones a la vez, y quien obtenga un JWT puede usarlo hasta su `exp` (15 min) o hasta que la sesión termine. La restricción llega con las salas (§23.1).
 8. **El admin global no lee conversaciones.** Puede cerrar, ceder o moderar una sala por sus miembros, pero no ve ni borra mensajes, y no puede cambiar la clave de una sala ajena (le permitiría entrar a leerla). La moderación del contenido es del dueño.
 9. Una conexión WebSocket ya abierta conserva el alias y el modo de sala que obtuvo al conectarse. La expulsión, el silencio, la salida, el cierre de la sala, el logout y la suspensión se le notifican al instante y, si esa notificación se pierde, se reconcilian en el siguiente latido (30 s).
 
@@ -126,7 +128,7 @@ Navegador (React SPA + WebCrypto) · Postman (primer parcial)
 | Servicio | Responsabilidad | BD (tablas) | Riesgos |
 |---|---|---|---|
 | **gateway** | Único punto de entrada: TLS, cabeceras de seguridad, rate limit perimetral, enrutamiento, autenticación delegada (`auth_request` a `auth`), SPA estática | — | 7, 10, 16 |
-| **auth** | Registro, login, TOTP para permisos de admin, JWT y sesiones (un dispositivo por cuenta), roles y permisos, suspensión; `verify`; CLI `create_admin`; rotación de su KEK | `auth`: `users`, `permissions`, `roles`, `role_permissions`, `user_roles`, `user_sessions`, `failed_attempts` | 4, 5, 13 |
+| **auth** | Registro, login, TOTP para permisos de admin, JWT y sesiones revocables, roles y permisos, suspensión; `verify`; CLI `create_admin`; rotación de su KEK | `auth`: `users`, `permissions`, `roles`, `role_permissions`, `user_roles`, `user_sessions`, `failed_attempts` | 4, 5, 13 |
 | **rooms** | Salas con dueño (máximo 2 activas), ingreso con clave, membresía, alias de cuenta, cupo atómico, expulsión con veto, silencio, cesión y cierre; membresía para chat y media | `rooms`: `rooms`, `room_members`, `failed_attempts` | 1, 5, 8, 15 |
 | **chat** | WebSocket, handshake ECDH firmado, cifrado de tramas, mensajes cifrados en reposo (DEK por sala), historial, borrado de mensajes, silencio, inactividad y latidos de sesión y membresía | `chat`: `room_keys`, `messages` | 2, 7, 10, 14 |
 | **media** | Subida, tope de tamaño, ClamAV, política (cuarentena, rechazo o publicación), cifrado de archivos en reposo, descarga con URL firmada, panel de cuarentena | `media`: `files` + volumen de archivos cifrados | 2, 6, 9, 12 |
@@ -136,7 +138,7 @@ Navegador (React SPA + WebCrypto) · Postman (primer parcial)
 Cada servicio es un proyecto Python independiente (`services/<svc>/`, paquete `<svc>_svc`) que comparte una librería común (`services/shared/`, paquete `shared`) y una única plantilla de `Dockerfile` (argumento `SERVICE`).
 
 ### 4.3 Modelo de confianza
-1. **Autenticación centralizada en el gateway.** Antes de enrutar una ruta protegida, Nginx hace un `auth_request` a `auth /internal/verify`. `auth` valida el JWT (firma RS256, `iss`, `aud`, `exp`), la sesión a la que apunta (`sid` activa, etapa `full`, sin vencer y con la misma cookie de dispositivo) y la cuenta (no suspendida). Si responde 2xx, el gateway copia la identidad que devolvió (`X-User-Id`, `X-User-Name`, `X-Session-Id`, `X-User-Perms`) a la petición hacia el servicio.
+1. **Autenticación centralizada en el gateway.** Antes de enrutar una ruta protegida, Nginx hace un `auth_request` a `auth /internal/verify`. `auth` valida el JWT (firma RS256, `iss`, `aud`, `exp`), la sesión a la que apunta (`sid` activa, etapa `full` y sin vencer) y la cuenta (no suspendida). Si responde 2xx, el gateway copia la identidad que devolvió (`X-User-Id`, `X-User-Name`, `X-Session-Id`, `X-User-Perms`) a la petición hacia el servicio.
    - **Los permisos salen de la BD en ese momento, no del token**, así que un rol quitado deja de valer en la siguiente petición.
    - **Toda cabecera de identidad que mande el cliente se sobrescribe o se vacía** en todas las rutas, y el JWT no se reenvía a los servicios.
 2. **Autorización en cada servicio.** El servicio decide si esa identidad puede hacer la operación: permiso del catálogo (`require_perm`), dueño o miembro de la sala (rooms), modo de la sala y silencio (chat y media, que se lo consultan a rooms).
@@ -313,14 +315,11 @@ CREATE TABLE user_sessions (
   user_id     uuid NOT NULL REFERENCES users(id),
   stage       text NOT NULL CHECK (stage IN ('preauth','full')),
   mfa         boolean NOT NULL,                     -- la sesión pasó por TOTP
-  device_hash bytea NOT NULL,                       -- SHA-256 de la cookie de dispositivo
   last_seen   timestamptz NOT NULL DEFAULT now(),
   expires_at  timestamptz NOT NULL,                 -- preauth: 5 min; full: 8 h absolutas
   ended_at    timestamptz,
-  end_reason  text                                  -- logout | replaced | expired | suspended | password_changed | mfa_passed
+  end_reason  text                                  -- logout | expired | suspended | password_changed | mfa_passed
 );
-CREATE UNIQUE INDEX one_full_session_per_user
-  ON user_sessions (user_id) WHERE stage = 'full' AND ended_at IS NULL;      -- riesgo 13
 CREATE TABLE failed_attempts (
   id         bigserial PRIMARY KEY,
   key        text NOT NULL,                       -- 'user:<u>' | 'ip:<ip>' | 'register:<ip>'
@@ -329,7 +328,6 @@ CREATE TABLE failed_attempts (
 CREATE INDEX ON failed_attempts (key, created_at);
 ```
 - La migración carga el catálogo de permisos y los roles semilla `user` (`rooms:create`) y `admin` (todos los permisos).
-- Una sesión vencida que todavía no tiene `ended_at` bloquearía el índice único: el login primero marca como `expired` las sesiones del usuario que ya vencieron.
 
 ### 7.2 BD `rooms`
 ```sql
@@ -448,12 +446,14 @@ Para cada servicio con BD `<svc>` ∈ {auth, rooms, chat, media, audit}:
 ## 8. Contratos HTTP
 
 ### 8.1 API pública (vía gateway)
+> **Primer parcial:** las rutas de `auth` y `stego` son las de §23.4 y §23.7; esta tabla es el diseño del sistema completo.
+
 **Identidad:** "—" = pública; "usuario" = JWT válido verificado por el gateway; un permiso (`stego:analyze`) = además ese permiso; "dueño" = dueño de la sala o `rooms:manage_any`; "miembro" = miembro actual de la sala.
 
 | Método | Ruta | Servicio | Identidad | Descripción |
 |---|---|---|---|---|
 | POST | `/api/auth/register` | auth | — | `{username, password, alias}` → `201 {id, username, alias}`. Sin roles; el alias es único y solo es el nombre visible (RF-20) |
-| POST | `/api/auth/login` | auth | — | `{username, password}` → `200 {access_token, token_type: "Bearer", expires_in}` + cookies `__Host-session` (y `__Host-device` si faltaba). Con un permiso de admin → `200 {mfa: "required" \| "setup"}` + cookie de etapa `preauth` |
+| POST | `/api/auth/login` | auth | — | `{username, password}` → `200 {access_token, token_type: "Bearer", expires_in}` + cookie `__Host-session`. Con un permiso de admin → `200 {mfa: "required" \| "setup"}` + cookie de etapa `preauth` |
 | POST | `/api/auth/totp/setup` | auth | cookie `preauth`, sin TOTP confirmado | → `{otpauth_uri}` |
 | POST | `/api/auth/totp` | auth | cookie `preauth` | `{code}` → sesión `full` con id nuevo; mismo cuerpo y cookies que el login |
 | POST | `/api/auth/logout` | auth | usuario | Termina la sesión y cierra sus WebSockets (204) |
@@ -493,7 +493,7 @@ Para cada servicio con BD `<svc>` ∈ {auth, rooms, chat, media, audit}:
 
 **JWT:** RS256 firmado con `jwt_signing_key`. Claims: `iss` (`auth`), `aud` (`secure-chat`), `sub` (id del usuario), `sid` (id de la sesión), `name` (username), `stage` (`preauth` o `full`), `roles` (nombres, solo informativo), `iat` y `exp` (el vencimiento absoluto de la sesión). La autorización nunca usa los roles del token: usa los permisos que `auth` lee de la BD en cada request.
 
-**Cookies:** `__Host-session` (el JWT) y `__Host-device` (128 bits aleatorios, sin fingerprinting), las dos con prefijo `__Host-` (Secure, Path=/, sin Domain), `HttpOnly` y `SameSite=Strict`. Ningún token es accesible desde JavaScript; la SPA no lee el `access_token` del cuerpo. Los clientes de API (Postman) mandan el token en `Authorization: Bearer` y conservan `__Host-device` en su almacén de cookies.
+**Cookies:** `__Host-session` (el JWT), con prefijo `__Host-` (Secure, Path=/, sin Domain), `HttpOnly` y `SameSite=Strict`. Ningún token es accesible desde JavaScript; la SPA no lee el `access_token` del cuerpo. Los clientes de API (Postman) mandan el token en `Authorization: Bearer`. En el primer parcial no hay cookies (§23.1).
 
 **CSRF:** además de SameSite=Strict, la dependencia `require_gateway` de la librería compartida rechaza con 403 (y audita `http.reject.origin`) los `POST/PUT/PATCH/DELETE` públicos cuyo `Origin` no esté en `ALLOWED_ORIGINS`. La colección de Postman manda `Origin: https://localhost`; la protección es para navegadores, que no permiten falsificar esa cabecera.
 
@@ -507,9 +507,11 @@ Para cada servicio con BD `<svc>` ∈ {auth, rooms, chat, media, audit}:
 - `max_members`: 2–50. `reason`: 1–200 caracteres sin controles.
 
 ### 8.2 API interna (nunca enrutada por el gateway)
+> **Primer parcial:** `GET /internal/verify` se reemplaza por `POST /internal/authorization/check` (§23.6).
+
 | Servicio | Método y ruta | Llamadores | Contrato |
 |---|---|---|---|
-| auth | `GET /internal/verify` | gateway | Lee `Authorization: Bearer` o la cookie `__Host-session`, más `__Host-device` → `204` + `X-User-Id`, `X-User-Name`, `X-Session-Id`, `X-User-Perms` (separados por comas; sin los `requires_mfa` si la sesión no pasó por TOTP; ausente si no hay permisos). Desliza `last_seen` · `401` |
+| auth | `GET /internal/verify` | gateway | Lee `Authorization: Bearer` o la cookie `__Host-session` → `204` + `X-User-Id`, `X-User-Name`, `X-Session-Id`, `X-User-Perms` (separados por comas; sin los `requires_mfa` si la sesión no pasó por TOTP; ausente si no hay permisos). Desliza `last_seen` · `401` |
 | auth | `POST /internal/sessions/heartbeat` | chat | `{session_ids: [...]}` → `last_seen = now()` en las activas · `200 {ended: [...]}` con las que ya no lo están |
 | rooms | `POST /internal/membership` | chat, media | `{room_id, user_id}` → `200 {alias, mode, is_owner, muted_until}`; `alias` es el alias de cuenta RF-20 y solo se devuelve si la sala está activa y es miembro actual · `404` |
 | rooms | `POST /internal/membership/heartbeat` | chat | `{members: [{room_id, user_id}]}` → `200 {states: [{room_id, user_id, member, muted_until}]}` |
@@ -550,16 +552,14 @@ Todos los servicios exponen además `GET /health` sin token (`{"status": "ok"}` 
 2. Argon2id verify. Si el usuario no existe se verifica contra un hash dummy, para no revelar por tiempo qué usuarios existen.
 3. Si falla: se registra el fallo, retraso progresivo `min(0.25·2^(n−1), 4)` s y `401 "credenciales inválidas"` (`auth.login.fail`).
 4. Cuenta suspendida (`suspended_until > now()`) → `403 "cuenta suspendida"` y `auth.login.suspended`. Se comprueba **después** de la contraseña.
-5. **Dispositivo:** si no llega `__Host-device`, se genera uno y se pone en la respuesta.
-6. **Una sesión por cuenta (R13):** se marcan como `expired` las sesiones vencidas del usuario. Si queda una sesión `full` activa con **otro** `device_hash` → `409 "ya hay una sesión activa en otro dispositivo"` y `auth.login.second_device` (warning). Si es del mismo dispositivo, se termina (`replaced`).
-7. Si el usuario tiene algún permiso `requires_mfa` → sesión `preauth` (5 min), JWT de etapa `preauth` en la cookie y `200 {mfa: "required"}`, o `{mfa: "setup"}` si todavía no confirmó su TOTP. Si no → sesión `full` (`mfa=false`), JWT y `auth.login.ok` (obligatoria).
-8. **TOTP** (`POST /api/auth/totp`): aplica el mismo bloqueo; descifra el secreto con `kek_auth` y verifica con `pyotp` (ventana ±1), rechazando si `step <= totp_last_step`. Si falla → se registra el fallo (`auth.totp.fail`). Si es válido → termina la sesión `preauth` (`mfa_passed`) y crea una sesión `full` **con un id nuevo** (contra la fijación de sesión) y `mfa=true`; 30 min de inactividad y 8 h absolutas. Auditoría `auth.login.ok`.
-9. **Configurar TOTP** (`POST /api/auth/totp/setup`, solo en `preauth` y sin TOTP confirmado): genera un secreto nuevo, lo guarda cifrado y responde el `otpauth_uri`. El primer código válido en `/api/auth/totp` fija `totp_confirmed_at` (`auth.totp.enrolled`). Con TOTP ya confirmado → 409.
-10. **Bootstrap:** `docker compose exec auth python -m auth_svc.create_admin <usuario>` pide la contraseña (o la lee con `--password-stdin`), crea la cuenta con el rol `admin` y el TOTP ya confirmado, e imprime el QR y el secreto.
+5. Si el usuario tiene algún permiso `requires_mfa` → sesión `preauth` (5 min), JWT de etapa `preauth` en la cookie y `200 {mfa: "required"}`, o `{mfa: "setup"}` si todavía no confirmó su TOTP. Si no → sesión `full` (`mfa=false`), JWT y `auth.login.ok` (obligatoria).
+6. **TOTP** (`POST /api/auth/totp`): aplica el mismo bloqueo; descifra el secreto con `kek_auth` y verifica con `pyotp` (ventana ±1), rechazando si `step <= totp_last_step`. Si falla → se registra el fallo (`auth.totp.fail`). Si es válido → termina la sesión `preauth` (`mfa_passed`) y crea una sesión `full` **con un id nuevo** (contra la fijación de sesión) y `mfa=true`; 30 min de inactividad y 8 h absolutas. Auditoría `auth.login.ok`.
+7. **Configurar TOTP** (`POST /api/auth/totp/setup`, solo en `preauth` y sin TOTP confirmado): genera un secreto nuevo, lo guarda cifrado y responde el `otpauth_uri`. El primer código válido en `/api/auth/totp` fija `totp_confirmed_at` (`auth.totp.enrolled`). Con TOTP ya confirmado → 409.
+8. **Bootstrap:** `docker compose exec auth python -m auth_svc.create_admin <usuario>` pide la contraseña (o la lee con `--password-stdin`), crea la cuenta con el rol `admin` y el TOTP ya confirmado, e imprime el QR y el secreto.
 
 **Verify** (`GET /internal/verify`, en cada request que pasa por el gateway):
 1. JWT válido: firma RS256 con la clave pública de `jwt_signing_key`, `iss`, `aud`, `exp` y `stage = full`.
-2. Sesión `sid`: etapa `full`, sin `ended_at`, `expires_at > now()`, `last_seen > now() − 30 min` y `device_hash` igual al SHA-256 de `__Host-device`. Si el dispositivo no coincide → 401 y `auth.verify.device_mismatch` (warning).
+2. Sesión `sid`: etapa `full`, sin `ended_at`, `expires_at > now()` y `last_seen > now() − 30 min`.
 3. Cuenta no suspendida.
 4. Permisos: la unión de los permisos de sus roles; si la sesión no pasó por TOTP, sin los `requires_mfa`. Así, quien recibe un rol de admin a mitad de una sesión necesita volver a entrar con TOTP para usarlo.
 5. Desliza `last_seen` y responde 204 con las cabeceras de identidad. Cualquier otro caso → 401.
@@ -670,6 +670,8 @@ Si suspenden al dueño, sus salas siguen funcionando para los demás miembros; e
 - La cuarentena es solo del admin global: un dueño podría liberar un payload en su propia sala.
 
 ### 9.9 API de esteganografía (primer parcial)
+> **Reemplazada por §23.7:** la ruta es `/api/steganography/analyze`, `stego` guarda cada análisis y los códigos son 413/415/422.
+
 `POST /api/stego/analyze` (multipart `file`, permiso `stego:analyze`):
 1. Tope de 5 MB (Nginx y la app).
 2. Como máximo 10 análisis por minuto por usuario (token bucket en memoria por `X-User-Id`; si no → 429 y `stego.ratelimited`).
@@ -744,7 +746,7 @@ Desde la revisión 4, `session_id` es el id de la sesión de la cuenta (`sid`). 
 | `postgres_password` | 32 bytes b64url | db |
 
 - Cada servicio lee sus secretos desde `/run/secrets/*` al arrancar y **no arranca si falta alguno**. Ningún secreto va en el código, en variables de entorno ni en un `.env` versionado.
-- El JWT no se guarda en ninguna parte: la BD solo tiene el id de la sesión a la que apunta, y sin `jwt_signing_key` nadie puede fabricar uno. La cookie de dispositivo se guarda como SHA-256.
+- El JWT no se guarda en ninguna parte: la BD solo tiene el id de la sesión a la que apunta, y sin `jwt_signing_key` nadie puede fabricar uno.
 - Argon2id para las contraseñas y las claves de sala, con un **tope de 4 verificaciones concurrentes** por proceso (4 × 64 MiB) para que un ataque de logins o ingresos masivos no agote la memoria.
 
 ### 11.2 Envelope encryption
@@ -814,6 +816,8 @@ Se necesitan ≥ 30 imágenes limpias reales (fotos de celular y capturas de pan
 Audio WAV: LSB sobre las muestras PCM (chi² y RS se adaptan a 16 bits); sanitización aleatorizando el LSB de las muestras. PDF y video: firma + ClamAV + política de rechazo hasta definir un análisis específico.
 
 ### 12.7 Veredicto
+> **Primer parcial:** los veredictos y la política son los de §23.7 (`sin_indicios`, `sospechoso`, `no_concluyente`, `error`). Equivalencias: `limpia` → `sin_indicios`; `problema` y `revision_manual` → `sospechoso`; tiempo excedido → `no_concluyente`; `invalida` → `error`.
+
 | Veredicto | Cuándo | Respuesta |
 |---|---|---|
 | `invalida` | La validación previa (§12.1) falla: firma que no coincide o formato no admitido, más de 5 MB, más de 20 MP, decodificación fallida o formato decodificado distinto de la firma | `422 {"error": "archivo no permitido", "motivos": [...]}` |
@@ -867,7 +871,7 @@ En JPEG, `checks` trae `trailing_bytes` y `metadata_bytes`. `chi2_p` y `rs_rate`
 - **`auth_request`:** una sola ubicación `internal` (`/_auth/user` → `auth /internal/verify`) que incluye solo `proxy-base.conf`, con `proxy_pass_request_body off`, `Content-Length ""` y `X-Original-URI`. Así las cookies y el `Authorization` originales llegan a `auth`. La identidad se toma con `auth_request_set $x $upstream_http_x_…`.
 - **Snippets de proxy** (en cada `location` se incluye exactamente uno, porque `proxy_set_header` no se hereda cuando una `location` declara los suyos):
   - `proxy-base.conf`: `Host`, `X-Real-IP $remote_addr`, `X-Forwarded-For $remote_addr` (sobrescribe, no concatena), `X-Forwarded-Proto https` y el token del gateway (`include /run/secrets/gateway_token_conf`, el secreto que se genera en `deploy/secrets/gateway_token.conf`).
-  - `proxy-public.conf`: base + **vacía** las 4 cabeceras `X-User-*` y `Authorization`. Las cookies sí pasan, porque `auth` las necesita en el login (dispositivo) y en el TOTP (etapa `preauth`).
+  - `proxy-public.conf`: base + **vacía** las 4 cabeceras `X-User-*` y `Authorization`. Las cookies sí pasan, porque `auth` las necesita en el TOTP (etapa `preauth`). En el primer parcial no pasa ninguna (§23.5).
   - `proxy-user.conf`: base + `X-User-*` desde `auth_request` + `Authorization ""` y `Cookie ""`: ni el JWT ni las cookies viajan a los servicios.
 - **Correlación (RNF-19):** el gateway genera `X-Request-ID` (`$request_id`), sobrescribe el del cliente y lo manda en `proxy-base.conf`, tanto a los servicios como al `auth_request` (la subpetición comparte variables con la petición, así que es el mismo id). Vuelve **una sola vez** al cliente (`add_header` a nivel `server`; los servicios no lo devuelven). Cada servicio toma el id (si cumple `^[A-Za-z0-9-]{8,64}$`, o crea uno), lo pone en sus registros, lo reenvía en `ServiceClient` y lo manda a `audit`, que lo guarda en `details.request_id` dentro del hash de la cadena.
 - **Registros (RNF-18):** una línea JSON por petición en el gateway y en cada servicio (`ts`, `service`, `level`, `request_id`, `logger`, `msg`, y `method`, `path`, `status`, `ms`), **sin query string**. uvicorn corre con `--no-access-log` y `LOG_FORMAT=json`.
@@ -890,7 +894,7 @@ En JPEG, `checks` trae `trailing_bytes` y `metadata_bytes`. `chi2_p` y `rs_rate`
 ### 14.2 Eventos
 | Servicio | info | warning | critical |
 |---|---|---|---|
-| auth | `user.registered`, `auth.login.ok`, `auth.logout`, `auth.password.changed`, `auth.totp.enrolled`, `user.reactivated`, `user.roles.changed`, `role.created`, `role.permissions.changed`, `role.deleted`, `admin.create`, `key.rotate.auth` | `auth.login.fail`, `auth.login.locked`, `auth.login.suspended`, `auth.login.second_device`, `auth.totp.fail`, `auth.verify.device_mismatch`, `auth.register.ratelimited`, `user.suspended`, `admin.guard.last_admin` | — |
+| auth | `user.registered`, `auth.login.ok`, `auth.logout`, `auth.password.changed`, `auth.totp.enrolled`, `user.reactivated`, `user.roles.changed`, `role.created`, `role.permissions.changed`, `role.deleted`, `admin.create`, `key.rotate.auth` | `auth.login.fail`, `auth.login.locked`, `auth.login.suspended`, `auth.totp.fail`, `auth.register.ratelimited`, `user.suspended`, `admin.guard.last_admin` | — |
 | rooms | `room.created`, `room.updated`, `room.closed`, `room.owner.transferred`, `room.member.joined`, `room.member.left`, `room.member.unbanned`, `room.member.unmuted` | `room.join.fail`, `room.join.ratelimited`, `room.join.full`, `room.join.alias_taken`, `room.join.banned`, `room.limit.reached`, `room.member.kicked`, `room.member.muted`, `room.forbidden` | — |
 | chat | `message.deleted`, `key.rotate.chat` | `ws.reject.{origin,handshake,replay,rate,size,forbidden,malformed,membership}`, `ws.muted` | `ws.tamper` |
 | media | `file.accepted`, `file.released`, `file.deleted`, `key.rotate.media` | `file.quarantined`, `file.rejected.{type,invalid,size,forbidden,muted}`, `file.download.denied`, `file.integrity.failed`, `clamav.unavailable`, `stego.unavailable` | `file.rejected.malware` |
@@ -913,7 +917,7 @@ El panel del admin global (permiso `audit:read`) pide `GET /api/admin/audit?min_
 ---
 
 ## 15. Manejo de errores
-- El cliente siempre recibe mensajes **genéricos** en JSON `{"error": "…"}` ("credenciales inválidas", "sala o clave inválida", "permiso insuficiente", "cuenta suspendida", "ya hay una sesión activa en otro dispositivo", "usuario no disponible", "no puedes entrar a esta sala", "estás silenciado", "archivo no permitido", "archivo retenido para revisión", 404 en descargas negadas). El detalle va a auditoría.
+- El cliente siempre recibe mensajes **genéricos** en JSON `{"error": "…"}` ("credenciales inválidas", "sala o clave inválida", "permiso insuficiente", "cuenta suspendida", "usuario no disponible", "no puedes entrar a esta sala", "estás silenciado", "archivo no permitido", "archivo retenido para revisión", 404 en descargas negadas). El detalle va a auditoría.
 - El login no revela si un usuario existe (hash dummy y el mismo mensaje). El registro sí lo revela con `409`, porque es inevitable; lo limita el tope de 10 registros por IP por hora.
 - Excepciones no controladas: handler global → `500 {"error":"error interno"}` + log en stdout sin datos sensibles. FastAPI sin docs ni OpenAPI públicos (`docs_url=None`, `openapi_url=None`).
 - Errores de validación: `422 {"error":"datos inválidos"}`, sin repetir la entrada.
@@ -934,7 +938,7 @@ El panel del admin global (permiso `audit:read`) pide `GET /api/admin/audit?min_
 
 ### 16.2 End-to-end (`e2e/`)
 pytest + httpx + `websockets` contra el stack completo vía `https://localhost`, verificando TLS con la CA de mkcert. Crea su admin con `create_admin --password-stdin` (y calcula el TOTP con el secreto que imprime). Cubre lo que cruza servicios:
-- **Cuentas:** registro → login → un segundo dispositivo se rechaza; un usuario sin `stego:analyze` → 403, con el rol asignado → 200, sin volver a iniciar sesión; suspensión → 401 en la siguiente petición y el WS se cierra.
+- **Cuentas:** registro → login; un usuario sin `stego:analyze` → 403, con el rol asignado → 200, sin volver a iniciar sesión; suspensión → 401 en la siguiente petición y el WS se cierra.
 - Chat entre dos clientes con *hello* firmado verificado; expulsión → 4411 y reingreso vetado → 403.
 - Imagen limpia → publicada y descargable; imagen con LSB → cuarentena y alerta visible en `GET /api/admin/audit`.
 - Gateway: `/internal/*` → 404; `X-User-*` enviados por el cliente se ignoran; `http://` → 301.
@@ -959,7 +963,7 @@ Se ejecuta en local antes de cada hito.
 | 10 | chat, stego | Rate de mensajes → 4429; trama mayor a 16 KB → 4413; sin `hello` en 10 s → 4400; más de 10 análisis por minuto → 429 |
 | 11 | todos los servicios con BD | `<svc>_app` no puede `CREATE TABLE`/`DROP` ni conectarse a otra BD |
 | 12 | media | Firma inválida, vencida, de otro usuario o de alguien que ya no es miembro → 404; archivo en cuarentena no descargable |
-| 13 | auth (+e2e) | Login desde otro dispositivo con la sesión viva → 409; el JWT con otra cookie de dispositivo → 401; tras logout o vencimiento, el otro dispositivo entra; el índice único impide dos sesiones `full` |
+| 13 | auth (+e2e) | Tras logout, vencimiento o desactivar la cuenta, el mismo JWT → 401 (la restricción de dispositivos llega con las salas) |
 | 14 | chat | El `from` del payload se ignora; AAD de otra sala → 4400; `seq` repetido → 4408; borrar un mensaje ajeno sin ser dueño → 4403 |
 | 15 | rooms | 20 ingresos concurrentes con cupo 5 → exactamente 5 aceptados; el `CHECK` impide superar el máximo; 3 creaciones concurrentes del mismo dueño → 2 salas |
 | 16 | shared y cada servicio (+e2e) | Sin token → 401; token de un llamador fuera de la allowlist → 403; cabeceras de identidad sin el token del gateway → ignoradas (401); e2e: `/internal/*` → 404 y cabeceras falsificadas ignoradas |
@@ -1052,7 +1056,6 @@ Los tickets de cada persona (Zaith, Andrés y Stefany), uno por archivo, están 
 | Fecha de la defensa del parcial y rúbrica desconocidas | Meta de demo: 30 oct. Preguntar en clase; el orden de los tickets deja primero lo que pide el docente |
 | El docente construye en clase su propio microservicio de usuarios | Si exige usar el suyo, se adapta `auth` manteniendo los contratos de §8 |
 | Postman no envía `Origin` | La colección fija `Origin: https://localhost` (la protección CSRF es para navegadores) |
-| Postman podría no conservar la cookie `__Host-device` y entonces `verify` respondería 401 | Probarlo en el primer día de GW-1; si falla, la colección guarda la cookie del login en una variable y la manda en la cabecera `Cookie` |
 | El docente puede pedir más formatos | Punto de extensión `FORMATS` (§12.1, §12.6) |
 | ClamAV usa ~1.5–3 GB de RAM y tarda minutos en cargar firmas | VPS con ≥ 4 GB; healthcheck de clamd con `start_period`; en ARM usar `clamav/clamav-debian` (variable `CLAMAV_IMAGE`). En el primer parcial no se levanta |
 | `jpegio` puede no tener wheels para Python 3.13 | Es *stretch*; JPEG queda cubierto por estructura + recodificación |
@@ -1076,7 +1079,7 @@ El resumen del docente (`PROYECTO INTEGRADOR - RESUMEN.docx`) repite el enunciad
 | B-06 · "Cierre" de sala nombrado "eliminar" | §8.1 y §9.3; botón *Cerrar sala* |
 | B-07 · Alertas solo como filas de una tabla | Contador de alertas nuevas en el dashboard (§14.3) |
 | B-08 · Sin informe de pruebas | `docs/informe-pruebas.md` en E2E-3 |
-| B-09 · "Único dispositivo" por cookie sin declarar | Limitación 7 (§3) |
+| B-09 · "Único dispositivo" | Fuera del primer parcial (§23.1); limitación 7 (§3) |
 
 La pregunta abierta de esta revisión (¿cuentas registradas o alias + dispositivo?) quedó respondida en la clase del 22/10: el docente pidió usuarios con roles (§22).
 
@@ -1117,3 +1120,248 @@ El 20/10 una rama paralela del equipo transcribió los requisitos de la Activida
 | RNF-08, 09, 13 · usabilidad | Prueba de contraste y Lighthouse ≥ 90 | FE-5 | Incremento 3 |
 
 No se adoptan, salvo que el docente los pida: la prueba de 500 conexiones con 25 contenedores (RNF-06; si hace falta, una versión de 20 a 50 participantes con p95), `bench_formats` (solo hay dos formatos), la prueba con 5 personas y todo lo del otro diseño (correo, Mailpit, canal general, 9 formatos).
+
+---
+
+## 23. Revisión 5: enunciado oficial del primer parcial (2026-11-03)
+
+El docente publicó el enunciado del primer parcial (`Proyecto_Integrador_Primer_Parcial.pdf`, entrega el **04/11/2026** a la hora de clase, rúbrica de 20 puntos). **Esta sección manda sobre el resto de la spec y sobre los planes y tickets del primer parcial.** Lo que no aparece aquí sigue como estaba.
+
+### 23.1 Decisiones
+
+| Tema | Decisión |
+|---|---|
+| Integración | **Se mantiene el gateway** con `auth_request` (decisión del equipo, 2026-11-03). La subpetición pasa a ser `POST /internal/authorization/check`: `auth` decide permitir o denegar **por acción** y el gateway la llama en nombre de `stego` (§23.6). `stego` conserva `require_perm` como segunda barrera |
+| Cuentas | Las crea el rol ADMIN con `POST /api/users`. Desaparecen el registro abierto (`/api/auth/register`) y el alias |
+| Dispositivo | **Sin cookie de dispositivo y sin sesión única por cuenta**: el enunciado excluye la restricción de dispositivos (§1.3). Una cuenta puede tener varias sesiones; cada una se revoca con `logout` o al desactivar la cuenta |
+| Cookies | El parcial no usa cookies: el login devuelve el token solo en el cuerpo y `check` solo lee `Authorization: Bearer`. `__Host-session` vuelve con la SPA |
+| Roles | Tres roles semilla, **ADMIN, ANALYST y USER**, con permisos de un catálogo en la BD (§23.3). Se pueden crear más con `POST /api/roles` |
+| `stego` | **Guarda cada análisis** en su propia BD y expone `GET /api/steganography/results/{id}`. Los veredictos y la política cambian a los del enunciado (§23.7) |
+| Códigos | 401 sin autenticación válida, 403 sin permiso, 413 por tamaño, 415 por formato no admitido |
+| Formatos | PNG con análisis de píxeles (chi², RS, entropía) y estructura; JPEG, GIF y WAV con lo que ya tienen. STG-6 y STG-7 no bloquean la entrega |
+| Documentación de la API | OpenAPI de cada servicio exportado a `docs/openapi/` con `app.openapi()`. Las apps no lo publican (`openapi_url=None` en `shared.web`) |
+
+### 23.2 Desviaciones del enunciado que se justifican en el informe
+
+1. **Quién pide la decisión a AUTH.** El enunciado describe a STEGO verificando el JWT y llamando a `/internal/authorization/check`. Aquí lo hace el gateway antes de enrutar: el archivo nunca llega a `stego` sin una decisión válida, y `stego` rechaza toda petición que no traiga el token de servicio del gateway (R16).
+2. **El JWT no llega a STEGO.** El gateway no lo reenvía, para no exponer el token en la red interna. La firma, `iss`, `aud`, `exp` y la sesión las verifica `auth` en cada petición.
+3. **Canal interno sin TLS.** El tramo gateway → servicio viaja por redes Docker internas (`internal: true`), con token de servicio por llamador y contenedores sin privilegios (`cap_drop: ALL`). Es la limitación 3 de §3; la mejora es mTLS.
+
+### 23.3 Modelo de datos de `auth` (Anexo A del enunciado)
+
+```sql
+CREATE TABLE users (
+  id            uuid PRIMARY KEY,
+  username      text UNIQUE NOT NULL CHECK (username ~ '^[a-z0-9_.-]{3,32}$'),  -- normalizado a minúsculas
+  email         text UNIQUE NOT NULL CHECK (length(email) <= 254 AND email ~ '^[^@[:space:]]+@[^@[:space:]]+$'),  -- en minúsculas
+  password_hash text NOT NULL,                                   -- $argon2id$...
+  status        text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  created_by    uuid REFERENCES users(id),                       -- NULL: lo creó el CLI
+  updated_by    uuid REFERENCES users(id)
+);
+CREATE TABLE permissions (                                       -- catálogo fijo; lo carga la migración
+  code        text PRIMARY KEY,
+  description text NOT NULL
+);
+CREATE TABLE roles (
+  id          uuid PRIMARY KEY,
+  name        text UNIQUE NOT NULL CHECK (name ~ '^[A-Z][A-Z0-9_]{2,31}$'),
+  description text NOT NULL DEFAULT '',
+  status      text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
+  builtin     boolean NOT NULL DEFAULT false,                    -- ADMIN, ANALYST y USER
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  created_by  uuid REFERENCES users(id),
+  updated_by  uuid REFERENCES users(id)
+);
+CREATE TABLE role_permissions (
+  role_id    uuid NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+  permission text NOT NULL REFERENCES permissions(code),
+  PRIMARY KEY (role_id, permission)
+);
+CREATE TABLE user_roles (                                        -- la relación N:M
+  id          uuid PRIMARY KEY,
+  user_id     uuid NOT NULL REFERENCES users(id),
+  role_id     uuid NOT NULL REFERENCES roles(id),
+  assigned_at timestamptz NOT NULL DEFAULT now(),
+  assigned_by uuid REFERENCES users(id),
+  UNIQUE (user_id, role_id)                                      -- T06: sin asignaciones duplicadas
+);
+CREATE TABLE user_sessions (
+  id         uuid PRIMARY KEY,                                   -- claim `sid` del JWT
+  user_id    uuid NOT NULL REFERENCES users(id),
+  expires_at timestamptz NOT NULL,                               -- igual al `exp` del JWT
+  ended_at   timestamptz,
+  end_reason text                                                -- logout | user_inactive
+);
+CREATE TABLE failed_attempts (                                   -- bloqueo del login (FND-3)
+  id         bigserial PRIMARY KEY,
+  key        text NOT NULL,                                      -- 'user:<u>' | 'ip:<ip>'
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX ON failed_attempts (key, created_at);
+```
+
+- `auth_app` hace DML sobre estas tablas, salvo `permissions`, que solo lee. No puede `DELETE` en `users` ni en `roles`: se desactivan con `status`. Sí puede `DELETE` en `user_roles` (retirar una asignación).
+
+**Catálogo y matriz de roles** (lo carga la migración; los roles son filas, no constantes del código):
+
+| Permiso | Qué permite | ADMIN | ANALYST | USER |
+|---|---|:-:|:-:|:-:|
+| — (solo autenticación) | `GET /api/auth/profile`, `POST /api/auth/logout` | ✓ | ✓ | ✓ |
+| `users.manage` | `/api/users` | ✓ | | |
+| `roles.manage` | `/api/roles` y `/api/user-roles` | ✓ | | |
+| `steganography.analyze` | `POST /api/steganography/analyze` | ✓ | ✓ | |
+| `steganography.results.read` | `GET /api/steganography/results/{id}` de sus propios análisis | ✓ | ✓ | |
+| `steganography.results.read_any` | Leer el análisis de cualquier usuario | ✓ | | |
+
+- **Permisos vigentes** = la unión de los permisos de los roles **activos** asignados a una cuenta **activa**. Se calculan en cada petición; el claim `roles` del JWT no autoriza nada.
+- **Sin escalada (R5):** solo una cuenta con el rol ADMIN puede asignar o retirar ADMIN y crear o editar un rol que incluya `users.manage` o `roles.manage`; cualquier otro caso → 403 y `authz.denied`.
+- **ADMIN** no se edita ni se desactiva. **Nunca sin admin:** desactivar al último ADMIN activo o retirarle su rol → 409 y `admin.guard.last_admin` (con `pg_advisory_xact_lock`). Nadie se desactiva a sí mismo.
+
+### 23.4 API pública de `auth` (vía gateway)
+
+| Método | Ruta | Acceso | Contrato |
+|---|---|---|---|
+| POST | `/api/auth/login` | Público, zona `login` del gateway y bloqueo de FND-3 | `{username, password}` → `200 {access_token, token_type: "Bearer", expires_in}` · `401 "credenciales inválidas"` (mismo mensaje si el usuario no existe) · `403 "cuenta inactiva"` (después de verificar la contraseña) · `429` + `Retry-After` |
+| GET | `/api/auth/profile` | Autenticado | `{id, username, email, status, roles: [nombre], permissions: [código]}` |
+| POST | `/api/auth/logout` | Sesión autenticada | Termina la sesión del `sid` (`ended_at`, `logout`) → `204`. El mismo JWT da 401 después |
+| POST | `/api/users` | `users.manage` | `{username, email, password}` → `201 {id, username, email, status, created_at}`. Nace sin roles · `409 "usuario no disponible"` |
+| GET | `/api/users` | `users.manage` | `[{id, username, email, status, roles: [{assignment_id, role_id, name}], created_at, updated_at}]` (hasta 200) |
+| PATCH | `/api/users/{id}` | `users.manage` | `{email?, status?}` → `200`. `status = inactive` termina sus sesiones (`user_inactive`) |
+| POST | `/api/roles` | `roles.manage` | `{name, description?, permissions: [código]}` → `201` · permiso fuera del catálogo → 422 · nombre repetido → 409 |
+| GET | `/api/roles` | `roles.manage` | `[{id, name, description, status, builtin, permissions, created_at, updated_at}]` |
+| PATCH | `/api/roles/{id}` | `roles.manage` | `{description?, status?, permissions?}` → `200`. ADMIN → 409 |
+| POST | `/api/user-roles` | `roles.manage` | `{user_id, role_id}` → `201 {id, user_id, role_id, assigned_at}` · repetida → `409 "asignación existente"` (T06) · usuario o rol inexistente → 404 |
+| DELETE | `/api/user-roles/{id}` | `roles.manage` | `204`; el permiso deja de valer en la siguiente petición (T07) |
+
+- **JWT:** RS256 fijo (`jwt_signing_key`, la privada solo en `auth`). Claims: `iss` (`auth`), `aud` (`secure-chat`), `sub` (id del usuario), `sid`, `name`, `roles` (informativo), `iat`, `exp` = `iat + JWT_TTL_MIN` (15 min por defecto). Sin refresh: al vencer, se vuelve a iniciar sesión.
+- Todos los cuerpos con `extra="forbid"`. Contraseña: la política de §8.1. `email`: se normaliza a minúsculas.
+- Eventos (`shared.audit.emit`): `auth.login.ok`, `auth.login.fail`, `auth.login.locked`, `auth.login.inactive`, `auth.logout`, `user.created`, `user.updated`, `role.created`, `role.updated`, `user_role.assigned`, `user_role.revoked`, `authz.denied`, `admin.guard.last_admin`, `admin.create`. Nunca el JWT ni la contraseña.
+
+### 23.5 Gateway
+
+| Ruta | Upstream | `auth_request` | Límite |
+|---|---|---|---|
+| `= /api/auth/login` | auth | — | zona `login` 1 r/s, ráfaga 5 |
+| `/api/auth/` | auth | sí | `api` |
+| `~ ^/api/(users\|roles\|user-roles)(/\|$)` | auth | sí | `api` |
+| `= /api/steganography/analyze` | stego | sí | `api`, `client_max_body_size 6m` (margen del multipart; la app corta en 5 MB) |
+| `/api/steganography/results/` | stego | sí | `api` |
+| cualquier otra `/api/…` o `/internal/…` | — | — | `404` JSON |
+
+- `/_auth/user` llama a `POST /internal/authorization/check` (`proxy_method POST`, sin cuerpo). Las cookies no pasan a ningún servicio (`Cookie ""` también en las rutas públicas).
+- La respuesta de `check` decide: 2xx → enruta con las `X-User-*` que devolvió; 401 → 401; 403 → 403; cualquier otra cosa o `auth` caído → 503 (T08).
+
+### 23.6 API interna de `auth`
+
+`POST /internal/authorization/check` · llamador: `gateway` (allowlist de `shared.service_auth`).
+
+- **Entrada:** `Authorization: Bearer <JWT>` (el `subject_token` del Anexo B) y `X-Original-URI` (la ruta pedida, de la que sale `action`). `resource_id` no se usa: la propiedad del recurso la decide el servicio que guarda el recurso (§23.7).
+- **Decisión:**
+  1. JWT válido: firma RS256, `iss`, `aud` y `exp`; si no → `401 {allowed: false, reason: "invalid_token"}`.
+  2. Sesión `sid` sin `ended_at` y sin vencer, y cuenta `active`; si no → `401 {allowed: false, reason: "session_ended" | "user_inactive"}`.
+  3. `action` según la ruta, comparada por segmentos completos (`^/api/users(/|$)`, igual que el gateway): `/api/auth/profile` y `/api/auth/logout` → `session` (solo autenticación); `/api/users` → `users.manage`; `/api/roles` y `/api/user-roles` → `roles.manage`; `/api/steganography/analyze` → `steganography.analyze`; `/api/steganography/results/{id}` → `steganography.results.read`; cualquier otra → 403.
+  4. Si los permisos vigentes incluyen `action` → `200 {subject_id, action, allowed: true, reason: "active_role_grants_permission"}` + `X-User-Id`, `X-User-Name`, `X-Session-Id` y `X-User-Perms` (todos los permisos vigentes, separados por comas). Si no → `403 {subject_id, action, allowed: false, reason: "no_active_role_grants_permission"}` y `authz.denied`.
+- La respuesta no es una autorización permanente: el gateway la pide en **cada** petición.
+
+### 23.7 `stego`
+
+**`POST /api/steganography/analyze`** (`steganography.analyze`, multipart `file`):
+
+1. Más de 10 análisis por minuto por usuario → 429 y `stego.ratelimited`.
+2. Más de 5 MB → `413 {"error": "archivo demasiado grande"}`, sin fila en `analyses` pero con el evento `stego.rejected` (tamaño, sin contenido).
+3. Extensión del nombre fuera de la lista del formato, `Content-Type` de la parte distinto del MIME del formato, o firma (*magic bytes*) que no coincide o no está en `FORMATS` → `415 {"error": "formato no admitido", "analysis_id"}`.
+4. Decodificación fallida, archivo truncado, más de 20 MP o formato decodificado distinto de la firma → `422 {"error": "archivo no permitido", "analysis_id"}`.
+5. El análisis corre en un `ProcessPoolExecutor` con `STEGO_TIMEOUT_S`. Los umbrales salen de `Settings` (`STEGO_CHI2_P`, `STEGO_RS_RATE`), no de constantes en la ruta.
+6. Aplica la política y guarda el registro: si es `cuarentena`, primero escribe el archivo y después hace el `INSERT`; si cualquiera de los dos falla → 503 (nunca `200`). Responde `200` con el registro.
+7. `filename`: se toma el basename, se normaliza a NFC, se quitan los caracteres de control y se trunca a 255 antes del `INSERT`. Nunca va en los eventos.
+
+| `status` | Cuándo | `action` | Archivo |
+|---|---|---|---|
+| `sin_indicios` | Ningún detector supera su umbral | `ninguna` | Se descarta |
+| `sospechoso` | Anomalía estructural (datos tras `IEND`/`FFD9`, chunks de texto o desconocidos, metadatos excesivos) o un detector estadístico ≥ umbral. Es un **indicio**, no una prueba | `cuarentena` | Se guarda en el volumen `stego_quarantine` (`noexec`, archivos `0600`) con el nombre `<analysis_id>`; ninguna ruta lo sirve |
+| `no_concluyente` | El análisis se pasó de tiempo o falló, o la imagen tiene menos de 1000 píxeles para los estadísticos. Nunca `sin_indicios` (fallar cerrado) | `advertencia` | Se descarta; evento `warning` |
+| `error` | 415 o 422 | `rechazo` | Se descarta sin analizar |
+
+```json
+{
+  "analysis_id": "<uuid>",
+  "user_id": "<uuid>",
+  "filename": "muestra.png",
+  "sha256": "<hex>",
+  "mime": "image/png",
+  "technique": "lsb_statistical_analysis",
+  "status": "sospechoso",
+  "indicators": {"chi2_p": 0.999, "chi2_p_threshold": 0.995, "rs_rate": 0.31, "rs_rate_threshold": 0.15,
+                 "lsb_entropy_mean": 0.99, "lsb_entropy_high_fraction": 0.4,
+                 "trailing_bytes": 0, "text_bytes": 0, "unknown_chunks": []},
+  "reasons": ["chi² del plano LSB"],
+  "action": "cuarentena",
+  "limitations": "Resultado indicativo, no prueba de esteganografía. LSB matching (±1) y el embebido adaptativo pueden evadir chi² y RS (ver docs/calibracion-estego.md).",
+  "created_at": "<iso8601>"
+}
+```
+
+- `technique`: `lsb_statistical_analysis` en PNG (chi², RS y entropía, más la estructura); `structure_analysis` en JPEG, GIF y WAV; `file_validation` en los `error`. Las métricas no calculables salen como `null`.
+- **`GET /api/steganography/results/{id}`** (`steganography.results.read`): el mismo JSON. Si el análisis es de otro usuario y no tiene `steganography.results.read_any` → `403` y `perm.denied` (T11). Inexistente → 404. La propiedad se compara con el `user_id` de la identidad del gateway, nunca con un parámetro. Distinguir 403 de 404 revela qué ids existen; lo mitigan los UUIDv4 y se declara como limitación.
+- **Persistencia:** BD `stego` propia (roles `stego_owner` y `stego_app`, igual que `auth`). `stego` nunca toca la BD de `auth`; `user_id` sale de la identidad del gateway y no tiene FK.
+
+```sql
+CREATE TABLE analyses (
+  id         uuid PRIMARY KEY,
+  user_id    uuid NOT NULL,
+  filename   text NOT NULL CHECK (length(filename) <= 255),   -- solo informativo; nunca se usa como ruta
+  mime       text,                                            -- NULL si se rechazó por formato
+  size_bytes integer NOT NULL,
+  sha256     char(64) NOT NULL,
+  technique  text NOT NULL,
+  status     text NOT NULL CHECK (status IN ('sin_indicios', 'sospechoso', 'no_concluyente', 'error')),
+  action     text NOT NULL CHECK (action IN ('ninguna', 'cuarentena', 'advertencia', 'rechazo')),
+  indicators jsonb NOT NULL,
+  reasons    jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX ON analyses (user_id, created_at);
+```
+
+- `stego_app` solo tiene `SELECT` e `INSERT` sobre `analyses`: los registros no se editan ni se borran.
+- **Límite de la cuarentena:** sin cuota ni retención automática en el parcial (10 análisis por minuto × 5 MB ≈ 3 GB/h por usuario en el peor caso). Se declara como limitación; la limpieza es manual (`docker volume`).
+- `stego` se monta sobre `shared.web.create_base_app` (token de servicio, errores `{"error": …}`) y lee la identidad con `shared.identity`. Eventos: `stego.analyzed` (`info` si es `sin_indicios`, `warning` en los demás), `stego.rejected`, `stego.ratelimited`, `stego.result.read`, `perm.denied`; con `sha256`, `status` y `action`, nunca el contenido del archivo.
+
+### 23.8 Entregables
+
+| Entregable | Dónde | Ticket |
+|---|---|---|
+| `README.md` con clonar, configurar (`gen_secrets.py`, mkcert), levantar, crear el admin y correr las pruebas | raíz | PAR-3 |
+| `.env.example` por servicio, solo con variables no secretas (los secretos los genera `gen_secrets.py`) | `services/auth/`, `services/stego/` | ATH-1, STG-3 |
+| Migraciones de `auth` y de `stego` | `services/<svc>/migrations/` | ATH-1, STG-3 |
+| `docker-compose.yml` con `db`, `auth`, `auth-migrate`, `stego`, `stego-migrate` y `gateway` | `deploy/` | GW-1 |
+| OpenAPI de los dos servicios, con la API interna | `docs/openapi/auth.json`, `docs/openapi/stego.json` | ATH-4, STG-3 |
+| Diagrama de arquitectura con límites de confianza y diagrama entidad-relación (Mermaid) | `docs/informe-parcial-1.md` | PAR-2 |
+| JWT, RBAC y comprobación de roles vigentes; matriz de roles y permisos (§23.3) | informe | PAR-2 |
+| Justificación del método de estegoanálisis, formatos, parámetros y limitaciones | informe y `docs/calibracion-estego.md` | STG-4, PAR-2 |
+| Matriz activos → amenazas → vulnerabilidades → riesgos → controles (Anexo E), ligada a Zero Trust, Secure by Design, Shift Left e ISO/IEC 27001/27034 | informe (sale de `docs/trazabilidad-riesgos.md` y `docs/cumplimiento-normativo.md`) | PAR-2 |
+| Resultados de `pytest` de `shared`, `auth` y `stego` | `docs/evidencias/` | PAR-2 |
+| Colección REST con T01–T12 | `docs/postman/` | PAR-1 |
+| Imagen de referencia y la misma con LSB embebido, más las de rechazo | `docs/demo-imagenes/` | STG-4 |
+| Registros de la demo depurados (sin JWT, contraseñas ni secretos) | `docs/evidencias/eventos-demo.log` | PAR-3 |
+
+### 23.9 Escenarios mínimos (Anexo D)
+
+| ID | Cómo se demuestra | Esperado |
+|---|---|---|
+| T01 | `docker compose stop stego` / `start stego` y lo mismo con `auth`: cada uno con su contenedor, su imagen y su `/health`; el otro sigue respondiendo por su ruta | Procesos autónomos |
+| T02 | Login con la contraseña correcta y con una incorrecta | `200` con JWT / `401` |
+| T03 | Analizar sin `Authorization`, con el JWT alterado y con uno vencido (`test_jwt_vencido_401`; en vivo, un token pedido al inicio de la demo cuando pasa su `exp`) | `401` |
+| T04 | Cuenta con solo USER analiza | `403` |
+| T05 | Una cuenta con ANALYST y USER; ANALYST asignado a dos cuentas | `GET /api/users` lo muestra |
+| T06 | Repetir una asignación | `409`, sin fila duplicada |
+| T07 | `DELETE /api/user-roles/{id}` y analizar con el mismo JWT | `403` |
+| T08 | `docker compose stop auth` y analizar | `503`; ningún `stego.analyzed` en los registros |
+| T09 | `docs/demo-imagenes/referencia.png` y `lsb.png` | `sin_indicios` / `sospechoso` con métricas y limitaciones |
+| T10 | Un ejecutable renombrado a `.png`, un PNG truncado y uno de más de 5 MB | `415` / `422` / `413` |
+| T11 | Un ANALYST pide el análisis de otro | `403` |
+| T12 | `docker compose logs gateway auth stego` | Eventos con `request_id`, sin JWT ni contraseñas |

@@ -7,23 +7,23 @@ description: Referencia del estegoanálisis del servicio stego (9 formatos de la
 `stego` no guarda nada: valida el archivo, lo analiza y responde un veredicto.
 
 ## Alcance del primer parcial
-Los 9 formatos de la Actividad 3: PNG y JPEG (STG-1…4), GIF y WAV (STG-5), MP3 y MP4 (STG-6), PDF, DOCX y TXT (STG-7).
+Manda la spec §23.7. Obligatorio: PNG (píxeles y estructura). JPEG, GIF y WAV entran con lo que ya tienen (STG-1…5); MP3 y MP4 (STG-6) y PDF, DOCX y TXT (STG-7) no bloquean la entrega.
 
-- Cada formato valida firma y tipo declarado, aplica su tope antes de parsear, limita profundidad y recursos, y devuelve `invalida`, `problema`, `revision_manual` o `limpia`.
+- Cada formato valida firma y tipo declarado, aplica su tope antes de parsear, limita profundidad y recursos, y devuelve `sin_indicios`, `sospechoso`, `no_concluyente` o `error`.
 - La firma manda; TXT es la única excepción y requiere extensión `.txt` declarada.
 - No se ejecutan macros, multimedia, enlaces ni contenido activo; `stego` no sanitiza.
 - Métricas por formato: GIF (paleta y frames), WAV (chunks y LSB en silencio), MP3 (frames e ID3), MP4 (cajas ISO-BMFF), PDF (estructura), DOCX (OOXML) y TXT (invisibles, caracteres de control y entropía).
-- El gateway permite 20 MB solo para el análisis; los topes de cada formato se siguen aplicando en `stego`.
+- El gateway permite 6 MB solo para el análisis (margen del multipart); `stego` corta en 5 MB con 413.
 
-## Veredicto (spec §12.7)
-| Veredicto | Cuándo |
-|---|---|
-| `invalida` (422) | Firma, tamaño, píxeles o decodificación inválidos |
-| `problema` | Anomalía estructural (datos al final, chunks de texto grandes o desconocidos, metadatos JPEG excesivos) |
-| `revision_manual` | chi², RS (o entropía, si se activa) sobre el umbral, o timeout del análisis |
-| `limpia` | Nada de lo anterior |
+## Veredicto y política (spec §23.7)
+| `status` | Cuándo | `action` |
+|---|---|---|
+| `error` (415 / 422) | Extensión, `Content-Type` o firma no admitidos (415); corrupto, truncado o más de 20 MP (422) | `rechazo` |
+| `sospechoso` | Anomalía estructural (datos al final, chunks de texto grandes o desconocidos, metadatos JPEG excesivos) o chi², RS (o entropía, si se activa) sobre el umbral | `cuarentena` |
+| `no_concluyente` | Timeout o fallo del análisis, o menos de 1000 píxeles | `advertencia` |
+| `sin_indicios` | Nada de lo anterior | `ninguna` |
 
-Si coinciden una anomalía estructural y una estadística, gana `problema`.
+Más de 5 MB → 413 sin registro. `sospechoso` es un indicio, no una prueba.
 
 ## Detectores (PNG, canales RGB)
 | Detector | Cálculo | Dispara si |

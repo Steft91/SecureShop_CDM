@@ -1,8 +1,8 @@
 # Salas de Chat Seguras — contexto del proyecto
 
-Proyecto integrador de **Software Seguro** con **microservicios**. El primer parcial es lo que pidió el docente el 22/10/2026: dos microservicios sin interfaz gráfica detrás de un API Gateway, probados con Postman. `auth` maneja usuarios, roles y RBAC, y su login entrega un JWT; `stego` recibe una imagen y responde si es inválida, limpia, con problema o para revisión manual, y solo se entra con el token de `auth`. Las salas, el chat y la interfaz gráfica llegan por incrementos, cuando el docente los defina. Equipo: Manangón, Díaz, Cedeño.
+Proyecto integrador de **Software Seguro** con **microservicios**. El primer parcial es el enunciado oficial del docente (`Proyecto_Integrador_Primer_Parcial.pdf`, entrega el **04/11/2026**; spec §23): dos microservicios sin interfaz gráfica detrás de un API Gateway, probados con Postman. `auth` maneja usuarios, roles ADMIN/ANALYST/USER y su relación N:M, y su login entrega un JWT; `stego` analiza una imagen, la clasifica en `sin_indicios`, `sospechoso`, `no_concluyente` o `error`, aplica una política y guarda el análisis, y solo se entra con el token de `auth`. Sin registro abierto, sin cookies y sin restricción de dispositivos. Las salas, el chat y la interfaz gráfica llegan por incrementos, cuando el docente los defina. Equipo: Manangón, Díaz, Cedeño.
 
-- **Spec (diseño de referencia):** `docs/specs/2026-10-12-chat-seguro-design.md` (rev. 4; la nota del inicio dice qué entra en el primer parcial)
+- **Spec (diseño de referencia):** `docs/specs/2026-10-12-chat-seguro-design.md` (rev. 5; **la §23 manda en el primer parcial**)
 - **Plan:** `docs/plans/2026-10-13-00-indice.md` (+ un archivo por subsistema)
 - **Tickets (por parcial y persona):** `docs/tickets/README.md`
 - **Riesgos → controles → tests:** `docs/trazabilidad-riesgos.md`
@@ -13,8 +13,8 @@ Proyecto integrador de **Software Seguro** con **microservicios**. El primer par
 | Pieza | Qué hace | BD |
 |---|---|---|
 | gateway (Nginx) | Único punto de entrada: TLS 1.3, rate limit, `auth_request` a `auth` en cada petición y enrutamiento a `auth` y `stego` | — |
-| auth | Registro, login (Argon2id, bloqueo progresivo), JWT RS256 + sesión por dispositivo, roles y permisos; `GET /internal/verify`; CLI `create_admin` | auth |
-| stego | Firma, Pillow, chi²/RS/estructura y veredicto; `POST /api/stego/analyze` con el permiso `stego:analyze` | — |
+| auth | Login (Argon2id, bloqueo progresivo), JWT RS256 + sesión revocable, usuarios, roles ADMIN/ANALYST/USER y la N:M `user_roles`; `POST /internal/authorization/check`; CLI `create_admin` | auth |
+| stego | Firma, Pillow, chi²/RS/estructura, veredicto y política; guarda cada análisis; `POST /api/steganography/analyze` y `GET /api/steganography/results/{id}` | stego |
 
 Confianza: el gateway pregunta a `auth` en cada request y sobrescribe `X-User-*` con la identidad y los permisos actuales. Cada servicio exige `X-Service-Token` (guarda solo hashes) y acepta esas cabeceras únicamente si el llamador es `gateway`. Detalle en `.claude/rules/microservices.md`.
 

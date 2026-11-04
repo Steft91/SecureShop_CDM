@@ -1,4 +1,4 @@
-# ATH-1: Esqueleto de `auth`, catálogo de permisos, rol `admin` y firma de JWT (R11)
+# ATH-1: Esqueleto de `auth`, modelo N:M, roles ADMIN/ANALYST/USER y firma de JWT (R11)
 
 | Campo | Valor |
 |---|---|
@@ -13,30 +13,34 @@
 
 > El paso de compose necesita además FND-6; los tests no.
 
+> **Rev. 5 (2026-11-03): manda la spec §23** (enunciado oficial; entrega el 04/11/2026). Este ticket ya está ajustado a ella; si el plan dice otra cosa, vale el ticket.
+
 ## Objetivo
 
-Servicio `auth` con su migración (catálogo de 3 permisos y el rol `admin`), la firma RS256 y el mínimo privilegio en la BD.
+Servicio `auth` con la migración de la spec §23.3 (`users`, `roles`, `permissions`, `role_permissions`, la N:M `user_roles`, `user_sessions` y `failed_attempts`), el catálogo de permisos y los roles semilla ADMIN, ANALYST y USER, la firma RS256 y el mínimo privilegio en la BD.
 
 ## Cómo trabajar sin esperar
 
-Mientras Zaith cierra FND-4 y FND-5: escribe la migración `0001_cuentas.py` y `tokens.py` (`Signer` solo usa `pyjwt`, y `test_tokens.py` corre sin BD ni `shared`). Las firmas de `shared` que vas a usar están en las *Interfaces* de FND-4 en el plan de fundaciones.
+`shared` ya está en `feat/zaith-fundaciones` (FND-2, 4, 5 y 6 cerrados); solo falta tu FND-3. Empieza por `0001_cuentas.py` y `tokens.py`: `Signer` solo usa `pyjwt` y `test_tokens.py` corre sin BD. El plan (Task ATH-1) sirve de base: cambia las tablas por las de §23.3.
 
 ## Criterios de aceptación
 
-- [ ] La migración carga los permisos `users:manage`, `roles:manage` y `stego:analyze`, y el rol `admin` con los tres (`test_catalogo_y_rol_semilla`)
-- [ ] `Signer` solo acepta `RS256`: un token `alg: none` o firmado con HS256 usando la clave pública se rechaza (`test_tokens.py`)
-- [ ] `auth_app` no puede `CREATE TABLE`, ni borrar cuentas, ni editar el catálogo (`test_r11_privilegios.py`)
-- [ ] `auth` en estado `healthy` en compose y en la matriz de la CI
+- [ ] Las tablas de §23.3 con sus FK, `UNIQUE (user_id, role_id)`, `username` y `email` únicos, `status` y campos de auditoría (`test_modelo_n_m_con_fk_y_unicidad`)
+- [ ] El catálogo (`users.manage`, `roles.manage`, `steganography.analyze`, `steganography.results.read`, `steganography.results.read_any`) y los roles ADMIN (todos), ANALYST (`steganography.analyze`, `steganography.results.read`) y USER (ninguno) quedan como filas, no como constantes del código (`test_catalogo_y_roles_semilla`)
+- [ ] `Signer` solo acepta `RS256`: `alg: none` o HS256 con la clave pública se rechazan; `exp = iat + JWT_TTL_MIN` (15 por defecto) (`test_tokens.py`)
+- [ ] `auth_app` no puede `CREATE TABLE`, ni `DELETE` en `users` o `roles`, ni editar `permissions`; sí puede `DELETE` en `user_roles` (`test_r11_privilegios.py`)
+- [ ] `services/auth/.env.example` con las variables no secretas (`JWT_TTL_MIN`, `ALLOWED_ORIGINS`, límites del login) y la nota de que los secretos los genera `deploy/gen_secrets.py`
+- [ ] `auth` y `auth-migrate` en compose, con `auth` en `healthy`
 
 ## Entregables
 
-- `services/auth/**` (esqueleto, `0001_cuentas.py`, `config.py`, `tokens.py`, `main.py`)
+- `services/auth/**` (esqueleto, `migrations/versions/0001_cuentas.py`, `config.py`, `tokens.py`, `main.py`, `.env.example`)
 - Servicios `auth` y `auth-migrate` en compose
 
 ## Documentación a actualizar
 
 - Fila R11 de la trazabilidad
-- `docs/justificacion-criptografica.md` (fila JWT RS256)
+- `docs/justificacion-criptografica.md` si cambia algo del JWT
 
 ## Verificación
 

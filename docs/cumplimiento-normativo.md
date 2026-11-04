@@ -31,13 +31,13 @@ El proyecto es una aplicación, no una organización completa: los controles de 
 | Control | Aplica | Riesgos | Mecanismo en el proyecto | Evidencia |
 |---|---|---|---|---|
 | A.5.15 Control de acceso | Sí | R5, R13, R16 | `auth_request` a `auth` en cada petición; `require_perm` en cada servicio; allowlist de llamadores por servicio | `test_r05_*`, `test_r16_*` |
-| A.5.16 Gestión de identidades | Sí | R4, R5, R13 | Registro abierto sin roles; admin global solo por CLI (sin credenciales por defecto); una sesión por cuenta; cookie de dispositivo | `test_registro_crea_cuenta_sin_roles`, `test_crea_admin_con_argon2id_y_rol_admin`, `test_r13_*` |
-| A.5.17 Información de autenticación | Sí | R4 | Argon2id (RFC 9106); política de contraseñas; JWT RS256 que solo `auth` firma; cookie de dispositivo guardada como SHA-256 | `test_r04_*`, `test_politica_de_claves`, `test_jwt_alterado_401` |
+| A.5.16 Gestión de identidades | Sí | R4, R5 | Las cuentas las crea ADMIN y nacen sin roles; el primer admin solo por CLI (sin credenciales por defecto); usuario y correo únicos; desactivar una cuenta termina sus sesiones | `test_admin_crea_cuenta_sin_roles`, `test_crea_admin_con_argon2id_y_rol_admin`, `test_cuenta_inactiva_401` |
+| A.5.17 Información de autenticación | Sí | R4 | Argon2id (RFC 9106); política de contraseñas; JWT RS256 que solo `auth` firma | `test_r04_*`, `test_politica_de_claves`, `test_jwt_alterado_401` |
 | A.5.18 Derechos de acceso | Sí | R5, R11 | RBAC con roles dinámicos y permisos de un catálogo fijo; los cambios valen en la siguiente petición; el sistema nunca se queda sin admin; roles de BD separados | `test_r05_*`, `test_r11_*` |
-| A.5.34 Privacidad de datos personales | Parcial | R2, R5 | Solo se guarda el nombre de usuario (sin correo ni otros datos personales); `stego` no guarda las imágenes | revisión con `security-auditor` |
+| A.5.34 Privacidad de datos personales | Parcial | R2, R5 | Solo se guardan el usuario y el correo que pide el enunciado; `stego` descarta las imágenes salvo las sospechosas, que quedan en un volumen aislado sin ruta | revisión con `security-auditor` |
 | A.8.2 Derechos de acceso privilegiado | Sí | R5, R11 | Los permisos de admin los da solo otro admin; `auth_owner` solo en el job de migración | `test_r05_sin_roles_manage_403`, `test_r11_*` |
-| A.8.5 Autenticación segura | Sí | R4, R13 | Bloqueo tras 5 fallos, error genérico, sesión ligada al dispositivo y verificada en cada petición | `test_r04_*`, `test_r13_*` |
-| A.8.6 Gestión de la capacidad | Sí | R10 | Rate limit en Nginx, token bucket por usuario en `stego`, tope de Argon2id concurrentes y de registros por IP | `test_r10_*` |
+| A.8.5 Autenticación segura | Sí | R4 | Bloqueo tras 5 fallos, error genérico, sesión revocable verificada en cada petición y JWT de 15 min | `test_r04_*`, `test_jwt_vencido_401` |
+| A.8.6 Gestión de la capacidad | Sí | R10 | Rate limit en Nginx, token bucket por usuario en `stego`, tope de Argon2id concurrentes y de 5 MB por archivo (413) | `test_r10_*` |
 | A.8.7 Protección contra malware | Parcial | R9 | Magic bytes, decodificación con Pillow y topes de tamaño y de píxeles en `stego`; el antivirus llega con la subida de archivos | `test_r09_*` |
 | A.8.8 Gestión de vulnerabilidades técnicas | Sí | — | `pip-audit`, CodeQL y dependencias fijadas en `requirements.lock` | CI (FND-7) |
 | A.8.9 Gestión de la configuración | Sí | R2, R11 | Compose declarativo, secretos generados por `gen_secrets.py`, contenedores endurecidos | `docker compose config`, revisión |
@@ -101,13 +101,13 @@ Principio del documento: *ningún usuario, dispositivo, sesión o recurso es con
 | Nada es confiable por estar "dentro" de la red | Los servicios no se creen las cabeceras de identidad: solo valen si el llamador presenta el token del gateway | `shared.identity`, `shared.service_auth` | `test_identidad_solo_vale_si_la_trae_el_gateway`, `test_r16_*` |
 | Cada solicitud se autentica | `auth_request` a `auth` en cada petición: verifica el JWT **y** la sesión a la que apunta, así que un token se revoca al instante; los permisos se leen de la BD en ese momento | GW-1, ATH-2 | `test_jwt_de_sesion_terminada_401`; curl de GW-1 con cabeceras falsificadas |
 | Cada solicitud se autoriza | Permiso del catálogo con `require_perm` en `auth` y en `stego` | `shared.identity` | `test_r05_*` |
-| Cada entrada se valida | Esquemas Pydantic con `extra="forbid"`, límites de tamaño y firma real del archivo | §8.1, §12.1 | `test_r09_*`, `test_r10_*`, `test_r05_registro_con_campo_role_422` |
-| El dispositivo y la sesión se verifican, no se suponen | La sesión queda ligada a la cookie de dispositivo y se comprueba en cada petición; una sola sesión por cuenta | ATH-2 | `test_r13_jwt_con_otra_cookie_de_dispositivo_401`, `test_r13_login_desde_otro_dispositivo_409` |
+| Cada entrada se valida | Esquemas Pydantic con `extra="forbid"`, límites de tamaño, extensión, `Content-Type` y firma real del archivo | §8.1, §12.1, §23.7 | `test_r09_*`, `test_r10_*`, `test_r05_cuerpo_con_campos_de_mas_422` |
+| La sesión se verifica, no se supone | `authorization/check` comprueba en cada petición que la sesión siga viva y la cuenta activa; retirar un rol vale en la siguiente petición. La restricción de dispositivos queda fuera del parcial (spec §23.1) | ATH-2, ATH-4 | `test_jwt_de_sesion_terminada_401`, `test_r05_rol_retirado_deja_de_valer_con_el_mismo_jwt` |
 | Mínimo privilegio | La cuenta nace sin roles; `auth_app` sin DDL; `cap_drop: ALL`; FS de solo lectura | §4.5, §7.6, §9.1 | `test_r05_*`, `test_r11_*` |
 | Comunicación protegida | TLS 1.3 entre el cliente y el gateway | §13 | verificación manual de GW-1 |
 | Segmentación | Tres redes; ni el gateway ni `stego` llegan a la BD | §4.5 | `docker compose config` |
 | Supervisión continua | Cada rechazo emite un evento con el id de correlación | §14 | `testing.events(...)` en los tests |
-| Fallar cerrado | Sin un secreto el servicio no arranca; `auth` caído → 503 en el gateway; análisis que excede el tiempo → `revision_manual` | §15 | `test_secreto_ausente_detiene_el_servicio`, `test_timeout_del_analisis_es_revision_manual`, curl de GW-1 |
+| Fallar cerrado | Sin un secreto el servicio no arranca; `auth` caído → 503 en el gateway; análisis que excede el tiempo → `no_concluyente` (nunca `sin_indicios`) | §15, §23.7 | `test_secreto_ausente_detiene_el_servicio`, `test_timeout_del_analisis_es_no_concluyente`, curl de GW-1 |
 
 **Excepción declarada:** el tramo interno gateway→servicio es HTTP plano (spec §3, limitación 3). Lo mitigan el token del gateway y las redes internas. La mejora es mTLS.
 
@@ -156,7 +156,7 @@ Principio del documento: *ningún usuario, dispositivo, sesión o recurso es con
 | Componente | S: suplantación | T: manipulación | R: repudio | I: divulgación | D: denegación | E: elevación |
 |---|---|---|---|---|---|---|
 | Gateway | Cabeceras de identidad falsas (R16, R5) | Downgrade a http (R7) | — | Cabeceras y versión del servidor (A.8.12) | Flood de peticiones (R10) | Rutas `/internal/*` (R16) |
-| auth | Fuerza bruta de cuentas (R4); token robado o usado desde otro dispositivo (R13) | JWT alterado (firma RS256) | Acceso sin rastro (eventos JSON) | Clave de firma del JWT en el código (R2) | Argon2id masivo; registros masivos (R10) | Asignarse `admin` por el registro o con un campo de más; dejar el sistema sin admin (R5) |
+| auth | Fuerza bruta de cuentas (R4); token robado (JWT de 15 min, sesión revocable) | JWT alterado (firma RS256) | Acceso sin rastro (eventos JSON) | Clave de firma del JWT en el código (R2) | Argon2id masivo (R10) | Asignarse ADMIN con un campo de más; dejar el sistema sin admin (R5) |
 | stego | — | Imagen que explota el decodificador (R9) | — | — | Bomba de descompresión; análisis masivo (R9, R10) | Usar la API sin el permiso (R5) |
 | BD y red interna | Servicio que se hace pasar por el gateway (R16) | — | — | Credenciales con privilegios excesivos (R11) | — | Escalar desde un servicio comprometido (R11) |
 

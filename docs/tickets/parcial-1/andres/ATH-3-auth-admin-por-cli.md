@@ -11,9 +11,11 @@
 | Plan | [`docs/plans/2026-10-13-03-auth.md`](../../../plans/2026-10-13-03-auth.md), sección *Task ATH-3* |
 | Estado | Pendiente |
 
+> **Rev. 5 (2026-11-03): manda la spec §23** (enunciado oficial; entrega el 04/11/2026). Este ticket ya está ajustado a ella; si el plan dice otra cosa, vale el ticket.
+
 ## Objetivo
 
-El primer admin se crea por línea de comandos, sin credenciales por defecto, y entra con su contraseña como cualquier cuenta.
+El primer ADMIN se crea por línea de comandos, sin credenciales por defecto, y entra con su contraseña como cualquier cuenta.
 
 ## Cómo trabajar sin esperar
 
@@ -21,10 +23,10 @@ Solo depende de tu ATH-2.
 
 ## Criterios de aceptación
 
-- [ ] `python -m auth_svc.create_admin <usuario>` pide la contraseña dos veces (o la lee con `--password-stdin`), aplica la política de claves y crea la cuenta con el rol `admin`
+- [ ] `python -m auth_svc.create_admin <usuario> --email <correo>` pide la contraseña dos veces (o la lee con `--password-stdin`), aplica la política de claves y crea la cuenta con el rol ADMIN
 - [ ] Imprime `admin <usuario> creado` y emite `admin.create` después del commit
-- [ ] Un usuario duplicado falla sin tocar la cuenta existente
-- [ ] El admin entra con su contraseña y `verify` le da los tres permisos (`test_admins.py`, 4 tests)
+- [ ] Un usuario o correo duplicado falla sin tocar la cuenta existente
+- [ ] El admin entra con su contraseña y `check` le da todos los permisos del catálogo (`test_admins.py`)
 
 ## Entregables
 

@@ -11,24 +11,28 @@
 | Plan | [`docs/plans/2026-10-25-parcial-1.md`](../../../plans/2026-10-25-parcial-1.md), sección *Task PAR-3* |
 | Estado | Pendiente |
 
+> **Rev. 5 (2026-11-03): manda la spec §23** (enunciado oficial; entrega el 04/11/2026). Este ticket ya está ajustado a ella; si el plan dice otra cosa, vale el ticket.
+
 ## Objetivo
 
-El guion de unos 7 minutos con el plan B, y un ensayo completo desde un `git clone` limpio.
+El `README.md` del repositorio, el guion de la sustentación con su plan B y un ensayo completo desde un `git clone` limpio.
 
 ## Cómo trabajar sin esperar
 
-El guion (quién habla y qué petición se ejecuta) se escribe con la tabla de PAR-1; el ensayo es lo último del parcial y lo hacen los tres.
+El README y el guion se escriben con la spec §23 y la colección de PAR-1; el ensayo es lo último del parcial y lo hacen los tres.
 
 ## Criterios de aceptación
 
-- [ ] `docs/demo-parcial-1.md` con los 5 pasos, quién habla y qué petición se ejecuta
-- [ ] Ensayo desde un clon limpio: Runner 30/30 y demo en ≤ 8 minutos cronometrados
-- [ ] `pytest` de `shared`, `auth` y `stego` en verde y la CI de la rama en verde
+- [ ] `README.md` en la raíz: clonar, `python deploy/gen_secrets.py`, mkcert, `docker compose up -d --build`, crear el admin, importar la colección y correr `pytest`
+- [ ] `docs/demo-parcial-1.md` sigue el orden que pide el enunciado: los dos servicios por separado (T01), usuario con dos roles y un rol en dos usuarios, login y análisis, los negativos, la revocación con el mismo JWT, AUTH caído y las dos imágenes con sus limitaciones
+- [ ] Plan B: captura del Runner y salida de `pytest`
+- [ ] `docs/evidencias/eventos-demo.log`: los registros de la demo sin JWT, contraseñas ni secretos (T12)
+- [ ] Ensayo desde un clon limpio, con la demo cronometrada
 - [ ] `CLAUDE.md`: primer parcial cerrado
 
 ## Entregables
 
-- `docs/demo-parcial-1.md`
+- `README.md`, `docs/demo-parcial-1.md`, `docs/evidencias/eventos-demo.log`
 
 ## Documentación a actualizar
 

@@ -1,6 +1,8 @@
 # Tickets
 
-Un ticket por tarea de los planes de `docs/plans/`. El plan manda: el ticket resume el objetivo, los criterios de aceptación y qué se puede adelantar sin esperar a nadie.
+Un ticket por tarea de los planes de `docs/plans/`. El ticket resume el objetivo, los criterios de aceptación y qué se puede adelantar sin esperar a nadie.
+
+> **Rev. 5 (2026-11-03): enunciado oficial del primer parcial, entrega el 04/11/2026.** Manda la spec §23; luego el ticket (ya ajustado a ella) y por último el plan. Cambios principales: rutas `/api/users`, `/api/roles`, `/api/user-roles`, `/api/auth/profile` y `/api/steganography/*`; roles ADMIN/ANALYST/USER con la N:M `user_roles`; `POST /internal/authorization/check` decide por acción; `stego` guarda cada análisis y clasifica en `sin_indicios`/`sospechoso`/`no_concluyente`/`error` con política; **sin registro abierto, sin alias, sin cookies y sin restricción de dispositivos**.
 
 Solo existe el **primer parcial** (gateway, `auth` y `stego`, probados con Postman). Las carpetas `parcial-2/` y `parcial-3/` se crean cuando el docente diga qué se entrega en cada uno.
 
@@ -30,26 +32,26 @@ Solo existe el **primer parcial** (gateway, `auth` y `stego`, probados con Postm
 | Fase | Ticket | Necesita | Estado |
 |---|---|---|---|
 | A | [FND-3: Contraseñas Argon2id y límites de intentos](parcial-1/andres/FND-3-argon2-y-limites.md) | — | Pendiente |
-| B | [ATH-1: Esqueleto de `auth`, catálogo de permisos, rol `admin` y firma de JWT (R11)](parcial-1/andres/ATH-1-auth-esqueleto-y-jwt.md) | FND-2, FND-3, FND-4, FND-5 | Pendiente |
-| B | [ATH-2: Registro con alias, login, JWT y sesión de dispositivo único, `verify`, `me` y `logout` (R4, R5, R10, R13, R16)](parcial-1/andres/ATH-2-auth-registro-login-verify.md) | ATH-1 | Pendiente |
+| B | [ATH-1: Esqueleto de `auth`, modelo N:M, roles ADMIN/ANALYST/USER y firma de JWT (R11)](parcial-1/andres/ATH-1-auth-esqueleto-y-jwt.md) | FND-2, FND-3, FND-4, FND-5 | Pendiente |
+| B | [ATH-2: Login, JWT, sesión revocable, `authorization/check`, `profile` y `logout` (R4, R5, R16)](parcial-1/andres/ATH-2-auth-registro-login-verify.md) | ATH-1 | Pendiente |
 | B | [ATH-3: Alta del admin global por CLI (R4)](parcial-1/andres/ATH-3-auth-admin-por-cli.md) | ATH-2 | Pendiente |
-| B | [ATH-4: Roles, permisos y administración de cuentas (R5)](parcial-1/andres/ATH-4-auth-roles-y-permisos.md) | ATH-3 | Pendiente |
+| B | [ATH-4: Usuarios, roles y asignaciones N:M (R5)](parcial-1/andres/ATH-4-auth-roles-y-permisos.md) | ATH-3 | Pendiente |
 
 ## Stefany
 
 | Fase | Ticket | Necesita | Estado |
 |---|---|---|---|
-| A | [STG-1: Esqueleto de `stego` sin BD, imágenes sintéticas y estegoanálisis (R6)](parcial-1/stefany/STG-1-stego-esqueleto-y-analisis.md) | FND-2, FND-4 | Pendiente |
-| B | [STG-2: Formatos, validación previa y veredicto (R6, R9)](parcial-1/stefany/STG-2-stego-formatos-y-veredicto.md) | STG-1 | Pendiente |
-| B | [STG-3: API de análisis aislado en otro proceso (R5, R9, R10, R16)](parcial-1/stefany/STG-3-stego-api.md) | STG-2, FND-3 | Pendiente |
+| A | [STG-1: Esqueleto de `stego`, imágenes sintéticas y estegoanálisis (R6)](parcial-1/stefany/STG-1-stego-esqueleto-y-analisis.md) | FND-2, FND-4 | Pendiente |
+| B | [STG-2: Formatos, validación previa, veredicto y política (R6, R9)](parcial-1/stefany/STG-2-stego-formatos-y-veredicto.md) | STG-1 | Pendiente |
+| B | [STG-3: API de análisis con persistencia, resultados y análisis aislado (R5, R9, R10, R11, R16)](parcial-1/stefany/STG-3-stego-api.md) | STG-2, FND-3 | Pendiente |
 | B | [STG-4: Imágenes de la demo y calibración rápida](parcial-1/stefany/STG-4-stego-demo-y-calibracion.md) | STG-3 | Pendiente |
 | C | [PAR-1: Colección de Postman del flujo del docente (RP-11)](parcial-1/stefany/PAR-1-postman.md) | GW-1, STG-4 | Pendiente |
 | C | [PAR-2: Informe del primer parcial (RP-10)](parcial-1/stefany/PAR-2-informe-parcial.md) | GW-1 | Pendiente |
 | C | [PAR-3: Guion de la demo y ensayo desde un clon limpio (RP-11)](parcial-1/stefany/PAR-3-demo-y-ensayo.md) | PAR-1, PAR-2 | Pendiente |
 
 | B | [STG-5: GIF y WAV](parcial-1/stefany/STG-5-gif-wav.md) | STG-2 | Pendiente |
-| B | [STG-6: MP3 y MP4](parcial-1/zaith/STG-6-mp3-mp4.md) | STG-2 | Pendiente |
-| B | [STG-7: PDF, DOCX y TXT](parcial-1/andres/STG-7-pdf-docx-txt.md) | STG-2 | Pendiente |
+| B | [STG-6: MP3 y MP4](parcial-1/zaith/STG-6-mp3-mp4.md) | STG-2 | Pendiente (no bloquea la entrega) |
+| B | [STG-7: PDF, DOCX y TXT](parcial-1/andres/STG-7-pdf-docx-txt.md) | STG-2 | Pendiente (no bloquea la entrega) |
 
 ## Cruces entre personas
 
@@ -57,7 +59,7 @@ Solo existe el **primer parcial** (gateway, `auth` y `stego`, probados con Postm
 |---|---|---|---|
 | Andrés (ATH-1) | FND-2, FND-4, FND-5 | Zaith | Migración y `tokens.py` (sin `shared`) |
 | Stefany (STG-1) | FND-2, FND-4 | Zaith | `stego.py`, `png.py`, `jpeg.py`, `synthetic.py` |
-| Stefany (STG-3) | FND-3 | Andrés | STG-2 |
+| Stefany (STG-3) | FND-3; BD `stego` en compose | Andrés; Zaith (GW-1) | STG-2; la BD de pruebas de FND-5 |
 | Zaith (FND-7) | FND-3 | Andrés | `ci.yml` y `.coveragerc` |
 | Zaith (GW-1) | ATH-4, STG-4 | Andrés, Stefany | Steps 1–4 (`nginx -t`) |
 | Stefany (PAR-1, PAR-2) | GW-1 | Zaith | Peticiones de la colección y secciones del informe |

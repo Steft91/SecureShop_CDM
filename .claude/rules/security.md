@@ -10,6 +10,6 @@ Fuente: spec §2–§15 y Tabla 3 de la Tarea 2, recortados al primer parcial (g
 6. **Contraseñas:** Argon2id (`shared.passwords`), con verificación contra un hash dummy cuando el usuario no existe.
 7. **Errores:** el cliente recibe `{"error": "..."}` genérico; el detalle va al registro de eventos. Todo rechazo de seguridad y todo acceso otorgado se registra con `shared.audit.emit(...)`.
 8. **Datos sensibles:** nunca se registran contraseñas, tokens (JWT incluidos) ni secretos.
-9. **Fallar cerrado:** si falta un secreto, el servicio no arranca. Si la BD no responde → 503. Si el análisis de una imagen falla o se pasa de tiempo, el veredicto es `revision_manual`, nunca `limpia`.
+9. **Fallar cerrado:** si falta un secreto, el servicio no arranca. Si la BD no responde → 503. Si el análisis de una imagen falla o se pasa de tiempo, el resultado es `no_concluyente`, nunca `sin_indicios` (spec §23.7).
 10. **Cripto:** solo con `shared.crypto` y PyJWT con `algorithms=["RS256"]` fijo. Nada de primitivas propias.
 11. **Documentos de cumplimiento:** un cambio de control, algoritmo, clave o ruta de datos actualiza `docs/trazabilidad-riesgos.md` y, si aplica, `docs/justificacion-criptografica.md` y `docs/cumplimiento-normativo.md`.

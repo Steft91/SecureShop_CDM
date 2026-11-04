@@ -1,4 +1,4 @@
-# STG-1: Esqueleto de `stego` sin BD, imágenes sintéticas y estegoanálisis (R6)
+# STG-1: Esqueleto de `stego`, imágenes sintéticas y estegoanálisis (R6)
 
 | Campo | Valor |
 |---|---|
@@ -13,13 +13,15 @@
 
 > El paso de compose necesita además FND-6.
 
+> **Rev. 5 (2026-11-03): manda la spec §23** (enunciado oficial; entrega el 04/11/2026). Este ticket ya está ajustado a ella; si el plan dice otra cosa, vale el ticket.
+
 ## Objetivo
 
-Servicio `stego` sin estado, con chi² (Westfeld), RS (Fridrich), entropía LSB, estructura PNG/JPEG y las imágenes sintéticas de las pruebas.
+Servicio `stego` con chi² (Westfeld), RS (Fridrich), entropía LSB, estructura PNG/JPEG y las imágenes sintéticas de las pruebas.
 
 ## Cómo trabajar sin esperar
 
-Empieza ya por los módulos de algoritmo: `stego.py`, `png.py`, `jpeg.py` y `synthetic.py` solo usan numpy, Pillow y scipy, no `shared`. Sus tests de `test_r06_estego.py` corren con `PYTHONPATH=services/stego pytest …`. `config.py`, `main.py` y `conftest.py` esperan a FND-2 y FND-4 de Zaith.
+El análisis ya está en `feat/stefany-stego` (`stego.py`, `png.py`, `jpeg.py`, `synthetic.py`, `stego_lab.py`) y no cambia con el enunciado. Lo que falta es montarlo sobre `shared` (STG-3).
 
 ## Criterios de aceptación
 
@@ -27,7 +29,8 @@ Empieza ya por los módulos de algoritmo: `stego.py`, `png.py`, `jpeg.py` y `syn
 - [ ] Datos después de `IEND` o `FFD9` → anomalía estructural; un JPEG progresivo no confunde al parser
 - [ ] `natural_image` y `embed_lsb` son deterministas con la misma semilla
 - [ ] Ninguna función pasa de complejidad 10: `jpeg.structure` se parte con `skip_entropy` (RNF-11)
-- [ ] `stego` en estado `healthy` en compose (sin BD, solo en la red `apps`) y en la matriz de la CI
+- [ ] `pyproject.toml` con `requires-python = ">=3.13"` y `httpx` (no `httpx2`) en las dependencias de prueba
+- [ ] `stego` en estado `healthy` en compose, en las redes `apps` y `data` (tiene BD desde STG-3)
 
 ## Entregables
 
@@ -51,4 +54,4 @@ Empieza ya por los módulos de algoritmo: `stego.py`, `png.py`, `jpeg.py` y `syn
 - [ ] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)
 
 
-> **Actualización de alcance:** STG-5, STG-6 y STG-7 completan en este parcial los 9 formatos (GIF, WAV, MP3, MP4, PDF, DOCX y TXT), además de PNG y JPEG.
+> **Alcance (spec §23.1):** PNG con análisis de píxeles y estructura es lo obligatorio; JPEG, GIF y WAV entran con lo que ya tienen. STG-6 y STG-7 no bloquean la entrega.
