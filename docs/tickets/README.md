@@ -35,7 +35,7 @@ Solo existe el **primer parcial** (gateway, `auth` y `stego`, probados con Postm
 | B | [ATH-1: Esqueleto de `auth`, modelo N:M, roles ADMIN/ANALYST/USER y firma de JWT (R11)](parcial-1/andres/ATH-1-auth-esqueleto-y-jwt.md) | FND-2, FND-3, FND-4, FND-5 | Cerrado (2026-11-04, `9c0854b`) |
 | B | [ATH-2: Login, JWT, sesión revocable, `authorization/check`, `profile` y `logout` (R4, R5, R16)](parcial-1/andres/ATH-2-auth-registro-login-verify.md) | ATH-1 | Cerrado (2026-11-04, `5424fef`) |
 | B | [ATH-3: Alta del admin global por CLI (R4)](parcial-1/andres/ATH-3-auth-admin-por-cli.md) | ATH-2 | Cerrado (2026-11-04, `75fbf19`) |
-| B | [ATH-4: Usuarios, roles y asignaciones N:M (R5)](parcial-1/andres/ATH-4-auth-roles-y-permisos.md) | ATH-3 | Pendiente |
+| B | [ATH-4: Usuarios, roles y asignaciones N:M (R5)](parcial-1/andres/ATH-4-auth-roles-y-permisos.md) | ATH-3 | Cerrado (2026-11-04, `b48a710`) |
 
 ## Stefany
 
