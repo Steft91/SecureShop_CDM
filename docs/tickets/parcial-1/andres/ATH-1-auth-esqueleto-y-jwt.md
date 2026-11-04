@@ -9,7 +9,7 @@
 | Necesita | [FND-2](../zaith/FND-2-shared-cripto-y-secretos.md) (Zaith), [FND-3](../andres/FND-3-argon2-y-limites.md) (Andrés), [FND-4](../zaith/FND-4-autenticacion-entre-servicios.md) (Zaith), [FND-5](../zaith/FND-5-utilidades-de-bd-y-pruebas.md) (Zaith) |
 | Lo necesitan | [ATH-2](../andres/ATH-2-auth-registro-login-verify.md) (Andrés) |
 | Plan | [`docs/plans/2026-10-13-03-auth.md`](../../../plans/2026-10-13-03-auth.md), sección *Task ATH-1* |
-| Estado | En progreso |
+| Estado | Cerrado (2026-11-04, `9c0854b`) |
 
 > **Rev. 5 (2026-11-03): manda la spec §23** (enunciado oficial; entrega el 04/11/2026). Este ticket ya está ajustado a ella; si el plan dice otra cosa, vale el ticket.
 
@@ -23,12 +23,12 @@ Servicio `auth` con la migración de la spec §23.3 (`users`, `roles`, `permissi
 
 ## Criterios de aceptación
 
-- [ ] Las tablas de §23.3 con sus FK, `UNIQUE (user_id, role_id)`, `username` y `email` únicos, `status` y campos de auditoría (`test_modelo_n_m_con_fk_y_unicidad`)
-- [ ] El catálogo (`users.manage`, `roles.manage`, `steganography.analyze`, `steganography.results.read`, `steganography.results.read_any`) y los roles ADMIN (todos), ANALYST (`steganography.analyze`, `steganography.results.read`) y USER (ninguno) quedan como filas, no como constantes del código (`test_catalogo_y_roles_semilla`)
-- [ ] `Signer` solo acepta `RS256`: `alg: none` o HS256 con la clave pública se rechazan; `exp = iat + JWT_TTL_MIN` (15 por defecto) (`test_tokens.py`)
-- [ ] `auth_app` no puede `CREATE TABLE`, ni `DELETE` en `users` o `roles`, ni editar `permissions`; sí puede `DELETE` en `user_roles` (`test_r11_privilegios.py`)
-- [ ] `services/auth/.env.example` con las variables no secretas (`JWT_TTL_MIN`, `ALLOWED_ORIGINS`, límites del login) y la nota de que los secretos los genera `deploy/gen_secrets.py`
-- [ ] `auth` y `auth-migrate` en compose, con `auth` en `healthy`
+- [x] Las tablas de §23.3 con sus FK, `UNIQUE (user_id, role_id)`, `username` y `email` únicos, `status` y campos de auditoría (`test_modelo_n_m_con_fk_y_unicidad`)
+- [x] El catálogo (`users.manage`, `roles.manage`, `steganography.analyze`, `steganography.results.read`, `steganography.results.read_any`) y los roles ADMIN (todos), ANALYST (`steganography.analyze`, `steganography.results.read`) y USER (ninguno) quedan como filas, no como constantes del código (`test_catalogo_y_roles_semilla`)
+- [x] `Signer` solo acepta `RS256`: `alg: none` o HS256 con la clave pública se rechazan; `exp = iat + JWT_TTL_MIN` (15 por defecto) (`test_tokens.py`)
+- [x] `auth_app` no puede `CREATE TABLE`, ni `DELETE` en `users` o `roles`, ni editar `permissions`; sí puede `DELETE` en `user_roles` (`test_r11_privilegios.py`)
+- [x] `services/auth/.env.example` con las variables no secretas (`JWT_TTL_MIN`, `ALLOWED_ORIGINS`, límites del login) y la nota de que los secretos los genera `deploy/gen_secrets.py`
+- [x] `auth` y `auth-migrate` en compose, con `auth` en `healthy`
 
 ## Entregables
 
@@ -46,7 +46,7 @@ Servicio `auth` con la migración de la spec §23.3 (`users`, `roles`, `permissi
 
 ## Al cerrar
 
-- [ ] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada
-- [ ] La trazabilidad y los documentos de arriba están actualizados
-- [ ] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
-- [ ] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)
+- [x] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada
+- [x] La trazabilidad y los documentos de arriba están actualizados
+- [x] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
+- [x] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)
