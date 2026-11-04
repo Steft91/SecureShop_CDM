@@ -44,6 +44,23 @@ services:
     networks: [data]
     restart: unless-stopped
 
+  auth:
+    <<: *python-service
+    build: {context: .., dockerfile: services/Dockerfile, args: {SERVICE: auth}}
+    image: chat-seguro/auth
+    environment:
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://localhost}
+    secrets: [db_auth_app, svc_hash_gateway, jwt_signing_key]
+    networks: [apps, data]
+    depends_on:
+      auth-migrate: {condition: service_completed_successfully}
+
+  auth-migrate:
+    <<: *migrate
+    build: {context: .., dockerfile: services/Dockerfile, args: {SERVICE: auth}}
+    image: chat-seguro/auth
+    secrets: [db_auth_owner]
+
   gateway:
     build: {context: .., dockerfile: gateway/Dockerfile}
     image: chat-seguro/gateway

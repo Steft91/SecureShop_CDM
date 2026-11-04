@@ -2,7 +2,7 @@
 name = "chat-shared"
 version = "0.1.0"
 description = "Librería común de los microservicios del chat seguro"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115",
   "uvicorn[standard]>=0.32",
