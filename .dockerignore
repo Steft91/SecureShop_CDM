@@ -1,0 +1,17 @@
+.git
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/tests
+# Tokens y contraseñas fijos de prueba: si producción lo importara por error, no arranca
+services/shared/shared/testing.py
+deploy/secrets
+deploy/certs
+**/*.pem
+**/*.key
+**/.env
+# Imágenes personales de calibración (STG-4)
+services/stego/tools/calibracion
+Documentación
+docs

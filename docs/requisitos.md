@@ -76,7 +76,7 @@
 | RNF-16 | Recuperación | Respaldo y restauración | No | — | — |
 | RNF-17 | Recuperación | Reinicio automático de servicios | **Parcial:** `restart: unless-stopped` y `healthcheck` en compose; la prueba de los 60 s llega después | FND-6 | `docker compose config` |
 | RNF-18 | Monitoreo | Métricas y alertas de consumo | **Parcial:** comprobación de salud (`/health`) en cada servicio; métricas y alertas después | FND-4 | `test_health` (auth), `test_health_sin_bd` (stego) |
-| RNF-19 | Monitoreo | Registros estructurados y trazables: fecha, servicio, nivel e id de correlación | **Sí** | FND-4, GW-1 | `test_formato_json_de_los_registros`, `test_el_id_del_gateway_llega_al_codigo_y_a_los_eventos`, `test_una_linea_por_peticion_sin_query_string`; curl de GW-1 |
+| RNF-19 | Monitoreo | Registros estructurados y trazables: fecha, servicio, nivel e id de correlación | **Sí** | FND-4, GW-1 | `test_formato_json_de_los_registros`, `test_el_id_del_gateway_llega_al_codigo_y_a_los_eventos`, `test_una_linea_por_peticion_sin_query_string`, `test_error_500_se_registra_con_el_id`; curl de GW-1 |
 
 ---
 
@@ -108,13 +108,13 @@
 | RS-22 | Integridad verificable del registro de eventos | No | — | — |
 | RS-23 | Protección de datos sensibles en registros | **Sí** | FND-4, todos | `test_una_linea_por_peticion_sin_query_string`; revisión con `security-auditor` |
 | RS-24 | Registro obligatorio de operaciones críticas | No (necesita el servicio de auditoría) | — | — |
-| RS-25 | Autenticación y autorización entre servicios | **Sí** | FND-4, ATH-2, STG-3 | `test_ruta_interna_respeta_la_allowlist`, `test_r16_verify_solo_para_el_gateway`, `test_r16_solo_acepta_el_token_del_gateway` |
+| RS-25 | Autenticación y autorización entre servicios | **Sí** | FND-4, ATH-2, STG-3 | `test_ruta_interna_respeta_la_allowlist`, `test_websocket_sin_token_se_rechaza`, `test_r16_verify_solo_para_el_gateway`, `test_r16_solo_acepta_el_token_del_gateway` |
 | RS-26 | Mínimo privilegio de componentes | **Sí** | FND-6, ATH-1 | `test_r11_rol_app_confinado`, `test_r11_la_app_no_borra_cuentas_ni_edita_el_catalogo` |
 | RS-27 | Rechazo de entradas no válidas | **Sí** | todos | `test_r05_cuerpo_con_campos_de_mas_422`, `test_politica_de_registro`, `test_alias_invalido_422`, bandit, CodeQL |
 | RS-28 | Protección frente al abuso de recursos | **Sí** (en el gateway, `auth` y `stego`) | GW-1, ATH-2, STG-3 | `test_r10_tope_de_registros_por_ip`, `test_r10_limite_de_analisis_por_minuto` |
 | RS-29 | Errores seguros sin filtración de información | **Sí** | FND-4 | `test_errores_genericos`, `test_error_generico_para_clave_mala_y_usuario_inexistente` |
 | RS-30 | Revisión de riesgos desde el diseño | **Sí** | FND-1 | Spec §4 y §16, modelo de amenazas en `docs/cumplimiento-normativo.md` §5.3 |
-| RS-31 | Verificación continua de identidad y permisos | **Sí** | FND-4, ATH-2, GW-1 | `test_identidad_solo_vale_si_la_trae_el_gateway`, `test_verify_devuelve_identidad_y_permisos_actuales` |
+| RS-31 | Verificación continua de identidad y permisos | **Sí** | FND-4, ATH-2, GW-1 | `test_identidad_solo_vale_si_la_trae_el_gateway`, `test_identidad_ignorada_si_no_la_trae_el_gateway`, `test_verify_devuelve_identidad_y_permisos_actuales` |
 | RS-32 | Detección temprana de vulnerabilidades | **Sí** | FND-1, FND-7 | CI (ruff, bandit, pip-audit, CodeQL, gitleaks) |
 | RS-33 | Asociación de riesgos con controles ISO/IEC 27001 | **Sí** | FND-1 | `docs/cumplimiento-normativo.md` §1 y la columna ISO de `docs/trazabilidad-riesgos.md` |
 | RS-34 | Verificación documentada de controles de aplicación (ISO/IEC 27034) | **Sí** | FND-1 | `docs/cumplimiento-normativo.md` §2 |

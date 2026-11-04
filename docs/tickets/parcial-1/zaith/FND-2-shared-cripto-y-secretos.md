@@ -9,7 +9,7 @@
 | Necesita | Nada: puedes empezar ya |
 | Lo necesitan | [FND-4](../zaith/FND-4-autenticacion-entre-servicios.md) (Zaith), [FND-5](../zaith/FND-5-utilidades-de-bd-y-pruebas.md) (Zaith), [FND-6](../zaith/FND-6-docker-secretos-postgres.md) (Zaith), [ATH-1](../andres/ATH-1-auth-esqueleto-y-jwt.md) (Andrés), [STG-1](../stefany/STG-1-stego-esqueleto-y-analisis.md) (Stefany) |
 | Plan | [`docs/plans/2026-10-13-01-fundaciones.md`](../../../plans/2026-10-13-01-fundaciones.md), sección *Task FND-2* |
-| Estado | Pendiente |
+| Estado | Cerrado (2026-11-02, `0fc6e32`) |
 
 ## Objetivo
 
@@ -21,9 +21,9 @@ No depende de nadie. Hazla justo después de FND-1: el `pyproject.toml` de `shar
 
 ## Criterios de aceptación
 
-- [ ] `pip install -e "services/shared[dev]"` instala sin errores
-- [ ] `test_crypto.py` y `test_r02_secretos.py` pasan
-- [ ] Sin un secreto, `read_secret` falla y el servicio no arranca (R2)
+- [x] `pip install -e "services/shared[dev]"` instala sin errores
+- [x] `test_crypto.py` y `test_r02_secretos.py` pasan
+- [x] Sin un secreto, `read_secret` falla y el servicio no arranca (R2)
 
 ## Entregables
 
@@ -42,7 +42,7 @@ No depende de nadie. Hazla justo después de FND-1: el `pyproject.toml` de `shar
 
 ## Al cerrar
 
-- [ ] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada
-- [ ] La trazabilidad y los documentos de arriba están actualizados
-- [ ] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
-- [ ] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)
+- [x] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada
+- [x] La trazabilidad y los documentos de arriba están actualizados
+- [x] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
+- [x] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)

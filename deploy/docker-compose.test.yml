@@ -1,0 +1,9 @@
+# Solo para pruebas locales. La contraseña "postgres" es de prueba; no es un secreto.
+name: chat-seguro-test
+services:
+  db-test:
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports: ["127.0.0.1:5433:5432"]
+    tmpfs: [/var/lib/postgresql/data]
