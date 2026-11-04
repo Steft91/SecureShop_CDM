@@ -6,7 +6,7 @@
 | **Autores** | Zaith Alejandro Manangón Vinueza, Stefany Maricela Díaz Antun, Andrés Isaias Cedeño Cuenca |
 | **Asignatura** | Software Seguro — Proyecto Integrador |
 | **Estado** | Revisión 5. Planes del primer parcial en `docs/plans/` y tickets en `docs/tickets/parcial-1/` |
-| **Fuente de requisitos** | `Documentación/Tarea 2/Actividad2_SGSI_Proyecto_Integrador.md` (enunciado + Tablas 1–4 de riesgos), `PROYECTO INTEGRADOR - RESUMEN.docx` (resumen del docente), la clase del 22/10/2026 y el enunciado `Proyecto_Integrador_Primer_Parcial.pdf` (primer parcial, §23). Los requisitos con ID están en `docs/requisitos.md` |
+| **Fuente de requisitos** | `Documentación/Tarea 2/Actividad2_SGSI_Proyecto_Integrador.md` (enunciado + Tablas 1–4 de riesgos), `PROYECTO INTEGRADOR - RESUMEN.docx` (resumen del docente), la clase del 22/10/2026 y el enunciado `docs/enunciado/Proyecto_Integrador_Primer_Parcial.pdf` (primer parcial, §23). Los requisitos con ID están en `docs/requisitos.md` |
 | **Plazo** | **Primer parcial:** corte definitivo con el gateway, `auth` y `stego`, probado con Postman; entrega y demo el **04/11/2026** (§23). **Después:** lo que el docente pida para los parciales 2 y 3 |
 
 > **Primer parcial: manda la §23.** El enunciado oficial del docente (2026-11-03) fija el contrato de `auth` y `stego`, el modelo de datos, los veredictos y los entregables. La §23 manda sobre el resto de esta spec y sobre los planes y tickets.
@@ -1125,7 +1125,7 @@ No se adoptan, salvo que el docente los pida: la prueba de 500 conexiones con 25
 
 ## 23. Revisión 5: enunciado oficial del primer parcial (2026-11-03)
 
-El docente publicó el enunciado del primer parcial (`Proyecto_Integrador_Primer_Parcial.pdf`, entrega el **04/11/2026** a la hora de clase, rúbrica de 20 puntos). **Esta sección manda sobre el resto de la spec y sobre los planes y tickets del primer parcial.** Lo que no aparece aquí sigue como estaba.
+El docente publicó el enunciado del primer parcial (`docs/enunciado/Proyecto_Integrador_Primer_Parcial.pdf`, entrega el **04/11/2026** a la hora de clase, rúbrica de 20 puntos). **Esta sección manda sobre el resto de la spec y sobre los planes y tickets del primer parcial.** Lo que no aparece aquí sigue como estaba.
 
 ### 23.1 Decisiones
 

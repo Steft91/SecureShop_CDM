@@ -1,7 +1,8 @@
 # Salas de Chat Seguras — contexto del proyecto
 
-Proyecto integrador de **Software Seguro** con **microservicios**. El primer parcial es el enunciado oficial del docente (`Proyecto_Integrador_Primer_Parcial.pdf`, entrega el **04/11/2026**; spec §23): dos microservicios sin interfaz gráfica detrás de un API Gateway, probados con Postman. `auth` maneja usuarios, roles ADMIN/ANALYST/USER y su relación N:M, y su login entrega un JWT; `stego` analiza una imagen, la clasifica en `sin_indicios`, `sospechoso`, `no_concluyente` o `error`, aplica una política y guarda el análisis, y solo se entra con el token de `auth`. Sin registro abierto, sin cookies y sin restricción de dispositivos. Las salas, el chat y la interfaz gráfica llegan por incrementos, cuando el docente los defina. Equipo: Manangón, Díaz, Cedeño.
+Proyecto integrador de **Software Seguro** con **microservicios**. El primer parcial es el enunciado oficial del docente (`docs/enunciado/Proyecto_Integrador_Primer_Parcial.pdf`, entrega el **04/11/2026**; spec §23): dos microservicios sin interfaz gráfica detrás de un API Gateway, probados con Postman. `auth` maneja usuarios, roles ADMIN/ANALYST/USER y su relación N:M, y su login entrega un JWT; `stego` analiza una imagen, la clasifica en `sin_indicios`, `sospechoso`, `no_concluyente` o `error`, aplica una política y guarda el análisis, y solo se entra con el token de `auth`. Sin registro abierto, sin cookies y sin restricción de dispositivos. Las salas, el chat y la interfaz gráfica llegan por incrementos, cuando el docente los defina. Equipo: Manangón, Díaz, Cedeño.
 
+- **Enunciado del primer parcial:** `docs/enunciado/` (PDF del docente y su texto en `.md`)
 - **Spec (diseño de referencia):** `docs/specs/2026-10-12-chat-seguro-design.md` (rev. 5; **la §23 manda en el primer parcial**)
 - **Plan:** `docs/plans/2026-10-13-00-indice.md` (+ un archivo por subsistema)
 - **Tickets (por parcial y persona):** `docs/tickets/README.md`
