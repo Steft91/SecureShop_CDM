@@ -1,4 +1,4 @@
-"""Configuración de auth (spec §19)."""
+"""Configuración de auth (spec §19, §23)."""
 
 from dataclasses import dataclass
 
@@ -12,6 +12,7 @@ class Settings:
     allowed_origins: frozenset[str] = frozenset({"https://localhost"})
     jwt_issuer: str = "auth"
     jwt_audience: str = "secure-chat"
+    jwt_ttl_min: int = 15
     session_idle_min: int = 30
     session_abs_hours: int = 8
     login_max_fails: int = 5
@@ -27,6 +28,7 @@ def load_settings() -> Settings:
         allowed_origins=origins(),
         jwt_issuer=env("JWT_ISSUER", "auth"),
         jwt_audience=env("JWT_AUDIENCE", "secure-chat"),
+        jwt_ttl_min=env("JWT_TTL_MIN", 15),
         session_idle_min=env("SESSION_IDLE_MIN", 30),
         session_abs_hours=env("SESSION_ABS_HOURS", 8),
         login_max_fails=env("LOGIN_MAX_FAILS", 5),
