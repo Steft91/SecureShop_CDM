@@ -1,24 +1,11 @@
 """Cuentas, catálogo de permisos, roles N:M y sesiones (spec §23.3, Anexo A)."""
 
-import sqlalchemy as sa
 from alembic import op
 
 revision = "0001"
 down_revision = None
 branch_labels = None
 depends_on = None
-
-PERMISSIONS = [
-    ("users.manage", "Listar, crear y desactivar cuentas"),
-    ("roles.manage", "Crear y editar roles; asignar y retirar roles a usuarios"),
-    ("steganography.analyze", "Enviar imágenes a análisis esteganográfico"),
-    ("steganography.results.read", "Consultar los resultados de los análisis propios"),
-    ("steganography.results.read_any", "Consultar los resultados de cualquier análisis"),
-]
-
-ADMIN_ROLE = "00000000-0000-4000-8000-000000000001"
-ANALYST_ROLE = "00000000-0000-4000-8000-000000000002"
-USER_ROLE = "00000000-0000-4000-8000-000000000003"
 
 UPGRADE = [
     "REVOKE ALL ON SCHEMA public FROM PUBLIC",
@@ -83,6 +70,24 @@ UPGRADE = [
     "GRANT SELECT ON permissions TO auth_app",
     "GRANT SELECT, INSERT ON failed_attempts TO auth_app",
     "GRANT USAGE ON SEQUENCE failed_attempts_id_seq TO auth_app",
+    """INSERT INTO permissions (code, description) VALUES
+        ('users.manage', 'Listar, crear y desactivar cuentas'),
+        ('roles.manage', 'Crear y editar roles; asignar y retirar roles a usuarios'),
+        ('steganography.analyze', 'Enviar imágenes a análisis esteganográfico'),
+        ('steganography.results.read', 'Consultar los resultados de los análisis propios'),
+        ('steganography.results.read_any', 'Consultar los resultados de cualquier análisis')""",
+    """INSERT INTO roles (id, name, description, builtin) VALUES
+        ('00000000-0000-4000-8000-000000000001', 'ADMIN', 'Admin global de la plataforma', true),
+        ('00000000-0000-4000-8000-000000000002', 'ANALYST', 'Analista de esteganografía', true),
+        ('00000000-0000-4000-8000-000000000003', 'USER', 'Usuario estándar de la plataforma', true)""",
+    """INSERT INTO role_permissions (role_id, permission) VALUES
+        ('00000000-0000-4000-8000-000000000001', 'users.manage'),
+        ('00000000-0000-4000-8000-000000000001', 'roles.manage'),
+        ('00000000-0000-4000-8000-000000000001', 'steganography.analyze'),
+        ('00000000-0000-4000-8000-000000000001', 'steganography.results.read'),
+        ('00000000-0000-4000-8000-000000000001', 'steganography.results.read_any'),
+        ('00000000-0000-4000-8000-000000000002', 'steganography.analyze'),
+        ('00000000-0000-4000-8000-000000000002', 'steganography.results.read')""",
 ]
 
 DOWNGRADE = [
@@ -99,40 +104,6 @@ DOWNGRADE = [
 def upgrade() -> None:
     for statement in UPGRADE:
         op.execute(statement)
-    insert_permission = sa.text(
-        "INSERT INTO permissions (code, description) VALUES (:code, :description)"
-    )
-    for code, description in PERMISSIONS:
-        op.execute(insert_permission.bindparams(code=code, description=description))
-    insert_role = sa.text(
-        "INSERT INTO roles (id, name, description, builtin) VALUES (:id, :name, :description, true)"
-    )
-    op.execute(
-        insert_role.bindparams(
-            id=ADMIN_ROLE, name="ADMIN", description="Admin global de la plataforma"
-        )
-    )
-    op.execute(
-        insert_role.bindparams(
-            id=ANALYST_ROLE, name="ANALYST", description="Analista de esteganografía"
-        )
-    )
-    op.execute(
-        insert_role.bindparams(
-            id=USER_ROLE, name="USER", description="Usuario estándar de la plataforma"
-        )
-    )
-
-    insert_role_perm = sa.text(
-        "INSERT INTO role_permissions (role_id, permission) VALUES (:role_id, :permission)"
-    )
-    # ADMIN tiene todos los permisos
-    for code, _ in PERMISSIONS:
-        op.execute(insert_role_perm.bindparams(role_id=ADMIN_ROLE, permission=code))
-    # ANALYST tiene steganography.analyze y steganography.results.read
-    for code in ("steganography.analyze", "steganography.results.read"):
-        op.execute(insert_role_perm.bindparams(role_id=ANALYST_ROLE, permission=code))
-    # USER no tiene permisos de catálogo por defecto
 
 
 def downgrade() -> None:

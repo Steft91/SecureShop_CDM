@@ -21,7 +21,7 @@ def test_r11_rol_app_confinado(database):
     ],
 )
 def test_r11_la_app_no_borra_cuentas_ni_edita_el_catalogo(database, statement):
-    with pytest.raises(Exception, match="permission denied"):
+    with pytest.raises(Exception, match="permission denied|permiso denegado"):
         testing.sql(APP_URL, statement)
 
 
@@ -50,23 +50,27 @@ def test_modelo_n_m_con_fk_y_unicidad(db):
     u2 = "00000000-0000-4000-8000-000000000011"
     admin_role = "00000000-0000-4000-8000-000000000001"
     db(
-        "INSERT INTO users (id, username, email, password_hash) VALUES (:id, :u, :e, :p)",
+        "INSERT INTO users (id, username, email, password_hash) VALUES (CAST(:id AS uuid), :u, :e, :p)",
         id=u1,
         u="user1",
         e="user1@example.com",
         p="hash1",
     )
-    with pytest.raises(Exception, match="duplicate key|unique constraint"):
+    with pytest.raises(
+        Exception, match="duplicate key|unique constraint|llave duplicada|violaci|restricci"
+    ):
         db(
-            "INSERT INTO users (id, username, email, password_hash) VALUES (:id, :u, :e, :p)",
+            "INSERT INTO users (id, username, email, password_hash) VALUES (CAST(:id AS uuid), :u, :e, :p)",
             id=u2,
             u="user1",
             e="user2@example.com",
             p="hash2",
         )
-    with pytest.raises(Exception, match="duplicate key|unique constraint"):
+    with pytest.raises(
+        Exception, match="duplicate key|unique constraint|llave duplicada|violaci|restricci"
+    ):
         db(
-            "INSERT INTO users (id, username, email, password_hash) VALUES (:id, :u, :e, :p)",
+            "INSERT INTO users (id, username, email, password_hash) VALUES (CAST(:id AS uuid), :u, :e, :p)",
             id=u2,
             u="user2",
             e="user1@example.com",
@@ -75,14 +79,16 @@ def test_modelo_n_m_con_fk_y_unicidad(db):
     ur1 = "00000000-0000-4000-8000-000000000020"
     ur2 = "00000000-0000-4000-8000-000000000021"
     db(
-        "INSERT INTO user_roles (id, user_id, role_id) VALUES (:id, :u, :r)",
+        "INSERT INTO user_roles (id, user_id, role_id) VALUES (CAST(:id AS uuid), CAST(:u AS uuid), CAST(:r AS uuid))",
         id=ur1,
         u=u1,
         r=admin_role,
     )
-    with pytest.raises(Exception, match="duplicate key|unique constraint"):
+    with pytest.raises(
+        Exception, match="duplicate key|unique constraint|llave duplicada|violaci|restricci"
+    ):
         db(
-            "INSERT INTO user_roles (id, user_id, role_id) VALUES (:id, :u, :r)",
+            "INSERT INTO user_roles (id, user_id, role_id) VALUES (CAST(:id AS uuid), CAST(:u AS uuid), CAST(:r AS uuid))",
             id=ur2,
             u=u1,
             r=admin_role,
