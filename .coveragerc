@@ -1,5 +1,8 @@
 # Cobertura de líneas (RNF-10): mide solo código de producción.
 [run]
+# SQLAlchemy async ejecuta las consultas en greenlets; sin esto, en Python 3.13 (CI) coverage
+# no ve las líneas que siguen a cada await de la BD y la cobertura de auth cae de 96 % a 74 %.
+concurrency = thread, greenlet
 omit =
     */tests/*
     */migrations/*
