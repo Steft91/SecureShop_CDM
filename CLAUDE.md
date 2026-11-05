@@ -58,4 +58,4 @@ pip install -e "services/shared[dev]" -e services/auth -e services/stego
 
 ## Estado actual
 Actualizar al cerrar cada ticket (`docs/tickets/README.md` tiene la ruta de cada persona).
-- Primer parcial: [x] 01 Fundaciones (FND-1 ✓, FND-2 ✓, FND-3 ✓, FND-4 ✓, FND-5 ✓, FND-6 ✓, FND-7 ✓ en local; falta el run en GitHub) · [x] 03 Auth (ATH-1 ✓, ATH-2 ✓, ATH-3 ✓, ATH-4 ✓) · [ ] 10 Stego · [ ] 04 Gateway (GW-1) · [ ] Entrega (PAR-1…3)
+- Primer parcial: [x] 01 Fundaciones (FND-1 ✓, FND-2 ✓, FND-3 ✓, FND-4 ✓, FND-5 ✓, FND-6 ✓, FND-7 ✓ en local; falta el run en GitHub) · [x] 03 Auth (ATH-1 ✓, ATH-2 ✓, ATH-3 ✓, ATH-4 ✓) · [x] 10 Stego (STG-1…5 ✓; commit pendiente) · [x] 04 Gateway (GW-1 ✓; paso 7 de CA mkcert pendiente) · [x] Entrega (PAR-1 ✓; captura del Runner pendiente)

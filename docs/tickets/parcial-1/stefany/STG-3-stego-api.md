@@ -9,7 +9,7 @@
 | Necesita | [STG-2](../stefany/STG-2-stego-formatos-y-veredicto.md) (Stefany), [FND-3](../andres/FND-3-argon2-y-limites.md) (Andrés) |
 | Lo necesitan | [STG-4](../stefany/STG-4-stego-demo-y-calibracion.md) (Stefany) |
 | Plan | [`docs/plans/2026-10-13-10-stego.md`](../../../plans/2026-10-13-10-stego.md), sección *Task STG-3* |
-| Estado | Pendiente |
+| Estado | Cerrado (2026-11-04; commit pendiente) |
 
 > **Rev. 5 (2026-11-03): manda la spec §23** (enunciado oficial; entrega el 04/11/2026). Este ticket ya está ajustado a ella; si el plan dice otra cosa, vale el ticket.
 
@@ -29,16 +29,16 @@ La BD de pruebas sale de `deploy/docker-compose.test.yml` con `testing.prepare_d
 
 ## Criterios de aceptación
 
-- [ ] Sin el token del gateway → 401 (middleware); sin identidad → 401; sin `steganography.analyze` → 403 y `perm.denied` (`test_r05_api.py`)
-- [ ] Cada análisis queda en `analyses` con id, usuario, `sha256`, técnica, indicadores, fecha, `status` y `action`; `stego_app` solo tiene `SELECT` e `INSERT` (`test_r11_privilegios_stego`)
-- [ ] La respuesta trae las claves del JSON de spec §23.7
-- [ ] `GET /api/steganography/results/{id}`: el dueño → 200; otro ANALYST → 403 y `perm.denied` (T11, `test_r05_resultado_ajeno_403`); con `steganography.results.read_any` → 200; inexistente → 404
-- [ ] Un `sospechoso` deja el archivo en `stego_quarantine/<analysis_id>` (`STEGO_QUARANTINE_DIR=/data`, archivos `0600`), escrito antes del `INSERT`; si falla la escritura o el `INSERT` → 503; los demás no dejan archivo
-- [ ] `filename` saneado (basename, NFC, sin caracteres de control, ≤ 255) y nunca en los eventos; un nombre de 300 caracteres no da 500 (`test_nombre_largo_se_trunca`)
-- [ ] El 413 también emite `stego.rejected`
-- [ ] Más de 10 análisis por minuto por usuario → 429 y `stego.ratelimited`; tiempo excedido → `no_concluyente` (`test_timeout_del_analisis_es_no_concluyente`)
-- [ ] Eventos con `shared.audit.emit` (`stego.analyzed`, `stego.rejected`, `stego.result.read`), sin el contenido del archivo
-- [ ] `services/stego/.env.example`, la migración `0001_analisis.py` y `docs/openapi/stego.json` (exportado con `app.openapi()`)
+- [x] Sin el token del gateway → 401 (middleware); sin identidad → 401; sin `steganography.analyze` → 403 y `perm.denied` (`test_r05_api.py`)
+- [x] Cada análisis queda en `analyses` con id, usuario, `sha256`, técnica, indicadores, fecha, `status` y `action`; `stego_app` solo tiene `SELECT` e `INSERT` (`test_r11_privilegios_stego`)
+- [x] La respuesta trae las claves del JSON de spec §23.7
+- [x] `GET /api/steganography/results/{id}`: el dueño → 200; otro ANALYST → 403 y `perm.denied` (T11, `test_r05_resultado_ajeno_403`); con `steganography.results.read_any` → 200; inexistente → 404
+- [x] Un `sospechoso` deja el archivo en `stego_quarantine/<analysis_id>` (`STEGO_QUARANTINE_DIR=/data`, archivos `0600`), escrito antes del `INSERT`; si falla la escritura o el `INSERT` → 503; los demás no dejan archivo
+- [x] `filename` saneado (basename, NFC, sin caracteres de control, ≤ 255) y nunca en los eventos; un nombre de 300 caracteres no da 500 (`test_nombre_largo_se_trunca`)
+- [x] El 413 también emite `stego.rejected`
+- [x] Más de 10 análisis por minuto por usuario → 429 y `stego.ratelimited`; tiempo excedido → `no_concluyente` (`test_timeout_del_analisis_es_no_concluyente`)
+- [x] Eventos con `shared.audit.emit` (`stego.analyzed`, `stego.rejected`, `stego.result.read`), sin el contenido del archivo
+- [x] `services/stego/.env.example`, la migración `0001_analisis.py` y `docs/openapi/stego.json` (exportado con `app.openapi()`)
 
 ## Entregables
 
@@ -56,10 +56,10 @@ La BD de pruebas sale de `deploy/docker-compose.test.yml` con `testing.prepare_d
 
 ## Al cerrar
 
-- [ ] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada
-- [ ] La trazabilidad y los documentos de arriba están actualizados
-- [ ] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
-- [ ] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)
+- [x] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada
+- [x] La trazabilidad y los documentos de arriba están actualizados
+- [x] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
+- [x] *Estado* = Cerrado, con la fecha; el hash se añadirá al cerrar los commits.
 
 
 > **Alcance (spec §23.1):** PNG con análisis de píxeles y estructura es lo obligatorio; JPEG, GIF y WAV entran con lo que ya tienen. STG-6 y STG-7 no bloquean la entrega.

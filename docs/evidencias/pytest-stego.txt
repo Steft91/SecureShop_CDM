@@ -1,0 +1,23 @@
+.........................................................                [100%]
+.venv\Lib\site-packages\fastapi\testclient.py:1
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.14.7-final-0 _______________
+Name                                    Stmts   Miss  Cover
+-----------------------------------------------------------
+services\stego\stego_svc\__init__.py        0      0   100%
+services\stego\stego_svc\config.py         18      1    94%
+services\stego\stego_svc\formats.py        43      4    91%
+services\stego\stego_svc\gif.py            66     16    76%
+services\stego\stego_svc\jpeg.py           45     11    76%
+services\stego\stego_svc\main.py           21      0   100%
+services\stego\stego_svc\pipeline.py       53      4    92%
+services\stego\stego_svc\png.py            60     14    77%
+services\stego\stego_svc\routes.py         91      2    98%
+services\stego\stego_svc\stego.py          66      5    92%
+services\stego\stego_svc\synthetic.py      27      0   100%
+services\stego\stego_svc\verdict.py        10      0   100%
+services\stego\stego_svc\wav.py            28      4    86%
+-----------------------------------------------------------
+TOTAL                                     528     61    88%
+Required test coverage of 80% reached. Total coverage: 88.45%
+57 passed, 1 warning in 43.66s

@@ -1,62 +1,46 @@
 # Colección de Postman del primer parcial
 
-Este directorio está reservado para `PAR-1`, a cargo de Stefany.
+`parcial-1.postman_collection.json` contiene 37 peticiones y recorre por el gateway el contrato mínimo del enunciado (§2.5) y los escenarios T02–T11 del Anexo D. No contiene secretos: las credenciales del administrador van en un entorno local, y los usuarios de prueba se crean con un sufijo distinto en cada corrida, así que se puede repetir sin limpiar la BD.
 
-## Alcance
+## Cómo ejecutarla
 
-La colección recorrerá el flujo del primer parcial:
+1. Stack levantado y administrador creado (ver `README.md` de la raíz).
+2. Entorno de Postman con `admin_username` y `admin_password`.
+3. *Working directory* en la raíz del repositorio y la CA de mkcert agregada en *Settings → Certificates*.
+4. `python services/stego/tools/stego_lab.py demo docs/demo-imagenes` para generar `grande.png`, que no se versiona.
+5. Runner: carpetas `1 - Admin` y `2 - Usuario y Stego`, en orden.
+6. Carpeta `3 - Manual: AUTH detenido (T08)`: solo después de `docker compose -f deploy/docker-compose.yml stop auth`. Luego, `start auth.
 
-1. Registro de un usuario sin privilegios.
-2. Rechazo de asignación masiva de rol.
-3. Login y consulta de identidad.
-4. Rechazo de Stego sin token y sin permiso.
-5. Login del administrador.
-6. Creación y asignación del rol `stego:analyze`.
-7. Análisis de las cuatro imágenes de demostración.
-8. Verificación de que los permisos actualizados aplican en la siguiente petición.
-9. Casos negativos y evidencias de logs.
+La colección valida el JWT ausente y manipulado. El caso de JWT vencido se verifica en `services/auth/tests/test_r16_check.py::test_jwt_vencido_401`; no se duplica en la colección porque su expiración no es reproducible de forma segura en Newman.
 
-## Variables
+## Cobertura
 
-La colección no debe contener secretos reales. Los valores sensibles se guardan únicamente como variables locales de Postman:
+| Ruta del enunciado | Petición |
+|---|---|
+| `POST /api/auth/login` | Login admin, Login con contraseña inválida, logins de los usuarios de prueba |
+| `GET /api/auth/profile` | Perfil usuario, Perfil con la sesión cerrada |
+| `POST /api/auth/logout` | Cerrar sesión |
+| `POST` y `GET /api/users` | Crear usuario demo y los otros dos; Listar usuarios |
+| `PATCH /api/users/:id` | Actualizar usuario |
+| `POST` y `GET /api/roles` | Crear rol analista, Listar roles (más `GET /api/roles/permissions`) |
+| `PATCH /api/roles/:id` | Actualizar rol |
+| `POST /api/user-roles` | Las cuatro asignaciones y la repetida (409) |
+| `DELETE /api/user-roles/:id` | Retirar el rol analista al usuario demo |
+| `POST /internal/authorization/check` | Lo llama el gateway en cada petición protegida; "Ruta interna no expuesta" comprueba el 404 desde afuera |
+| `POST /api/steganography/analyze` | Referencia, LSB, ZIP al final, no es imagen (415), truncada (422), más de 5 MB (413) y los rechazos 401 y 403 |
+| `GET /api/steganography/results/:id` | Consultar resultado propio (200) y análisis ajeno (403) |
 
-- `base_url`: `https://localhost`.
-- `admin_username`: variable local.
-- `admin_password`: variable local.
-- `username`, `user_id`, `user_token`, `admin_token`, `role_id`: variables generadas durante la ejecución.
+| Escenario | Petición | Esperado |
+|---|---|---|
+| T02 | Login admin / Login con contraseña inválida | 200 con JWT / 401 |
+| T03 | Analizar sin token / con JWT manipulado | 401 |
+| T04 | USER intenta analizar | 403 |
+| T05 | Asignar dos roles al usuario demo y el rol analista a dos usuarios; Listar usuarios | 201 y dos roles en el listado |
+| T06 | Repetir una asignación | 409 |
+| T07 | Retirar el rol y analizar con el mismo JWT | 204 / 403 |
+| T08 | Carpeta 3 con `auth` detenido | 503 |
+| T09 | Referencia / LSB | `sin_indicios` / `sospechoso` con indicadores y limitaciones |
+| T10 | No es imagen / truncada / más de 5 MB | 415 / 422 / 413 |
+| T11 | Consultar análisis ajeno | 403 |
 
-## Requisitos para ejecutar
-
-- Gateway, `auth` y `stego` levantados.
-- Certificado local de `mkcert` confiable en Postman.
-- Verificación SSL activada.
-- Directorio de trabajo de Postman ubicado en la raíz del repositorio.
-- Las imágenes de demo generadas localmente en `docs/demo-imagenes/`.
-
-## Colección disponible
-
-La colección `parcial-1.postman_collection.json` contiene el flujo integrado actual:
-
-- Login del administrador.
-- Consulta del catálogo de permisos.
-- Creación de usuario y rol analista.
-- Asignación del permiso `steganography.analyze`.
-- Listado y actualización de usuarios y roles con autorización `ADMIN`.
-- Login y perfil del usuario.
-- Análisis de las cuatro imágenes demo.
-- Cierre de sesión autenticado.
-
-Las rutas usan el contrato real del gateway: `/api/steganography/analyze`, `/api/users`, `/api/roles` y `/api/user-roles`.
-
-## Cobertura del contrato mínimo
-
-La colección cubre las rutas ejecutables del contrato mínimo:
-
-- AUTH: login, profile, logout, usuarios (POST/GET/PATCH), roles (POST/GET/PATCH) y user-roles (POST).
-- STEGO: POST `/api/steganography/analyze`, con casos limpia, problema, revisión manual y archivo inválido (422).
-
-La ruta GET `/api/steganography/results/:id` queda documentada como pendiente: el gateway reconoce su permiso, pero el servicio Stego actual no persiste ni expone resultados consultables. No se agrega una prueba falsa que aparente cubrirla.
-
-## Orden de ejecución
-
-Ejecuta la carpeta `1 - Admin` completa y luego `2 - Usuario y Stego` en orden. `Cerrar sesión usuario` debe ser la última solicitud porque invalida `user_token`. Si vuelves a ejecutar la colección, usa un `demo_user` y `demo_email` nuevos o elimina previamente el usuario creado.
+T01 y T12 se demuestran con `docker compose` (ver `README.md`). La salida de una corrida completa está en `docs/evidencias/postman-newman.txt`; la captura del Runner se incorpora como evidencia de la sustentación.
