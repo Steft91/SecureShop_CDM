@@ -10,11 +10,13 @@ router = APIRouter()
 _events = []
 _requests = defaultdict(deque)
 
+@router.post("/api/steganography/analyze")
 @router.post("/api/stego/analyze")
 async def analyze(request: Request, file: UploadFile = File(...), x_user_id: str | None = Header(None), x_user_perms: str = Header(""), x_service_name: str | None = Header(None), x_service_token: str | None = Header(None)):
-    if not x_user_id or x_service_name != "gateway":
+    caller = getattr(request.state, "caller", None)
+    if not x_user_id or caller != "gateway":
         _events.append({"event": "perm.denied", "user_id": x_user_id}); raise HTTPException(401, "identidad no válida")
-    if "stego:analyze" not in {p.strip() for p in x_user_perms.split(",")}: 
+    if "steganography.analyze" not in {p.strip() for p in x_user_perms.split(",")}:
         _events.append({"event": "perm.denied", "user_id": x_user_id}); raise HTTPException(403, "permiso insuficiente")
     now = time.monotonic(); bucket = _requests[x_user_id]
     while bucket and now - bucket[0] >= 60: bucket.popleft()
