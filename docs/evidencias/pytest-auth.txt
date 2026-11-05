@@ -1,0 +1,21 @@
+........................................................................ [ 93%]
+.....                                                                    [100%]
+.venv\Lib\site-packages\fastapi\testclient.py:1
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.14.7-final-0 _______________
+Name                                     Stmts   Miss  Cover
+------------------------------------------------------------
+services\auth\auth_svc\__init__.py           0      0   100%
+services\auth\auth_svc\accounts.py          45      0   100%
+services\auth\auth_svc\admin.py            211      8    96%
+services\auth\auth_svc\config.py            16      1    94%
+services\auth\auth_svc\create_admin.py      36      2    94%
+services\auth\auth_svc\internal.py          63      7    89%
+services\auth\auth_svc\main.py              14      0   100%
+services\auth\auth_svc\routes.py            57      2    96%
+services\auth\auth_svc\sessions.py          18      0   100%
+services\auth\auth_svc\tokens.py            18      0   100%
+------------------------------------------------------------
+TOTAL                                      478     20    96%
+Required test coverage of 80% reached. Total coverage: 95.82%
+77 passed, 1 warning in 35.55s

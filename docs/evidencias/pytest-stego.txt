@@ -1,0 +1,46 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.7, pytest-9.2.0, pluggy-1.7.0
+rootdir: C:\Users\alejo\Documentos\8vo Semestre\Sw Seguro\Repo\SecureShop_CDM\services\stego
+configfile: pyproject.toml
+plugins: anyio-4.16.0, platformdirs-4.14.3, cov-7.1.0, timeout-2.4.0
+collected 83 items
+
+services\stego\tests\test_analisis.py .................                  [ 20%]
+services\stego\tests\test_demo.py ............                           [ 34%]
+services\stego\tests\test_formatos_api.py .......                        [ 43%]
+services\stego\tests\test_gif_wav.py .....                               [ 49%]
+services\stego\tests\test_r05_api.py .......                             [ 57%]
+services\stego\tests\test_r06_estego.py .........                        [ 68%]
+services\stego\tests\test_r09_robustez.py ...............                [ 86%]
+services\stego\tests\test_r11_privilegios.py .                           [ 87%]
+services\stego\tests\test_resultados.py .....                            [ 93%]
+services\stego\tests\test_stego_core.py .....                            [100%]
+
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\alejo\Documentos\8vo Semestre\Sw Seguro\Repo\SecureShop_CDM\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=============================== tests coverage ================================
+_______________ coverage: platform win32, python 3.14.7-final-0 _______________
+
+Name                                    Stmts   Miss  Cover
+-----------------------------------------------------------
+services\stego\stego_svc\__init__.py        0      0   100%
+services\stego\stego_svc\config.py         23      1    96%
+services\stego\stego_svc\formats.py        43      4    91%
+services\stego\stego_svc\gif.py            66     16    76%
+services\stego\stego_svc\jpeg.py           45      7    84%
+services\stego\stego_svc\main.py           19      0   100%
+services\stego\stego_svc\pipeline.py       76      7    91%
+services\stego\stego_svc\png.py            62     14    77%
+services\stego\stego_svc\routes.py         88      2    98%
+services\stego\stego_svc\stego.py          66      3    95%
+services\stego\stego_svc\synthetic.py      27      0   100%
+services\stego\stego_svc\verdict.py        10      0   100%
+services\stego\stego_svc\wav.py            29      4    86%
+-----------------------------------------------------------
+TOTAL                                     554     58    90%
+Required test coverage of 80% reached. Total coverage: 89.53%
+================== 83 passed, 1 warning in 117.67s (0:01:57) ==================

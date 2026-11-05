@@ -1,0 +1,193 @@
+(node:26464) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
+(Use `node --trace-deprecation ...` to show where the warning was created)
+newman
+
+Chat seguro - Primer parcial
+
+□ 1 - Admin
+└ Login admin (T02)
+  POST https://localhost/api/auth/login [200 OK, 1.43kB, 115ms]
+  √  login admin: 200
+  √  JWT recibido
+  √  token_type Bearer
+
+└ Login con contraseña inválida (T02)
+  POST https://localhost/api/auth/login [401 Unauthorized, 614B, 584ms]
+  √  credenciales inválidas: 401
+  √  sin token
+
+└ Ruta interna no expuesta
+  POST https://localhost/internal/authorization/check [404 Not Found, 601B, 3ms]
+  √  el gateway no enruta /internal: 404
+
+└ Catálogo de permisos
+  GET https://localhost/api/roles/permissions [200 OK, 1.05kB, 9ms]
+  √  catálogo: 200
+  √  incluye steganography.analyze
+
+└ Crear usuario demo
+  POST https://localhost/api/users [201 Created, 742B, 67ms]
+  √  usuario creado: 201
+  √  nace sin roles
+
+└ Crear segundo analista
+  POST https://localhost/api/users [201 Created, 740B, 67ms]
+  √  usuario creado: 201
+
+└ Crear usuario solo USER
+  POST https://localhost/api/users [201 Created, 740B, 67ms]
+  √  usuario creado: 201
+
+└ Crear rol analista
+  POST https://localhost/api/roles [201 Created, 880B, 15ms]
+  √  rol creado: 201
+
+└ Listar roles
+  GET https://localhost/api/roles [200 OK, 2.74kB, 9ms]
+  √  roles listados: 200
+  √  aparece el rol creado
+  √  existen los roles semilla
+
+└ Asignar rol analista al usuario demo (T05)
+  POST https://localhost/api/user-roles [201 Created, 762B, 12ms]
+  √  rol asignado: 201
+
+└ Asignar USER al usuario demo (T05: dos roles)
+  POST https://localhost/api/user-roles [201 Created, 762B, 11ms]
+  √  segundo rol asignado: 201
+
+└ Asignar rol analista al segundo usuario (T05: un rol, dos usuarios)
+  POST https://localhost/api/user-roles [201 Created, 762B, 11ms]
+  √  rol asignado: 201
+
+└ Asignar USER al tercer usuario
+  POST https://localhost/api/user-roles [201 Created, 762B, 10ms]
+  √  rol asignado: 201
+
+└ Repetir una asignación (T06)
+  POST https://localhost/api/user-roles [409 Conflict, 608B, 9ms]
+  √  asignación duplicada: 409
+
+└ Listar usuarios (T05)
+  GET https://localhost/api/users [200 OK, 5.51kB, 10ms]
+  √  usuarios listados: 200
+  √  el usuario demo tiene dos roles
+
+└ Actualizar usuario
+  PATCH https://localhost/api/users/f173e695-2195-4708-b1d7-4f7af2009e2f [200 OK, 786B, 10ms]
+  √  usuario actualizado: 200
+
+└ Actualizar rol
+  PATCH https://localhost/api/roles/8ae495ea-6a57-43a1-8d34-7bdffef96ae3 [200 OK, 889B, 13ms]
+  √  rol actualizado: 200
+
+□ 2 - Usuario y Stego
+└ Login usuario demo
+  POST https://localhost/api/auth/login [200 OK, 1.47kB, 74ms]
+  √  login: 200
+
+└ Perfil usuario
+  GET https://localhost/api/auth/profile [200 OK, 806B, 8ms]
+  √  perfil: 200
+  √  permiso vigente
+  √  sin contraseña ni hash
+
+└ Analizar sin token (T03)
+  POST https://localhost/api/steganography/analyze (node:26464) [DEP0044] DeprecationWarning: The `util.isArray` API is deprecated. Please use `Array.isArray()` instead.
+[401 Unauthorized, 605B, 6ms]
+  √  sin JWT: 401
+
+└ Analizar con JWT manipulado (T03)
+  POST https://localhost/api/steganography/analyze [401 Unauthorized, 605B, 3ms]
+  √  firma inválida: 401
+
+└ Analizar imagen de referencia (T09)
+  POST https://localhost/api/steganography/analyze [200 OK, 1.37kB, 71ms]
+  √  Analizar imagen de referencia (T09): 200
+  √  contrato del análisis
+  √  sin indicios
+  √  política: ninguna
+  √  técnica LSB
+
+└ Analizar imagen con LSB (T09)
+  POST https://localhost/api/steganography/analyze [200 OK, 1.38kB, 63ms]
+  √  Analizar imagen con LSB (T09): 200
+  √  sospechoso
+  √  política: cuarentena
+  √  indicadores y umbrales
+  √  limitaciones declaradas
+
+└ Analizar PNG con ZIP al final
+  POST https://localhost/api/steganography/analyze [200 OK, 1.4kB, 61ms]
+  √  Analizar PNG con ZIP al final: 200
+  √  sospechoso por estructura
+
+└ Analizar archivo que no es imagen (T10)
+  POST https://localhost/api/steganography/analyze [415 Unsupported Media Type, 673B, 48ms]
+  √  Analizar archivo que no es imagen (T10): 415
+  √  formato no admitido
+
+└ Analizar PNG truncado (T10)
+  POST https://localhost/api/steganography/analyze [422 Unprocessable Content, 673B, 49ms]
+  √  Analizar PNG truncado (T10): 422
+
+└ Analizar archivo de más de 5 MB (T10)
+  POST https://localhost/api/steganography/analyze [413 Content Too Large, 620B, 93ms]
+  √  Analizar archivo de más de 5 MB (T10): 413
+
+└ Consultar resultado propio
+  GET https://localhost/api/steganography/results/445f9261-e913-4bab-a18c-60aaa50568ae [200 OK, 1.37kB, 9ms]
+  √  resultado propio: 200
+  √  mismo análisis
+
+└ Login segundo analista
+  POST https://localhost/api/auth/login [200 OK, 1.46kB, 74ms]
+  √  login: 200
+
+└ Consultar análisis ajeno (T11)
+  GET https://localhost/api/steganography/results/445f9261-e913-4bab-a18c-60aaa50568ae [403 Forbidden, 608B, 9ms]
+  √  recurso ajeno: 403
+
+└ Login usuario solo USER
+  POST https://localhost/api/auth/login [200 OK, 1.44kB, 66ms]
+  √  login: 200
+
+└ USER intenta analizar (T04)
+  POST https://localhost/api/steganography/analyze [403 Forbidden, 597B, 9ms]
+  √  USER intenta analizar (T04): 403
+
+└ Retirar el rol analista al usuario demo (T07)
+  DELETE https://localhost/api/user-roles/852a3aba-f7bd-4796-9cf4-ef1d56d608f8 [204 No Content, 525B, 9ms]
+  √  asignación retirada: 204
+
+└ Analizar con el mismo JWT tras retirar el rol (T07)
+  POST https://localhost/api/steganography/analyze [403 Forbidden, 597B, 6ms]
+  √  Analizar con el mismo JWT tras retirar el rol (T07): 403
+
+└ Cerrar sesión
+  POST https://localhost/api/auth/logout [204 No Content, 525B, 8ms]
+  √  logout: 204
+
+└ Perfil con la sesión cerrada
+  GET https://localhost/api/auth/profile [401 Unauthorized, 605B, 5ms]
+  √  sesión terminada: 401
+
+┌─────────────────────────┬───────────────────┬──────────────────┐
+│                         │          executed │           failed │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│              iterations │                 1 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│                requests │                36 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│            test-scripts │                36 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│      prerequest-scripts │                 3 │                0 │
+├─────────────────────────┼───────────────────┼──────────────────┤
+│              assertions │                57 │                0 │
+├─────────────────────────┴───────────────────┴──────────────────┤
+│ total run duration: 4.7s                                       │
+├────────────────────────────────────────────────────────────────┤
+│ total data received: 17.12kB (approx)                          │
+├────────────────────────────────────────────────────────────────┤
+│ average response time: 47ms [min: 3ms, max: 584ms, s.d.: 95ms] │
+└────────────────────────────────────────────────────────────────┘

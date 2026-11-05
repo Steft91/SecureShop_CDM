@@ -1,0 +1,24 @@
+# Falsos positivos de gitleaks ya commiteados: contraseñas de ejemplo de docs/plans/ y la de prueba de
+# services/auth/tests/conftest.py. Una huella por hallazgo (commit:archivo:regla:línea): un secreto nuevo
+# en esos mismos archivos sí se detecta. No se eximen carpetas.
+0b4689a28e1077d0f0e9aea47c3b80f481f32e48:docs/plans/2026-10-13-03-auth.md:generic-api-key:431
+0b4689a28e1077d0f0e9aea47c3b80f481f32e48:docs/plans/2026-10-13-03-auth.md:generic-api-key:54
+0b4689a28e1077d0f0e9aea47c3b80f481f32e48:docs/plans/rev3/2026-10-13-05-rooms.md:generic-api-key:872
+49a5f9fe9ae00388508c955e40b1f4cfbb40328e:docs/plans/2026-10-13-03-auth.md:generic-api-key:1147
+49a5f9fe9ae00388508c955e40b1f4cfbb40328e:docs/plans/2026-10-13-03-auth.md:generic-api-key:1281
+49a5f9fe9ae00388508c955e40b1f4cfbb40328e:docs/plans/2026-10-13-03-auth.md:generic-api-key:1290
+49a5f9fe9ae00388508c955e40b1f4cfbb40328e:docs/plans/2026-10-13-03-auth.md:generic-api-key:1850
+49a5f9fe9ae00388508c955e40b1f4cfbb40328e:docs/plans/2026-10-13-03-auth.md:generic-api-key:1851
+49a5f9fe9ae00388508c955e40b1f4cfbb40328e:docs/plans/2026-10-13-03-auth.md:generic-api-key:1852
+b4479f84ec64fed02c7d1d94f26223497883f31c:docs/plans/2026-10-13-03-auth.md:generic-api-key:54
+be93068b50da9ecd85d166bb8cf722856c761c73:docs/plans/2026-10-13-05-rooms.md:generic-api-key:872
+c4597f1bbc3f7e05353f55eb27fd024e73b992c3:services/auth/tests/conftest.py:generic-api-key:16
+e3bd9d6ad30673b029c7ceb6d4141e5bf5fc851d:docs/plans/2026-10-13-03-auth.md:generic-api-key:1398
+e3bd9d6ad30673b029c7ceb6d4141e5bf5fc851d:docs/plans/2026-10-13-03-auth.md:generic-api-key:1406
+e3bd9d6ad30673b029c7ceb6d4141e5bf5fc851d:docs/plans/2026-10-13-03-auth.md:generic-api-key:1415
+e3bd9d6ad30673b029c7ceb6d4141e5bf5fc851d:docs/plans/2026-10-13-03-auth.md:generic-api-key:1442
+e3bd9d6ad30673b029c7ceb6d4141e5bf5fc851d:docs/plans/2026-10-13-03-auth.md:generic-api-key:2645
+e3bd9d6ad30673b029c7ceb6d4141e5bf5fc851d:docs/plans/2026-10-13-03-auth.md:generic-api-key:2648
+e3bd9d6ad30673b029c7ceb6d4141e5bf5fc851d:docs/plans/2026-10-13-03-auth.md:generic-api-key:2650
+e3bd9d6ad30673b029c7ceb6d4141e5bf5fc851d:docs/plans/2026-10-13-05-rooms.md:generic-api-key:1072
+e3bd9d6ad30673b029c7ceb6d4141e5bf5fc851d:docs/plans/2026-10-13-05-rooms.md:generic-api-key:1075

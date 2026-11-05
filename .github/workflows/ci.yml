@@ -1,0 +1,95 @@
+name: ci
+on:
+  push:
+  pull_request:
+  # Revisión completa (gitleaks en todo el historial, CVE nuevos en pip-audit). `schedule` solo corre desde `main`.
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
+
+# Mínimo privilegio para el GITHUB_TOKEN; cada job pide solo lo que le falta.
+permissions:
+  contents: read
+
+# Acciones fijadas por SHA (un tag se puede mover); al actualizar, cambiar el SHA y el comentario.
+jobs:
+  services:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        svc: [shared, auth, stego]
+    services:
+      postgres:
+        # BD efímera de las pruebas (shared.testing: 127.0.0.1:5433). "postgres" es de prueba, no un secreto.
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Instalar
+        run: |
+          python -m pip install --upgrade pip
+          if [ "${{ matrix.svc }}" != "shared" ]; then pip install -r "services/${{ matrix.svc }}/requirements.lock"; fi
+          pip install -e "services/shared[dev]"
+          if [ "${{ matrix.svc }}" != "shared" ]; then pip install -e "services/${{ matrix.svc }}"; fi
+      - name: Ruff (incluye complejidad ≤ 10, RNF-11)
+        # deploy/ (gen_secrets.py, R2) se revisa en cada servicio: cuesta un segundo.
+        run: ruff check "services/${{ matrix.svc }}" deploy && ruff format --check "services/${{ matrix.svc }}" deploy
+      - name: Pruebas con cobertura ≥ 80 % (RNF-10)
+        run: |
+          pkg="${{ matrix.svc }}_svc"; [ "${{ matrix.svc }}" = shared ] && pkg=shared
+          pytest "services/${{ matrix.svc }}" --cov="$pkg" --cov-report=term --cov-fail-under=80
+      - name: Bandit
+        # -ll: severidad media o mayor. Se excluyen las pruebas, las herramientas y el soporte de pruebas.
+        run: bandit -q -ll -r "services/${{ matrix.svc }}" -x "services/${{ matrix.svc }}/tests,services/${{ matrix.svc }}/tools,services/shared/shared/testing.py"
+      - name: pip-audit
+        # El entorno de la CI y, aparte, el lock exacto que instala services/Dockerfile.
+        run: |
+          pip-audit --skip-editable
+          if [ "${{ matrix.svc }}" != "shared" ]; then pip-audit --no-deps -r "services/${{ matrix.svc }}/requirements.lock"; fi
+
+  codeql:
+    # SAST (Shift Left). El repositorio es público: los resultados van a Security → Code scanning,
+    # y la regla de `main` exige "Code scanning results" para que un hallazgo bloquee el merge.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066  # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066  # v4.39.3
+
+  secrets:
+    # gitleaks: en push y PR revisa sus commits; con schedule o workflow_dispatch, todo el historial.
+    # Falso positivo: `gitleaks:allow` en un comentario de esa línea (se ve en la revisión) o su huella
+    # en .gitleaksignore. Nunca se eximen carpetas.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e  # v3.0.0 (v2 usa Node 20, retirado)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.30.1  # la misma versión de la verificación local
+          GITLEAKS_ENABLE_COMMENTS: false  # comentar en el PR pediría permisos de escritura

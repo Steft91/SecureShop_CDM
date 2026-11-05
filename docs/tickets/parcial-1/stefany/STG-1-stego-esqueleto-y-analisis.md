@@ -1,4 +1,4 @@
-# STG-1: Esqueleto de `stego` sin BD, imágenes sintéticas y estegoanálisis (R6)
+# STG-1: Esqueleto de `stego`, imágenes sintéticas y estegoanálisis (R6)
 
 | Campo | Valor |
 |---|---|
@@ -9,25 +9,28 @@
 | Necesita | [FND-2](../zaith/FND-2-shared-cripto-y-secretos.md) (Zaith), [FND-4](../zaith/FND-4-autenticacion-entre-servicios.md) (Zaith) |
 | Lo necesitan | [STG-2](../stefany/STG-2-stego-formatos-y-veredicto.md) (Stefany) |
 | Plan | [`docs/plans/2026-10-13-10-stego.md`](../../../plans/2026-10-13-10-stego.md), sección *Task STG-1* |
-| Estado | Pendiente |
+| Estado | Cerrado (2026-11-04) |
 
 > El paso de compose necesita además FND-6.
 
+> **Rev. 5 (2026-11-03): manda la spec §23** (enunciado oficial; entrega el 04/11/2026). Este ticket ya está ajustado a ella; si el plan dice otra cosa, vale el ticket.
+
 ## Objetivo
 
-Servicio `stego` sin estado, con chi² (Westfeld), RS (Fridrich), entropía LSB, estructura PNG/JPEG y las imágenes sintéticas de las pruebas.
+Servicio `stego` con chi² (Westfeld), RS (Fridrich), entropía LSB, estructura PNG/JPEG y las imágenes sintéticas de las pruebas.
 
 ## Cómo trabajar sin esperar
 
-Empieza ya por los módulos de algoritmo: `stego.py`, `png.py`, `jpeg.py` y `synthetic.py` solo usan numpy, Pillow y scipy, no `shared`. Sus tests de `test_r06_estego.py` corren con `PYTHONPATH=services/stego pytest …`. `config.py`, `main.py` y `conftest.py` esperan a FND-2 y FND-4 de Zaith.
+El análisis ya está en `feat/stefany-stego` (`stego.py`, `png.py`, `jpeg.py`, `synthetic.py`, `stego_lab.py`) y no cambia con el enunciado. Lo que falta es montarlo sobre `shared` (STG-3).
 
 ## Criterios de aceptación
 
-- [ ] Un PNG con LSB secuencial al 10 % dispara chi²; LSB aleatorio al 50 % dispara RS; imágenes limpias y capturas con colores planos no disparan (`test_r06_estego.py`)
-- [ ] Datos después de `IEND` o `FFD9` → anomalía estructural; un JPEG progresivo no confunde al parser
-- [ ] `natural_image` y `embed_lsb` son deterministas con la misma semilla
-- [ ] Ninguna función pasa de complejidad 10: `jpeg.structure` se parte con `skip_entropy` (RNF-11)
-- [ ] `stego` en estado `healthy` en compose (sin BD, solo en la red `apps`) y en la matriz de la CI
+- [x] Un PNG con LSB secuencial al 10 % dispara chi²; LSB aleatorio al 50 % dispara RS; imágenes limpias y capturas con colores planos no disparan (`test_r06_estego.py`)
+- [x] Datos después de `IEND` o `FFD9` → anomalía estructural; un JPEG progresivo no confunde al parser
+- [x] `natural_image` y `embed_lsb` son deterministas con la misma semilla
+- [x] Ninguna función pasa de complejidad 10: `jpeg.structure` se parte con `skip_entropy` (RNF-11)
+- [x] `pyproject.toml` con `requires-python = ">=3.13"` y `httpx2` en las dependencias de prueba; se conserva `httpx2` porque Starlette marca `httpx` como obsoleto.
+- [x] `stego` en estado `healthy` en compose, en las redes `apps` y `data` (tiene BD desde STG-3)
 
 ## Entregables
 
@@ -45,10 +48,10 @@ Empieza ya por los módulos de algoritmo: `stego.py`, `png.py`, `jpeg.py` y `syn
 
 ## Al cerrar
 
-- [ ] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada
-- [ ] La trazabilidad y los documentos de arriba están actualizados
+- [x] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada
+- [x] La trazabilidad y los documentos de arriba están actualizados
 - [ ] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
-- [ ] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)
+- [x] *Estado* = Cerrado, con la fecha; el hash se añadirá al cerrar los commits.
 
 
-> **Actualización de alcance:** STG-5, STG-6 y STG-7 completan en este parcial los 9 formatos (GIF, WAV, MP3, MP4, PDF, DOCX y TXT), además de PNG y JPEG.
+> **Alcance (spec §23.1):** PNG con análisis de píxeles y estructura es lo obligatorio; JPEG, GIF y WAV entran con lo que ya tienen. STG-6 y STG-7 no bloquean la entrega.

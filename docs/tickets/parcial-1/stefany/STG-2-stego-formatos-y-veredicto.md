@@ -1,4 +1,4 @@
-# STG-2: Formatos, validación previa y veredicto (R6, R9)
+# STG-2: Formatos, validación previa, veredicto y política (R6, R9)
 
 | Campo | Valor |
 |---|---|
@@ -9,22 +9,24 @@
 | Necesita | [STG-1](../stefany/STG-1-stego-esqueleto-y-analisis.md) (Stefany) |
 | Lo necesitan | [STG-3](../stefany/STG-3-stego-api.md) (Stefany) |
 | Plan | [`docs/plans/2026-10-13-10-stego.md`](../../../plans/2026-10-13-10-stego.md), sección *Task STG-2* |
-| Estado | Pendiente |
+| Estado | Cerrado (2026-11-04) |
+
+> **Rev. 5 (2026-11-03): manda la spec §23** (enunciado oficial; entrega el 04/11/2026). Este ticket ya está ajustado a ella; si el plan dice otra cosa, vale el ticket.
 
 ## Objetivo
 
-El punto de extensión `FORMATS`, la validación previa y la clasificación en `invalida`, `problema`, `revision_manual` o `limpia`.
+El punto de extensión `FORMATS`, la validación previa (extensión, `Content-Type`, firma, tamaño y píxeles) y la clasificación de la spec §23.7: `sin_indicios`, `sospechoso`, `no_concluyente` o `error`, cada una con su política.
 
 ## Cómo trabajar sin esperar
 
-Depende de tu STG-1 y de `shared.crypto.sha256` (FND-2). `verdict.py` y la tabla de formatos se pueden escribir junto con los módulos de la fase A.
+`formats.py` y `verdict.py` ya existen en `feat/stefany-stego`: hay que cambiar los nombres de los veredictos, agregar la política y validar también la extensión y el `Content-Type`.
 
 ## Criterios de aceptación
 
-- [ ] Contenido que no coincide con la firma, un PNG truncado, una bomba de descompresión, más de 5 MB o más de 20 MP → `invalida` con sus `motivos` (`test_r09_formatos.py`)
-- [ ] Anomalía estructural → `problema`; solo estadística → `revision_manual`; si coinciden, gana `problema` (`test_veredicto.py`)
-- [ ] RGBA, paleta, escala de grises y 16 bits se analizan sin 500 (`test_modos_de_imagen_no_rgb`)
-- [ ] El JSON del veredicto tiene las claves de la spec §12.7 y los NaN salen como `null`
+- [x] Más de 5 MB → 413; extensión, `Content-Type` o firma no admitidos → 415; corrupto, truncado, bomba de descompresión o más de 20 MP → 422; los 415 y 422 quedan como `error` con `action = rechazo` (`test_r09_formatos.py`)
+- [x] Anomalía estructural o detector estadístico ≥ umbral → `sospechoso` y `cuarentena`; tiempo excedido o menos de 1000 píxeles → `no_concluyente` y `advertencia` (nunca `sin_indicios`); nada → `sin_indicios` y `ninguna` (`test_veredicto.py`)
+- [x] RGBA, paleta, escala de grises y 16 bits se analizan sin 500 (`test_modos_de_imagen_no_rgb`)
+- [x] `indicators` trae cada métrica con su umbral (`chi2_p_threshold`, `rs_rate_threshold`), los NaN salen como `null`, y la respuesta trae `technique` según el formato y `limitations`
 
 ## Entregables
 
@@ -41,10 +43,10 @@ Depende de tu STG-1 y de `shared.crypto.sha256` (FND-2). `verdict.py` y la tabla
 
 ## Al cerrar
 
-- [ ] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada
-- [ ] La trazabilidad y los documentos de arriba están actualizados
-- [ ] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
-- [ ] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)
+- [x] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada
+- [x] La trazabilidad y los documentos de arriba están actualizados
+- [x] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
+- [x] *Estado* = Cerrado, con la fecha; el hash se añadirá al cerrar los commits.
 
 
-> **Actualización de alcance:** STG-5, STG-6 y STG-7 completan en este parcial los 9 formatos (GIF, WAV, MP3, MP4, PDF, DOCX y TXT), además de PNG y JPEG.
+> **Alcance (spec §23.1):** PNG con análisis de píxeles y estructura es lo obligatorio; JPEG, GIF y WAV entran con lo que ya tienen. STG-6 y STG-7 no bloquean la entrega.

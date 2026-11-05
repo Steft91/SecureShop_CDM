@@ -1,4 +1,4 @@
-# ATH-2: Registro con alias, login, JWT y sesión de dispositivo único, `verify`, `me` y `logout` (R4, R5, R10, R13, R16)
+# ATH-2: Login, JWT, sesión revocable, `authorization/check`, `profile` y `logout` (R4, R5, R16)
 
 | Campo | Valor |
 |---|---|
@@ -9,35 +9,39 @@
 | Necesita | [ATH-1](../andres/ATH-1-auth-esqueleto-y-jwt.md) (Andrés) |
 | Lo necesitan | [ATH-3](../andres/ATH-3-auth-admin-por-cli.md) (Andrés) |
 | Plan | [`docs/plans/2026-10-13-03-auth.md`](../../../plans/2026-10-13-03-auth.md), sección *Task ATH-2* |
-| Estado | Pendiente |
+| Estado | Cerrado (2026-11-04, `5424fef`) |
+
+> **Rev. 5 (2026-11-03): manda la spec §23** (enunciado oficial; entrega el 04/11/2026). Este ticket ya está ajustado a ella; si el plan dice otra cosa, vale el ticket.
 
 ## Objetivo
 
-Cuentas con registro abierto (usuario, contraseña y alias visible) y sin roles, un login con bloqueo que entrega el JWT, una sesión por cuenta ligada al dispositivo, y el `verify` que el gateway llama en cada petición.
+Un login con bloqueo que entrega el JWT (sin cookies), sesiones revocables (una cuenta puede tener varias), el `POST /internal/authorization/check` que el gateway llama en cada petición y que decide **por acción** (spec §23.6), y `profile` y `logout`.
+
+**Fuera de este ticket** (lo quitó el enunciado): el registro abierto, el alias, la cookie de dispositivo y la sesión única por cuenta.
 
 ## Cómo trabajar sin esperar
 
-Solo depende de tu ATH-1.
+Solo depende de tu ATH-1. El plan (Task ATH-2) ya no tiene la cookie de dispositivo; de su código quita además el registro, el alias y la cookie `__Host-session`, y cambia `verify` por `check`.
 
 ## Criterios de aceptación
 
-- [ ] El registro pide `alias` (RF-20) y no asigna roles; un cuerpo con `role` → 422; `" ANA "` y `ana` son la misma cuenta (`test_usuario_normalizado_en_registro_y_login`)
-- [ ] El alias se normaliza, es único sin distinguir mayúsculas y rechaza caracteres de control y `<>` (`test_alias_duplicado_sin_distinguir_mayusculas_409`, `test_alias_invalido_422`); `me` y la lista de cuentas lo devuelven
-- [ ] Tope de registros por IP (`test_r10_tope_de_registros_por_ip`)
-- [ ] 5 fallos en 15 min → 429 + `Retry-After`; el mismo mensaje si el usuario no existe
-- [ ] El login devuelve `{access_token, token_type: "Bearer", expires_in}`
-- [ ] Login desde otro dispositivo con la sesión viva → 409; el JWT con otra cookie de dispositivo → 401
-- [ ] `verify` acepta la cookie o `Authorization: Bearer` y devuelve `X-User-Id/Name`, `X-Session-Id` y `X-User-Perms`; sin cookie de dispositivo → 401, nunca 500; solo lo llama el gateway
-- [ ] Los eventos (`auth.login.ok`, `auth.login.fail`, `auth.login.locked`, …) salen como registros JSON
+- [x] `POST /api/auth/login` → `200 {access_token, token_type: "Bearer", expires_in}` sin `Set-Cookie`; `" ANA "` y `ana` son la misma cuenta (`test_usuario_normalizado_al_crear_y_en_login`)
+- [x] Clave mala y usuario inexistente → el mismo `401 "credenciales inválidas"`; 5 fallos en 15 min por usuario o IP → 429 + `Retry-After` (`test_r04_*`); cuenta `inactive` → 403 después de verificar la contraseña
+- [x] `check` sin token, con el JWT alterado o vencido → 401 (`test_jwt_alterado_401`, `test_jwt_vencido_401`); con la sesión terminada o la cuenta inactiva → 401 (`test_jwt_de_sesion_terminada_401`, `test_cuenta_inactiva_401`)
+- [x] `check` traduce `X-Original-URI` a la acción de §23.6 y responde `200 {subject_id, action, allowed: true, reason}` con `X-User-Id`, `X-User-Name`, `X-Session-Id` y `X-User-Perms`, o `403 {allowed: false, …}` y `authz.denied`; la ruta se compara por segmentos completos (`/api/usersx` no es `/api/users`) y una que no está en el mapa → 403 (`test_check_decide_por_accion`)
+- [x] Solo cuentan los roles `active`; el claim `roles` del JWT no autoriza nada
+- [x] `check` solo acepta al gateway (`test_r16_check_solo_para_el_gateway`)
+- [x] `GET /api/auth/profile` → `{id, username, email, status, roles, permissions}`; `POST /api/auth/logout` → 204 y el mismo JWT da 401 después
+- [x] Eventos JSON `auth.login.ok`, `auth.login.fail`, `auth.login.locked`, `auth.login.inactive`, `auth.logout` y `authz.denied`, sin el JWT ni la contraseña
 
 ## Entregables
 
 - `services/auth/auth_svc/{accounts,sessions,routes,internal}.py`
-- Tests `test_registro.py`, `test_r04_login.py`, `test_r13_sesiones.py`, `test_r16_verify.py`
+- Tests `test_r04_login.py`, `test_sesiones.py`, `test_r16_check.py`
 
 ## Documentación a actualizar
 
-- Filas R4, R5, R10, R13 y R16 de la trazabilidad
+- Filas R4, R5 y R16 de la trazabilidad (R13 queda *Fuera del parcial*)
 
 ## Verificación
 
@@ -45,7 +49,7 @@ Solo depende de tu ATH-1.
 
 ## Al cerrar
 
-- [ ] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada
-- [ ] La trazabilidad y los documentos de arriba están actualizados
-- [ ] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
-- [ ] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)
+- [x] Los tests de la tarea están en verde, y `ruff check` y `ruff format --check` no reportan nada
+- [x] La trazabilidad y los documentos de arriba están actualizados
+- [x] Commit con el mensaje del plan (en español y sin atribución). Nada de `push` ni de merge a `main` sin autorización
+- [x] *Estado* = Cerrado, con la fecha y el hash del commit (aquí y en `docs/tickets/README.md`)

@@ -1,0 +1,31 @@
+# Secretos, certificados y archivos generados por entorno (spec §11)
+deploy/secrets/
+deploy/certs/
+.env
+*.pem
+*.key
+
+# Contexto local de cada integrante
+CLAUDE.local.md
+.claude/settings.local.json
+decision.md
+progress.md
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Calibración del estegoanálisis (imágenes personales)
+services/stego/tools/calibracion/*
+!services/stego/tools/calibracion/.gitkeep
+
+# Evidencias y salidas locales de la demo
+docs/demo-imagenes/grande.png
