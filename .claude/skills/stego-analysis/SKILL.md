@@ -28,8 +28,8 @@ Más de 5 MB → 413 sin registro. `sospechoso` es un indicio, no una prueba.
 ## Detectores (PNG, canales RGB)
 | Detector | Cálculo | Dispara si |
 |---|---|---|
-| Chi² (Westfeld–Pfitzmann) | Por canal: pares `(2k, 2k+1)`, `E=(h2k+h2k+1)/2`, `χ²=Σ(h2k−E)²/E` (pares con `E>4`), `p = chi2.sf(χ², pares−1)`; prefijos 10/25/50/100 % (≥ 1000 píxeles) | `p ≥ STEGO_CHI2_P` (0.95) |
-| RS (Fridrich 2001) | Grupos 2×2 en zigzag, variación `Σ|xᵢ₊₁−xᵢ|`, máscara `[0,1,1,0]`, raíz de menor módulo de `2(d1+d0)x² + (d−0−d−1−d1−3d0)x + d0−d−0`, `p̂ = x/(x−½)` | `p̂ ≥ STEGO_RS_RATE` (0.08) |
+| Chi² (Westfeld–Pfitzmann) | Por canal: pares `(2k, 2k+1)`, `E=(h2k+h2k+1)/2`, `χ²=Σ(h2k−E)²/E` (pares con `E>4`), `p = chi2.sf(χ², pares−1)`; prefijos 10/25/50/100 % (≥ 1000 píxeles) | `p ≥ STEGO_CHI2_P` (0.995) |
+| RS (Fridrich 2001) | Grupos 2×2 en zigzag, variación `Σ|xᵢ₊₁−xᵢ|`, máscara `[0,1,1,0]`, raíz de menor módulo de `2(d1+d0)x² + (d−0−d−1−d1−3d0)x + d0−d−0`, `p̂ = x/(x−½)` | `p̂ ≥ STEGO_RS_RATE` (0.15) |
 | Entropía LSB | Bloques 64×64; media y fracción de bloques con H ≥ 0.999 | Solo si `STEGO_ENTROPY_TRIGGER` está activo (por defecto, no) |
 | Estructura PNG | Bytes tras `IEND`, chunks de texto > 1 KB, chunks desconocidos | Cualquiera |
 | Estructura JPEG | Más de 16 bytes tras `FFD9`, APPn+COM > 64 KB | Cualquiera |

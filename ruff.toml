@@ -15,7 +15,8 @@ known-first-party = ["shared", "auth_svc", "stego_svc"]
 [lint.flake8-bugbear]
 # FastAPI declara dependencias y parámetros con llamadas en los valores por defecto.
 extend-immutable-calls = [
-  "fastapi.Depends", "fastapi.Query", "fastapi.params.Depends", "fastapi.params.Query",
+  "fastapi.Depends", "fastapi.Query", "fastapi.File", "fastapi.params.Depends", "fastapi.params.Query",
+  "fastapi.params.File",
   "shared.identity.require_perm", "shared.service_auth.allow",  # Depends(require_perm("x"))
 ]
 

@@ -18,8 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Cada tarea *-1 de un servicio agrega su nombre aquí (stego entra con STG-1).
-        svc: [shared, auth]
+        svc: [shared, auth, stego]
     services:
       postgres:
         # BD efímera de las pruebas (shared.testing: 127.0.0.1:5433). "postgres" es de prueba, no un secreto.

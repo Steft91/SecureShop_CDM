@@ -1,40 +1,155 @@
-import asyncio
+"""API de stego (spec §23.7): análisis con registro y consulta de resultados con propiedad."""
+
 import hashlib
-import time
-from collections import defaultdict, deque
-from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
-from stego_svc import formats
-from stego_svc.verdict import classify
+from uuid import UUID, uuid4
+
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
+
+from shared import audit
+from shared.identity import UserIdentity, client_ip, require_perm
+from shared.ratelimit import TokenBucket
+from stego_svc import formats, pipeline
+from stego_svc.verdict import ACTIONS, LIMITATIONS, classify
 
 router = APIRouter()
-_events = []
-_requests = defaultdict(deque)
+
+READ_ANY = "steganography.results.read_any"
+UNAVAILABLE = (SQLAlchemyError, OSError)  # BD caída o volumen de cuarentena inaccesible → 503
+
+
+def _emit(request: Request, who: UserIdentity, severity: str, event: str, **details) -> None:
+    audit.emit(
+        severity,
+        event,
+        actor=f"user:{who.username}",
+        target=request.url.path,
+        ip=client_ip(request),
+        details=details,
+    )
+
+
+def _check_rate(request: Request, who: UserIdentity) -> None:
+    per_min = request.app.state.settings.analyze_per_min
+    buckets = request.app.state.buckets
+    bucket = buckets.setdefault(who.user_id, TokenBucket(rate=per_min / 60, burst=per_min))
+    if not bucket.allow():
+        _emit(request, who, "warning", "stego.ratelimited")
+        raise HTTPException(429, "límite de análisis excedido")
+
+
+async def _persist(request: Request, record: dict, data: bytes) -> None:
+    """Sospechoso: primero el archivo en cuarentena y después el INSERT; si algo falla → 503."""
+    settings, engine = request.app.state.settings, request.app.state.engine
+    path = None
+    try:
+        if record["action"] == "cuarentena":
+            path = pipeline.quarantine(settings.quarantine_dir, record["id"], data)
+        await pipeline.save(engine, record)
+    except UNAVAILABLE:
+        if path is not None:
+            path.unlink(missing_ok=True)
+        details = {k: record[k] for k in ("sha256", "status")}
+        audit.emit(
+            "critical",
+            "stego.persist_failed",
+            actor="service:stego",
+            details={"analysis_id": record["id"], **details},
+        )
+        raise HTTPException(503, "servicio no disponible") from None
+
+
+async def _reject(request, who, record, data, code: int, error: str) -> JSONResponse:
+    record.update(technique="file_validation", status="error", action="rechazo", indicators={})
+    await _persist(request, record, data)
+    _emit(request, who, "warning", "stego.rejected", analysis_id=record["id"], code=code)
+    return JSONResponse({"error": error, "analysis_id": record["id"]}, status_code=code)
+
 
 @router.post("/api/steganography/analyze")
-@router.post("/api/stego/analyze")
-async def analyze(request: Request, file: UploadFile = File(...), x_user_id: str | None = Header(None), x_user_perms: str = Header(""), x_service_name: str | None = Header(None), x_service_token: str | None = Header(None)):
-    caller = getattr(request.state, "caller", None)
-    if not x_user_id or caller != "gateway":
-        _events.append({"event": "perm.denied", "user_id": x_user_id}); raise HTTPException(401, "identidad no válida")
-    if "steganography.analyze" not in {p.strip() for p in x_user_perms.split(",")}:
-        _events.append({"event": "perm.denied", "user_id": x_user_id}); raise HTTPException(403, "permiso insuficiente")
-    now = time.monotonic(); bucket = _requests[x_user_id]
-    while bucket and now - bucket[0] >= 60: bucket.popleft()
-    settings = getattr(request.app.state, "settings", None)
-    per_min = getattr(settings, "analyze_per_min", 10)
-    max_bytes = getattr(settings, "upload_max_bytes", 5 * 1024 * 1024)
-    max_pixels = getattr(settings, "max_image_pixels", 20_000_000)
-    timeout = getattr(settings, "stego_timeout_s", 10.0)
-    if len(bucket) >= per_min:
-        _events.append({"event": "stego.ratelimited", "user_id": x_user_id}); raise HTTPException(429, "límite de análisis excedido")
-    bucket.append(now)
-    data = await file.read(max_bytes + 1)
-    kind, reasons = formats.validate(data, max_bytes=max_bytes, max_pixels=max_pixels)
-    if not kind: raise HTTPException(422, {"error": "archivo no permitido", "motivos": reasons})
+async def analyze(
+    request: Request,
+    file: UploadFile = File(...),
+    who: UserIdentity = Depends(require_perm("steganography.analyze")),
+):
+    settings = request.app.state.settings
+    _check_rate(request, who)
+    data = await file.read(settings.upload_max_bytes + 1)
+    if len(data) > settings.upload_max_bytes:
+        _emit(request, who, "warning", "stego.rejected", code=413, size_bytes=len(data))
+        raise HTTPException(413, "archivo demasiado grande")
+    name = pipeline.clean_name(file.filename)
+    kind = formats.detect(data)
+    record = {
+        "id": str(uuid4()),
+        "user_id": who.user_id,
+        "filename": name,
+        "mime": None,
+        "size_bytes": len(data),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "reasons": [],
+    }
+    if kind is None or not formats.matches(kind, name, file.content_type):
+        record["reasons"] = ["firma, extensión o Content-Type no admitidos"]
+        return await _reject(request, who, record, data, 415, "formato no admitido")
+    record["mime"] = kind
+    cfg = settings.thresholds
+    result = await pipeline.analyze_isolated(
+        request.app.state, kind, data, cfg, settings.stego_timeout_s
+    )
+    if result.get("problems"):
+        record["reasons"] = result["problems"]
+        return await _reject(request, who, record, data, 422, "archivo no permitido")
+    status = classify(result)
+    record.update(
+        technique=formats.FORMATS[kind].technique,
+        status=status,
+        action=ACTIONS[status],
+        indicators=pipeline.indicators(kind, result["metrics"], cfg),
+        reasons=result["reasons"],
+    )
+    await _persist(request, record, data)
+    severity = "info" if status == "sin_indicios" else "warning"
+    _emit(
+        request,
+        who,
+        severity,
+        "stego.analyzed",
+        analysis_id=record["id"],
+        sha256=record["sha256"],
+        status=status,
+        action=record["action"],
+    )
+    return await _read(request, record["id"])
+
+
+async def _read(request: Request, analysis_id: str) -> dict | None:
     try:
-        result = await asyncio.wait_for(asyncio.to_thread(formats.FORMATS[kind].analyze, data, {"chi2_p": .995, "rs_rate": .15, "entropy_trigger": None, "max_pixels": max_pixels}), timeout=timeout)
-    except asyncio.TimeoutError:
-        result = {"suspicious": True, "reasons": ["análisis excedió el tiempo límite"], "metrics": {}}
-    response = {"verdict": classify(result), "mime": kind, "sha256": hashlib.sha256(data).hexdigest(), "motivos": result["reasons"], "checks": result["metrics"]}
-    _events.append({"event": "stego.analyzed", "user_id": x_user_id, "verdict": response["verdict"]})
-    return response
+        found = await pipeline.fetch(request.app.state.engine, analysis_id)
+    except UNAVAILABLE:
+        raise HTTPException(503, "servicio no disponible") from None
+    if found is not None:
+        found["limitations"] = LIMITATIONS[found["technique"]]
+    return found
+
+
+@router.get("/api/steganography/results/{analysis_id}")
+async def result(
+    analysis_id: str,
+    request: Request,
+    who: UserIdentity = Depends(require_perm("steganography.results.read")),
+):
+    try:
+        analysis_id = str(UUID(analysis_id))  # forma canónica: Postgres no acepta urn:uuid:
+    except ValueError:
+        raise HTTPException(404, "no encontrado") from None
+    found = await _read(request, analysis_id)
+    if found is None:
+        raise HTTPException(404, "no encontrado")
+    # La propiedad sale de la identidad del gateway, nunca de un parámetro (T11).
+    if found["user_id"] != who.user_id and READ_ANY not in who.perms:
+        _emit(request, who, "warning", "perm.denied", required=[READ_ANY])
+        raise HTTPException(403, "permiso insuficiente")
+    _emit(request, who, "info", "stego.result.read", analysis_id=analysis_id)
+    return found

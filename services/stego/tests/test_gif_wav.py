@@ -1,10 +1,9 @@
 import io
-import struct
 import wave
 
 from PIL import Image
 
-from stego_svc import formats
+from stego_svc import formats, gif
 from stego_svc.verdict import classify
 
 
@@ -30,7 +29,7 @@ def test_gif_valido():
     assert kind == "image/gif"
     assert reasons == []
     result = formats.FORMATS[kind].analyze(data, {"max_pixels": 20_000_000})
-    assert classify(result) == "limpia"
+    assert classify(result) == "sin_indicios"
 
 
 def test_gif_truncado_es_invalido():
@@ -45,10 +44,17 @@ def test_wav_valido():
     assert kind == "audio/wav"
     assert reasons == []
     result = formats.FORMATS[kind].analyze(data, {})
-    assert classify(result) == "limpia"
+    assert classify(result) == "sin_indicios"
 
 
 def test_wav_truncado_es_invalido():
     kind, reasons = formats.validate(wav_bytes()[:-10])
     assert kind is None
     assert reasons
+
+
+def test_gif_con_datos_tras_el_trailer_aunque_contengan_punto_y_coma():
+    """El final es el trailer que encuentra el parser, no el último ';' del archivo."""
+    found = gif.structure(gif_bytes() + b"oculto;mas")
+    assert found["trailing_bytes"] == len(b"oculto;mas")
+    assert "datos después del trailer GIF" in gif.structural_reasons(found)

@@ -68,10 +68,23 @@ services:
     image: chat-seguro/stego
     environment:
       STEGO_QUARANTINE_DIR: /data
+      STEGO_CHI2_P: "0.995"  # umbrales calibrados (docs/calibracion-estego.md)
+      STEGO_RS_RATE: "0.15"
     secrets: [db_stego_app, svc_hash_gateway]
     volumes:
       - stego_quarantine:/data  # solo stego lo monta; ninguna ruta lo sirve
     networks: [apps, data]
+    # R10: un PNG de 20 MP ocupa ~600 MB en un worker; con 2 workers el contenedor no pasa de 2 GB.
+    mem_limit: 2g
+    pids_limit: 64
+    depends_on:
+      stego-migrate: {condition: service_completed_successfully}
+
+  stego-migrate:
+    <<: *migrate
+    build: {context: .., dockerfile: services/Dockerfile, args: {SERVICE: stego}}
+    image: chat-seguro/stego
+    secrets: [db_stego_owner]
 
   gateway:
     build: {context: .., dockerfile: gateway/Dockerfile}

@@ -28,5 +28,4 @@ services/stego/tools/calibracion/*
 !services/stego/tools/calibracion/.gitkeep
 
 # Evidencias y salidas locales de la demo
-docs/demo-imagenes/*
-!docs/demo-imagenes/.gitkeep
+docs/demo-imagenes/grande.png
