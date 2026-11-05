@@ -21,7 +21,7 @@
         {
           "name": "Login admin",
           "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}, {"key": "Origin", "value": "https://localhost"}], "body": {"mode": "raw", "raw": "{\n  \"username\": \"{{admin_username}}\",\n  \"password\": \"{{admin_password}}\"\n}"}, "url": {"raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"]}},
-          "event": [{"listen": "test", "script": {"exec": ["pm.test('login admin 200', () => pm.response.to.have.status(200));", "pm.collectionVariables.set('admin_token', pm.response.json().access_token);"]}}]
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('login admin 200', () => pm.response.to.have.status(200));", "const token = pm.response.json().access_token;", "pm.test('token admin recibido', () => pm.expect(token).to.be.a('string').and.not.empty);", "pm.collectionVariables.set('admin_token', token);", "pm.environment.set('admin_token', token);"]}}]
         },
         {
           "name": "Catálogo de permisos",
@@ -42,6 +42,26 @@
           "name": "Asignar rol al usuario",
           "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{admin_token}}"}, {"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"role_id\": \"{{role_id}}\"\n}"}, "url": {"raw": "{{base_url}}/api/user-roles", "host": ["{{base_url}}"], "path": ["api", "user-roles"]}},
           "event": [{"listen": "test", "script": {"exec": ["pm.test('rol asignado', () => pm.response.to.have.status(201));"]}}]
+        },
+        {
+          "name": "Listar usuarios (ADMIN)",
+          "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{admin_token}}"}], "url": {"raw": "{{base_url}}/api/users", "host": ["{{base_url}}"], "path": ["api", "users"]}},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('usuarios listados', () => pm.response.to.have.status(200));", "pm.test('aparece usuario demo', () => pm.expect(pm.response.text()).to.include(pm.environment.get('demo_user') || pm.collectionVariables.get('demo_user')));" ]}}]
+        },
+        {
+          "name": "Actualizar usuario (ADMIN)",
+          "request": {"method": "PATCH", "header": [{"key": "Authorization", "value": "Bearer {{admin_token}}"}, {"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"email\": \"{{demo_email}}\"\n}"}, "url": {"raw": "{{base_url}}/api/users/{{user_id}}", "host": ["{{base_url}}"], "path": ["api", "users", "{{user_id}}"]}},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('usuario actualizado', () => pm.response.to.have.status(200));"]}}]
+        },
+        {
+          "name": "Listar roles (ADMIN)",
+          "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{admin_token}}"}], "url": {"raw": "{{base_url}}/api/roles", "host": ["{{base_url}}"], "path": ["api", "roles"]}},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('roles listados', () => pm.response.to.have.status(200));", "pm.test('aparece rol creado', () => pm.expect(pm.response.text()).to.include('ANALISTA_'));" ]}}]
+        },
+        {
+          "name": "Actualizar rol (ADMIN)",
+          "request": {"method": "PATCH", "header": [{"key": "Authorization", "value": "Bearer {{admin_token}}"}, {"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"description\": \"Analista de esteganografía - actualizado\",\n  \"permissions\": [\"steganography.analyze\"]\n}"}, "url": {"raw": "{{base_url}}/api/roles/{{role_id}}", "host": ["{{base_url}}"], "path": ["api", "roles", "{{role_id}}"]}},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('rol actualizado', () => pm.response.to.have.status(200));"]}}]
         }
       ]
     },
@@ -51,7 +71,7 @@
         {
           "name": "Login usuario",
           "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"username\": \"{{demo_user}}\",\n  \"password\": \"{{demo_password}}\"\n}"}, "url": {"raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"]}},
-          "event": [{"listen": "test", "script": {"exec": ["pm.test('login usuario 200', () => pm.response.to.have.status(200));", "pm.collectionVariables.set('user_token', pm.response.json().access_token);"]}}]
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('login usuario 200', () => pm.response.to.have.status(200));", "const token = pm.response.json().access_token;", "pm.test('token usuario recibido', () => pm.expect(token).to.be.a('string').and.not.empty);", "pm.collectionVariables.set('user_token', token);", "pm.environment.set('user_token', token);"]}}]
         },
         {
           "name": "Perfil usuario",
@@ -77,6 +97,11 @@
           "name": "Analizar archivo inválido",
           "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{user_token}}"}], "body": {"mode": "formdata", "formdata": [{"key": "file", "type": "file", "src": "docs/demo-imagenes/4-invalida-no-es-imagen.png"}]}, "url": {"raw": "{{base_url}}/api/steganography/analyze", "host": ["{{base_url}}"], "path": ["api", "steganography", "analyze"]}},
           "event": [{"listen": "test", "script": {"exec": ["pm.test('inválido 422', () => pm.response.to.have.status(422));"]}}]
+        },
+        {
+          "name": "Cerrar sesión usuario",
+          "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{user_token}}"}], "url": {"raw": "{{base_url}}/api/auth/logout", "host": ["{{base_url}}"], "path": ["api", "auth", "logout"]}},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('logout 204', () => pm.response.to.have.status(204));"]}}]
         }
       ]
     }

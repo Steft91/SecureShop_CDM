@@ -41,7 +41,22 @@ La colección `parcial-1.postman_collection.json` contiene el flujo integrado ac
 - Consulta del catálogo de permisos.
 - Creación de usuario y rol analista.
 - Asignación del permiso `steganography.analyze`.
+- Listado y actualización de usuarios y roles con autorización `ADMIN`.
 - Login y perfil del usuario.
 - Análisis de las cuatro imágenes demo.
+- Cierre de sesión autenticado.
 
 Las rutas usan el contrato real del gateway: `/api/steganography/analyze`, `/api/users`, `/api/roles` y `/api/user-roles`.
+
+## Cobertura del contrato mínimo
+
+La colección cubre las rutas ejecutables del contrato mínimo:
+
+- AUTH: login, profile, logout, usuarios (POST/GET/PATCH), roles (POST/GET/PATCH) y user-roles (POST).
+- STEGO: POST `/api/steganography/analyze`, con casos limpia, problema, revisión manual y archivo inválido (422).
+
+La ruta GET `/api/steganography/results/:id` queda documentada como pendiente: el gateway reconoce su permiso, pero el servicio Stego actual no persiste ni expone resultados consultables. No se agrega una prueba falsa que aparente cubrirla.
+
+## Orden de ejecución
+
+Ejecuta la carpeta `1 - Admin` completa y luego `2 - Usuario y Stego` en orden. `Cerrar sesión usuario` debe ser la última solicitud porque invalida `user_token`. Si vuelves a ejecutar la colección, usa un `demo_user` y `demo_email` nuevos o elimina previamente el usuario creado.
