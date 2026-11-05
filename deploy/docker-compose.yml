@@ -72,14 +72,6 @@ services:
     volumes:
       - stego_quarantine:/data  # solo stego lo monta; ninguna ruta lo sirve
     networks: [apps, data]
-    depends_on:
-      stego-migrate: {condition: service_completed_successfully}
-
-  stego-migrate:
-    <<: *migrate
-    build: {context: .., dockerfile: services/Dockerfile, args: {SERVICE: stego}}
-    image: chat-seguro/stego
-    secrets: [db_stego_owner]
 
   gateway:
     build: {context: .., dockerfile: gateway/Dockerfile}
