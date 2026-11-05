@@ -152,6 +152,22 @@ Principio del documento: *ningún usuario, dispositivo, sesión o recurso es con
 | **gitleaks** | Secretos o claves en el historial del repositorio | Detección de secretos |
 | `pytest` por servicio con PostgreSQL real y cobertura ≥ 80 % | Regresión de cada control | Pruebas de seguridad |
 
+Cómo está armado el workflow:
+- **Token:** el `GITHUB_TOKEN` solo lee el repositorio (`permissions: contents: read`) y ningún checkout lo deja guardado (`persist-credentials: false`). `codeql` pide además `security-events: write` para publicar en Security → Code scanning.
+- **Acciones:** fijadas por SHA, con la versión en un comentario.
+- **Disparadores:** corre en cada push y PR, cada lunes y a pedido. En esas dos últimas corridas, gitleaks revisa todo el historial y pip-audit vuelve a buscar CVE nuevos.
+- **Matriz `services`:** hoy corre `shared` y `auth`, y ruff revisa también `deploy/`; `stego` entra con STG-1. pip-audit revisa el entorno y, además, el `requirements.lock` exacto que instala la imagen.
+- **gitleaks:** usa las reglas por defecto y no exime carpetas. Los 21 falsos positivos ya commiteados (contraseñas de ejemplo de `docs/plans/` y la de prueba de `services/auth/tests/conftest.py`) se ignoran uno por uno, por huella, en `.gitleaksignore`. Un caso nuevo se marca con `gitleaks:allow` en la línea, y eso queda visible en la revisión del PR. El hook `guard.py` no revisa `docs/`, así que eximir esa carpeta habría dejado un hueco.
+
+Evidencia (FND-7, 2026-11-04, en local):
+- ruff sin hallazgos.
+- `pytest` con `--cov-fail-under=80` en verde: `shared` 54 tests y 92 %; `auth` 77 tests y 96 %.
+- bandit `-ll` sin hallazgos.
+- `pip-audit` sin vulnerabilidades conocidas, tanto en un contenedor `python:3.13-slim` con la misma instalación que la CI como sobre `services/auth/requirements.lock`.
+- gitleaks 8.30.1 sin hallazgos en los 66 commits de ramas y remotos.
+
+El run en GitHub y la regla de `main` se registran cuando el equipo autorice el push.
+
 ### 5.3 Modelo de amenazas (STRIDE por componente)
 | Componente | S: suplantación | T: manipulación | R: repudio | I: divulgación | D: denegación | E: elevación |
 |---|---|---|---|---|---|---|
