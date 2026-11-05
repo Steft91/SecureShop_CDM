@@ -9,7 +9,7 @@
 | Necesita | [STG-2](../stefany/STG-2-stego-formatos-y-veredicto.md) (Stefany), [FND-3](../andres/FND-3-argon2-y-limites.md) (Andrés) |
 | Lo necesitan | [STG-4](../stefany/STG-4-stego-demo-y-calibracion.md) (Stefany) |
 | Plan | [`docs/plans/2026-10-13-10-stego.md`](../../../plans/2026-10-13-10-stego.md), sección *Task STG-3* |
-| Estado | Cerrado (2026-11-04; commit pendiente) |
+| Estado | Cerrado (2026-11-04) |
 
 > **Rev. 5 (2026-11-03): manda la spec §23** (enunciado oficial; entrega el 04/11/2026). Este ticket ya está ajustado a ella; si el plan dice otra cosa, vale el ticket.
 

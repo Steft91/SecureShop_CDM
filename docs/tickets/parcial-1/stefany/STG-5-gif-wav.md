@@ -9,7 +9,7 @@
 | Necesita | [STG-2](../stefany/STG-2-stego-formatos-y-veredicto.md) |
 | Lo necesitan | [STG-6](../zaith/STG-6-mp3-mp4.md), [STG-7](../andres/STG-7-pdf-docx-txt.md), [PAR-1](../stefany/PAR-1-postman.md) |
 | Plan | [`docs/plans/2026-10-13-10-stego.md`](../../../plans/2026-10-13-10-stego.md), *Task STG-5* |
-| Estado | Cerrado (2026-11-04; commit pendiente) |
+| Estado | Cerrado (2026-11-04) |
 
 ## Objetivo
 

@@ -9,7 +9,7 @@
 | Necesita | [STG-1](../stefany/STG-1-stego-esqueleto-y-analisis.md) (Stefany) |
 | Lo necesitan | [STG-3](../stefany/STG-3-stego-api.md) (Stefany) |
 | Plan | [`docs/plans/2026-10-13-10-stego.md`](../../../plans/2026-10-13-10-stego.md), sección *Task STG-2* |
-| Estado | Cerrado (2026-11-04; commit pendiente) |
+| Estado | Cerrado (2026-11-04) |
 
 > **Rev. 5 (2026-11-03): manda la spec §23** (enunciado oficial; entrega el 04/11/2026). Este ticket ya está ajustado a ella; si el plan dice otra cosa, vale el ticket.
 

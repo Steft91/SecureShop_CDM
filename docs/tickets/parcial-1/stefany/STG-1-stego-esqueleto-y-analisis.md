@@ -9,7 +9,7 @@
 | Necesita | [FND-2](../zaith/FND-2-shared-cripto-y-secretos.md) (Zaith), [FND-4](../zaith/FND-4-autenticacion-entre-servicios.md) (Zaith) |
 | Lo necesitan | [STG-2](../stefany/STG-2-stego-formatos-y-veredicto.md) (Stefany) |
 | Plan | [`docs/plans/2026-10-13-10-stego.md`](../../../plans/2026-10-13-10-stego.md), sección *Task STG-1* |
-| Estado | Cerrado (2026-11-04; commit pendiente) |
+| Estado | Cerrado (2026-11-04) |
 
 > El paso de compose necesita además FND-6.
 

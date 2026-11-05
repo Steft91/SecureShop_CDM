@@ -9,7 +9,7 @@
 | Necesita | [FND-6](../zaith/FND-6-docker-secretos-postgres.md) (Zaith), [ATH-4](../andres/ATH-4-auth-roles-y-permisos.md) (Andrés), [STG-4](../stefany/STG-4-stego-demo-y-calibracion.md) (Stefany) |
 | Lo necesitan | [PAR-1](../stefany/PAR-1-postman.md) (Stefany), [PAR-2](../stefany/PAR-2-informe-parcial.md) (Stefany) |
 | Plan | [`docs/plans/2026-10-13-04-gateway.md`](../../../plans/2026-10-13-04-gateway.md), sección *Task GW-1* |
-| Estado | Cerrado con evidencia pendiente (2026-11-04; pasos 1–6 y 8 verificados; paso 7 requiere CA de mkcert; commit pendiente) |
+| Estado | Cerrado con evidencia pendiente (2026-11-04; pasos 1–6 y 8 verificados; paso 7 requiere CA de mkcert) |
 
 > Es el punto donde se juntan los tres: avisa en el grupo cuando `auth` y `stego` estén `healthy` en compose.
 

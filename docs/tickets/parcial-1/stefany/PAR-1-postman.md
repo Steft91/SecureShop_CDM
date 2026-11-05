@@ -9,7 +9,7 @@
 | Necesita | [GW-1](../zaith/GW-1-gateway-parcial.md) (Zaith), [STG-4](../stefany/STG-4-stego-demo-y-calibracion.md) (Stefany) |
 | Lo necesitan | [PAR-3](../stefany/PAR-3-demo-y-ensayo.md) (Stefany) |
 | Plan | [`docs/plans/2026-10-25-parcial-1.md`](../../../plans/2026-10-25-parcial-1.md), sección *Task PAR-1* |
-| Estado | Cerrado con evidencia pendiente (2026-11-04; commit pendiente) |
+| Estado | Cerrado con evidencia pendiente (2026-11-04) |
 
 > **Rev. 5 (2026-11-03): manda la spec §23** (enunciado oficial; entrega el 04/11/2026). Este ticket ya está ajustado a ella; si el plan dice otra cosa, vale el ticket.
 

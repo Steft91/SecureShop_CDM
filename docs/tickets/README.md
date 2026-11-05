@@ -25,7 +25,7 @@ Solo existe el **primer parcial** (gateway, `auth` y `stego`, probados con Postm
 | A | [FND-5: Utilidades de BD para pruebas y migraciones comunes](parcial-1/zaith/FND-5-utilidades-de-bd-y-pruebas.md) | FND-2 | Cerrado (2026-11-03, `c62543e`) |
 | A | [FND-6: Plantilla Docker, generación de secretos y PostgreSQL de `auth`](parcial-1/zaith/FND-6-docker-secretos-postgres.md) | FND-2 | Cerrado (2026-11-03, `c090a11`) |
 | B | [FND-7: Integración continua](parcial-1/zaith/FND-7-integracion-continua.md) | FND-3, FND-6 | Cerrado en local (2026-11-04, `d8bb1e2`; falta el run en GitHub) |
-| C | [GW-1: Gateway Nginx con TLS 1.3, `auth_request` y las rutas del parcial (R5, R7, R10, R16)](parcial-1/zaith/GW-1-gateway-parcial.md) | FND-6, ATH-4, STG-4 | Cerrado con evidencia pendiente (2026-11-04; paso 7 requiere CA de mkcert; commit pendiente) |
+| C | [GW-1: Gateway Nginx con TLS 1.3, `auth_request` y las rutas del parcial (R5, R7, R10, R16)](parcial-1/zaith/GW-1-gateway-parcial.md) | FND-6, ATH-4, STG-4 | Cerrado con evidencia pendiente (2026-11-04; paso 7 requiere CA de mkcert) |
 
 ## Andrés
 
@@ -41,16 +41,16 @@ Solo existe el **primer parcial** (gateway, `auth` y `stego`, probados con Postm
 
 | Fase | Ticket | Necesita | Estado |
 |---|---|---|---|
-| A | [STG-1: Esqueleto de `stego`, imágenes sintéticas y estegoanálisis (R6)](parcial-1/stefany/STG-1-stego-esqueleto-y-analisis.md) | FND-2, FND-4 | Cerrado (2026-11-04; commit pendiente) |
-| B | [STG-2: Formatos, validación previa, veredicto y política (R6, R9)](parcial-1/stefany/STG-2-stego-formatos-y-veredicto.md) | STG-1 | Cerrado (2026-11-04; commit pendiente) |
-| B | [STG-3: API de análisis con persistencia, resultados y análisis aislado (R5, R9, R10, R11, R16)](parcial-1/stefany/STG-3-stego-api.md) | STG-2, FND-3 | Cerrado (2026-11-04; commit pendiente) |
-| B | [STG-4: Imágenes de la demo y calibración rápida](parcial-1/stefany/STG-4-stego-demo-y-calibracion.md) | STG-3 | Cerrado (2026-11-04; commit pendiente) |
-| C | [PAR-1: Colección de Postman del flujo del docente (RP-11)](parcial-1/stefany/PAR-1-postman.md) | GW-1, STG-4 | Cerrado con evidencia pendiente (2026-11-04; captura del Runner pendiente; commit pendiente) |
+| A | [STG-1: Esqueleto de `stego`, imágenes sintéticas y estegoanálisis (R6)](parcial-1/stefany/STG-1-stego-esqueleto-y-analisis.md) | FND-2, FND-4 | Cerrado (2026-11-04) |
+| B | [STG-2: Formatos, validación previa, veredicto y política (R6, R9)](parcial-1/stefany/STG-2-stego-formatos-y-veredicto.md) | STG-1 | Cerrado (2026-11-04) |
+| B | [STG-3: API de análisis con persistencia, resultados y análisis aislado (R5, R9, R10, R11, R16)](parcial-1/stefany/STG-3-stego-api.md) | STG-2, FND-3 | Cerrado (2026-11-04) |
+| B | [STG-4: Imágenes de la demo y calibración rápida](parcial-1/stefany/STG-4-stego-demo-y-calibracion.md) | STG-3 | Cerrado (2026-11-04) |
+| C | [PAR-1: Colección de Postman del flujo del docente (RP-11)](parcial-1/stefany/PAR-1-postman.md) | GW-1, STG-4 | Cerrado con evidencia pendiente (2026-11-04; captura del Runner pendiente) |
 | C | [PAR-2: Informe del primer parcial (RP-10)](parcial-1/stefany/PAR-2-informe-parcial.md) | GW-1 | Pendiente |
 | C | [PAR-3: Guion de la demo y ensayo desde un clon limpio (RP-11)](parcial-1/stefany/PAR-3-demo-y-ensayo.md) | PAR-1, PAR-2 | Pendiente |
 
 
-| B | [STG-5: GIF y WAV](parcial-1/stefany/STG-5-gif-wav.md) | STG-2 | Cerrado (2026-11-04; commit pendiente) |
+| B | [STG-5: GIF y WAV](parcial-1/stefany/STG-5-gif-wav.md) | STG-2 | Cerrado (2026-11-04) |
 | B | [STG-6: MP3 y MP4](parcial-1/zaith/STG-6-mp3-mp4.md) | STG-2 | Pendiente (no bloquea la entrega) |
 | B | [STG-7: PDF, DOCX y TXT](parcial-1/andres/STG-7-pdf-docx-txt.md) | STG-2 | Pendiente (no bloquea la entrega) |
 
