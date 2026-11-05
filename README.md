@@ -16,6 +16,25 @@ Equipo: Zaith Manangón, Andrés Cedeño y Stefany Díaz. Enunciado: `docs/enunc
 - [mkcert](https://github.com/FiloSottile/mkcert), para el certificado TLS local
 - Postman, o Node.js para correr la colección con `npx newman`
 
+### Instalación en Windows
+
+Abre PowerShell como administrador para instalar las herramientas del sistema. Si
+Chocolatey aún no está instalado, sigue primero su [guía oficial de
+instalación](https://chocolatey.org/install). Después instala `mkcert`:
+
+```powershell
+choco install mkcert -y
+```
+
+Cierra y vuelve a abrir VS Code o PowerShell para que se actualice el `PATH`.
+`mkcert -install` instala la CA local en Windows y, si existe un JDK instalado,
+también en el almacén de certificados de Java; por eso este comando debe
+ejecutarse desde una terminal como administrador:
+
+```powershell
+mkcert -install
+```
+
 ## Puesta en marcha
 
 ```bash
@@ -31,18 +50,45 @@ cd SecureShop_CDM
 
 2. **Certificado TLS.** Instala la CA local de mkcert una vez y crea el certificado para `localhost`:
 
-   ```bash
+   ```powershell
+   New-Item -ItemType Directory -Force deploy\certs
    mkcert -install
-   mkcert -cert-file deploy/certs/fullchain.pem -key-file deploy/certs/privkey.pem localhost 127.0.0.1 ::1
+   mkcert -cert-file deploy\certs\fullchain.pem `
+          -key-file deploy\certs\privkey.pem `
+          localhost 127.0.0.1 ::1
    ```
 
 3. **Levantar el stack.** Arranca `db`, `auth-migrate`, `auth`, `stego-migrate`, `stego` y `gateway`:
 
-   ```bash
+   ```powershell
    docker compose -f deploy/docker-compose.yml up -d --build --wait
    ```
 
    Si ya tenías el volumen `pgdata` de una versión sin la BD de `stego`, recréalo con `docker compose -f deploy/docker-compose.yml down -v`. Ojo: eso borra los datos locales.
+
+   El archivo Compose está dentro de `deploy`; si prefieres trabajar desde esa carpeta, usa:
+
+   ```powershell
+   cd deploy
+   docker compose up -d --build --wait
+   ```
+
+   Si una migración termina con `exit 1`, revisa sus logs usando el mismo archivo Compose:
+
+   ```powershell
+   docker compose -f deploy/docker-compose.yml logs stego-migrate auth-migrate
+   docker compose -f deploy/docker-compose.yml ps -a
+   ```
+
+   Si ejecutas `docker compose logs` desde la raíz sin `-f deploy/docker-compose.yml`,
+   Compose no encontrará ningún archivo de configuración. Si el problema es un
+   volumen de una versión anterior, recréalo con `down -v`; esto borra los datos
+   locales y vuelve a ejecutar las migraciones:
+
+   ```powershell
+   docker compose -f deploy/docker-compose.yml down -v
+   docker compose -f deploy/docker-compose.yml up -d --build --wait
+   ```
 
 4. **Crear el administrador.** No existen credenciales por defecto. El CLI pide la contraseña dos veces, sin mostrarla; en scripts, `exec -T` con `--password-stdin` la lee de la entrada estándar:
 
