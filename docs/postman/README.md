@@ -33,6 +33,15 @@ La colección no debe contener secretos reales. Los valores sensibles se guardan
 - Directorio de trabajo de Postman ubicado en la raíz del repositorio.
 - Las imágenes de demo generadas localmente en `docs/demo-imagenes/`.
 
-## Estado
+## Colección disponible
 
-La colección se implementará cuando los contratos ejecutables de `auth` y gateway estén disponibles. Hasta entonces, las pruebas de Stego se validan mediante pytest, calibración y llamadas directas a su API.
+La colección `parcial-1.postman_collection.json` contiene el flujo integrado actual:
+
+- Login del administrador.
+- Consulta del catálogo de permisos.
+- Creación de usuario y rol analista.
+- Asignación del permiso `steganography.analyze`.
+- Login y perfil del usuario.
+- Análisis de las cuatro imágenes demo.
+
+Las rutas usan el contrato real del gateway: `/api/steganography/analyze`, `/api/users`, `/api/roles` y `/api/user-roles`.

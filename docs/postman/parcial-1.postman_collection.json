@@ -1,0 +1,84 @@
+{
+  "info": {
+    "name": "Chat seguro - Primer parcial",
+    "description": "Flujo integrado auth + gateway + stego. No contiene secretos reales.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "base_url", "value": "https://localhost"},
+    {"key": "admin_token", "value": ""},
+    {"key": "user_token", "value": ""},
+    {"key": "user_id", "value": ""},
+    {"key": "role_id", "value": ""},
+    {"key": "demo_user", "value": ""},
+    {"key": "demo_password", "value": ""},
+    {"key": "demo_email", "value": ""}
+  ],
+  "item": [
+    {
+      "name": "1 - Admin",
+      "item": [
+        {
+          "name": "Login admin",
+          "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}, {"key": "Origin", "value": "https://localhost"}], "body": {"mode": "raw", "raw": "{\n  \"username\": \"{{admin_username}}\",\n  \"password\": \"{{admin_password}}\"\n}"}, "url": {"raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"]}},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('login admin 200', () => pm.response.to.have.status(200));", "pm.collectionVariables.set('admin_token', pm.response.json().access_token);"]}}]
+        },
+        {
+          "name": "Catálogo de permisos",
+          "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{admin_token}}"}], "url": {"raw": "{{base_url}}/api/roles/permissions", "host": ["{{base_url}}"], "path": ["api", "roles", "permissions"]}},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('permisos 200', () => pm.response.to.have.status(200));", "pm.test('incluye steganography.analyze', () => pm.expect(pm.response.text()).to.include('steganography.analyze'));"]}}]
+        },
+        {
+          "name": "Crear usuario demo",
+          "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{admin_token}}"}, {"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"username\": \"{{demo_user}}\",\n  \"email\": \"{{demo_email}}\",\n  \"password\": \"{{demo_password}}\"\n}"}, "url": {"raw": "{{base_url}}/api/users", "host": ["{{base_url}}"], "path": ["api", "users"]}},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('usuario creado', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('user_id', pm.response.json().id);"]}}]
+        },
+        {
+          "name": "Crear rol analista",
+          "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{admin_token}}"}, {"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"name\": \"ANALISTA_{{timestamp}}\",\n  \"description\": \"Analista de esteganografía\",\n  \"permissions\": [\"steganography.analyze\"]\n}"}, "url": {"raw": "{{base_url}}/api/roles", "host": ["{{base_url}}"], "path": ["api", "roles"]}},
+          "event": [{"listen": "prerequest", "script": {"exec": ["pm.collectionVariables.set('timestamp', Date.now().toString());"]}}, {"listen": "test", "script": {"exec": ["pm.test('rol creado', () => pm.response.to.have.status(201));", "pm.collectionVariables.set('role_id', pm.response.json().id);"]}}]
+        },
+        {
+          "name": "Asignar rol al usuario",
+          "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{admin_token}}"}, {"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"user_id\": \"{{user_id}}\",\n  \"role_id\": \"{{role_id}}\"\n}"}, "url": {"raw": "{{base_url}}/api/user-roles", "host": ["{{base_url}}"], "path": ["api", "user-roles"]}},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('rol asignado', () => pm.response.to.have.status(201));"]}}]
+        }
+      ]
+    },
+    {
+      "name": "2 - Usuario y Stego",
+      "item": [
+        {
+          "name": "Login usuario",
+          "request": {"method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": {"mode": "raw", "raw": "{\n  \"username\": \"{{demo_user}}\",\n  \"password\": \"{{demo_password}}\"\n}"}, "url": {"raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"]}},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('login usuario 200', () => pm.response.to.have.status(200));", "pm.collectionVariables.set('user_token', pm.response.json().access_token);"]}}]
+        },
+        {
+          "name": "Perfil usuario",
+          "request": {"method": "GET", "header": [{"key": "Authorization", "value": "Bearer {{user_token}}"}], "url": {"raw": "{{base_url}}/api/auth/profile", "host": ["{{base_url}}"], "path": ["api", "auth", "profile"]}},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('perfil 200', () => pm.response.to.have.status(200));", "pm.test('permiso asignado', () => pm.expect(pm.response.json().permissions).to.include('steganography.analyze'));"]}}]
+        },
+        {
+          "name": "Analizar limpia",
+          "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{user_token}}"}], "body": {"mode": "formdata", "formdata": [{"key": "file", "type": "file", "src": "docs/demo-imagenes/1-limpia.png"}]}, "url": {"raw": "{{base_url}}/api/steganography/analyze", "host": ["{{base_url}}"], "path": ["api", "steganography", "analyze"]}},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('limpia 200', () => pm.response.to.have.status(200));", "pm.test('veredicto limpia', () => pm.expect(pm.response.json().verdict).to.eql('limpia'));"]}}]
+        },
+        {
+          "name": "Analizar problema estructural",
+          "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{user_token}}"}], "body": {"mode": "formdata", "formdata": [{"key": "file", "type": "file", "src": "docs/demo-imagenes/2-problema-zip-al-final.png"}]}, "url": {"raw": "{{base_url}}/api/steganography/analyze", "host": ["{{base_url}}"], "path": ["api", "steganography", "analyze"]}},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('problema 200', () => pm.response.to.have.status(200));", "pm.test('veredicto problema', () => pm.expect(pm.response.json().verdict).to.eql('problema'));"]}}]
+        },
+        {
+          "name": "Analizar revisión manual",
+          "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{user_token}}"}], "body": {"mode": "formdata", "formdata": [{"key": "file", "type": "file", "src": "docs/demo-imagenes/3-revision-manual-lsb.png"}]}, "url": {"raw": "{{base_url}}/api/steganography/analyze", "host": ["{{base_url}}"], "path": ["api", "steganography", "analyze"]}},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('revisión manual 200', () => pm.response.to.have.status(200));", "pm.test('veredicto revisión manual', () => pm.expect(pm.response.json().verdict).to.eql('revision_manual'));"]}}]
+        },
+        {
+          "name": "Analizar archivo inválido",
+          "request": {"method": "POST", "header": [{"key": "Authorization", "value": "Bearer {{user_token}}"}], "body": {"mode": "formdata", "formdata": [{"key": "file", "type": "file", "src": "docs/demo-imagenes/4-invalida-no-es-imagen.png"}]}, "url": {"raw": "{{base_url}}/api/steganography/analyze", "host": ["{{base_url}}"], "path": ["api", "steganography", "analyze"]}},
+          "event": [{"listen": "test", "script": {"exec": ["pm.test('inválido 422', () => pm.response.to.have.status(422));"]}}]
+        }
+      ]
+    }
+  ]
+}
