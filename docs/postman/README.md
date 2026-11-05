@@ -6,10 +6,10 @@
 
 1. Stack levantado y administrador creado (ver `README.md` de la raíz).
 2. Entorno de Postman con `admin_username` y `admin_password`.
-3. *Working directory* en la raíz del repositorio y la CA de mkcert agregada en *Settings → Certificates*.
+3. *Working directory* en la raíz del repositorio y la CA de mkcert (`rootCA.pem`) en *Settings → Certificates → CA certificates*; el detalle está en el `README.md` de la raíz.
 4. `python services/stego/tools/stego_lab.py demo docs/demo-imagenes` para generar `grande.png`, que no se versiona.
 5. Runner: carpetas `1 - Admin` y `2 - Usuario y Stego`, en orden.
-6. Carpeta `3 - Manual: AUTH detenido (T08)`: solo después de `docker compose -f deploy/docker-compose.yml stop auth`. Luego, `start auth.
+6. Carpeta `3 - Manual: AUTH detenido (T08)`: solo después de `docker compose -f deploy/docker-compose.yml stop auth`. Luego, `docker compose -f deploy/docker-compose.yml start auth`.
 
 La colección valida el JWT ausente y manipulado. El caso de JWT vencido se verifica en `services/auth/tests/test_r16_check.py::test_jwt_vencido_401`; no se duplica en la colección porque su expiración no es reproducible de forma segura en Newman.
 
