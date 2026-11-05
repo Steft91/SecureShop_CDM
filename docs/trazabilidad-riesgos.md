@@ -24,7 +24,7 @@ Quedan fuera del primer parcial, hasta que el docente defina los siguientes entr
 |---|---|---|---|
 | TLS 1.2 rechazado | `curl --tlsv1.2 --tls-max 1.2 https://localhost/` | error de handshake | 2026-11-04: rechazado (gateway solo, certificado de prueba) |
 | http → https | `curl -I http://localhost/` | `301` | 2026-11-04: `301` a https (stack completo) |
-| /internal no enrutado | `curl -X POST https://localhost/internal/authorization/check` | `404` JSON | 2026-11-04: `404` (gateway solo) |
+| /internal no enrutado | `curl -X POST https://localhost/internal/authorization/check` | `404` JSON | 2026-11-04: `404` (gateway solo); 2026-11-05: `404` JSON con HSTS, stack completo y cadena verificada contra la CA de mkcert, sin `-k` (en Windows, `curl.exe --ssl-no-revoke`: la CA de mkcert no publica revocación) |
 | Cabeceras de identidad falsificadas | `curl -H "X-User-Id: x" -H "X-User-Perms: roles.manage" https://localhost/api/roles` | `401` JSON | 2026-11-04: `401`; con JWT de USER y `X-User-Perms` falsificada → `403` |
 | AUTH caído (T08) | `docker compose stop auth` y analizar con un JWT válido | `503` y ningún `stego.analyzed` | 2026-11-04: `503` con el stack completo (carpeta 3 de la colección) |
 | `auth` en compose (ATH-1) | `docker compose up -d --wait auth` | `auth-migrate` sale con 0 y `auth` queda `healthy` | 2026-11-04: OK (`db`, `auth-migrate` y `auth`, sin gateway) |

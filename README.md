@@ -42,13 +42,21 @@ git clone https://github.com/Steft91/SecureShop_CDM.git
 cd SecureShop_CDM
 ```
 
-1. **Secretos.** Crea las contraseñas de las BD, la clave de firma del JWT y el token del gateway en `deploy/secrets/`. Esa carpeta no se versiona, y el script solo genera los secretos que faltan.
+1. **Entorno de Python.** Va primero porque `gen_secrets.py` usa `cryptography`, y `stego_lab.py` (sección de Postman) usa `numpy` y `Pillow`:
+
+   ```bash
+   py -3.13 -m venv .venv                      # macOS/Linux: python3.13 -m venv .venv
+   .venv\Scripts\activate                      # macOS/Linux: source .venv/bin/activate
+   pip install -e "services/shared[dev]" -e services/auth -e services/stego
+   ```
+
+2. **Secretos.** Crea las contraseñas de las BD, la clave de firma del JWT y el token del gateway en `deploy/secrets/`. Esa carpeta no se versiona, y el script solo genera los secretos que faltan.
 
    ```bash
    python deploy/gen_secrets.py
    ```
 
-2. **Certificado TLS.** Instala la CA local de mkcert una vez y crea el certificado para `localhost`:
+3. **Certificado TLS.** Instala la CA local de mkcert una vez y crea el certificado para `localhost`:
 
    ```powershell
    New-Item -ItemType Directory -Force deploy\certs
@@ -58,13 +66,13 @@ cd SecureShop_CDM
           localhost 127.0.0.1 ::1
    ```
 
-3. **Levantar el stack.** Arranca `db`, `auth-migrate`, `auth`, `stego-migrate`, `stego` y `gateway`:
+4. **Levantar el stack.** Arranca `db`, `auth-migrate`, `auth`, `stego-migrate`, `stego` y `gateway`:
 
    ```powershell
    docker compose -f deploy/docker-compose.yml up -d --build --wait
    ```
 
-   Si ya tenías el volumen `pgdata` de una versión sin la BD de `stego`, recréalo con `docker compose -f deploy/docker-compose.yml down -v`. Ojo: eso borra los datos locales.
+   `auth-migrate` y `stego-migrate` aplican las migraciones y se apagan. Que aparezcan como `Exited (0)` en `docker compose -f deploy/docker-compose.yml ps -a` es lo esperado: `auth` y `stego` solo arrancan cuando su migración termina bien. Si el código no es 0, la causa está en `docker compose -f deploy/docker-compose.yml logs auth-migrate stego-migrate`.
 
    El archivo Compose está dentro de `deploy`; si prefieres trabajar desde esa carpeta, usa:
 
@@ -73,24 +81,24 @@ cd SecureShop_CDM
    docker compose up -d --build --wait
    ```
 
-   Si una migración termina con `exit 1`, revisa sus logs usando el mismo archivo Compose:
+   Desde la raíz, todo `docker compose` (también `logs` y `ps`) necesita `-f deploy/docker-compose.yml`; sin él, Compose no encuentra ningún archivo de configuración.
 
-   ```powershell
-   docker compose -f deploy/docker-compose.yml logs stego-migrate auth-migrate
-   docker compose -f deploy/docker-compose.yml ps -a
-   ```
-
-   Si ejecutas `docker compose logs` desde la raíz sin `-f deploy/docker-compose.yml`,
-   Compose no encontrará ningún archivo de configuración. Si el problema es un
-   volumen de una versión anterior, recréalo con `down -v`; esto borra los datos
-   locales y vuelve a ejecutar las migraciones:
+   Si ya tenías el volumen `pgdata` de una versión anterior (por ejemplo, sin la BD de `stego`), recréalo con `down -v`; esto borra los datos locales y vuelve a ejecutar las migraciones:
 
    ```powershell
    docker compose -f deploy/docker-compose.yml down -v
    docker compose -f deploy/docker-compose.yml up -d --build --wait
    ```
 
-4. **Crear el administrador.** No existen credenciales por defecto. El CLI pide la contraseña dos veces, sin mostrarla; en scripts, `exec -T` con `--password-stdin` la lee de la entrada estándar:
+   Para comprobar el gateway y TLS (no hay `/health` público, y las rutas internas no se exponen):
+
+   ```bash
+   curl -i https://localhost/internal/authorization/check   # Windows: curl.exe -i --ssl-no-revoke https://localhost/internal/authorization/check
+   ```
+
+   Debe responder `404` con `{"error":"no encontrado"}`. En Windows, curl necesita `--ssl-no-revoke` porque la CA de mkcert no publica una lista de revocación; la cadena del certificado se sigue verificando, a diferencia de `-k`.
+
+5. **Crear el administrador.** No existen credenciales por defecto. El CLI pide la contraseña dos veces, sin mostrarla; en scripts, `exec -T` con `--password-stdin` la lee de la entrada estándar:
 
    ```bash
    docker compose -f deploy/docker-compose.yml exec auth python -m auth_svc.create_admin <usuario> --email <correo>
@@ -121,10 +129,12 @@ Las especificaciones OpenAPI están en `docs/openapi/auth.json` y `docs/openapi/
 ## Colección de Postman
 
 1. Importa `docs/postman/parcial-1.postman_collection.json`.
-2. Crea un entorno con `admin_username` y `admin_password`, las del administrador del paso 4.
-3. En *Settings → General*, apunta el *Working directory* a la raíz del repositorio; las imágenes salen de `docs/demo-imagenes/`. En *Settings → Certificates*, agrega la CA de mkcert (`mkcert -CAROOT`).
-4. Genera el archivo de más de 5 MB, que no se versiona: `python services/stego/tools/stego_lab.py demo docs/demo-imagenes`.
-5. Ejecuta con el Runner las carpetas `1 - Admin` y `2 - Usuario y Stego`, en orden. La carpeta `3` se corre después de `docker compose -f deploy/docker-compose.yml stop auth`.
+2. Crea un entorno con `admin_username` y `admin_password`, las del administrador del paso 5, y selecciónalo arriba a la derecha.
+3. En *Settings → General*, apunta el *Working directory* a la raíz del repositorio (las imágenes salen de `docs/demo-imagenes/`) y deja activado *SSL certificate verification*.
+4. En *Settings → Certificates*, activa **CA certificates** y, en *PEM file*, elige `rootCA.pem` de la carpeta que imprime `mkcert -CAROOT` (en Windows, `%LOCALAPPDATA%\mkcert`). No uses *Add certificate*, que es para certificados de cliente, y nunca cargues `rootCA-key.pem`: es la clave privada de la CA.
+5. Genera el archivo de más de 5 MB, que no se versiona: `python services/stego/tools/stego_lab.py demo docs/demo-imagenes`. Qué es cada imagen y qué resultado se espera: `docs/calibracion-estego.md`, sección *Imágenes de la demo*.
+6. Runner: sobre la colección, *⋯ → Run collection*. Desmarca la carpeta `3`, deja *Iterations* en 1 y, en *Advanced settings*, *Keep variable values* activado (si corres las carpetas por separado, la `2` usa el usuario y los tokens que guardó la `1`). Se puede repetir: los usuarios de prueba llevan un sufijo distinto en cada corrida.
+7. Carpeta `3` (T08): `docker compose -f deploy/docker-compose.yml stop auth`, *⋯ → Run folder* sobre ella y, al terminar, `docker compose -f deploy/docker-compose.yml start auth`.
 
 Por consola:
 
@@ -136,19 +146,24 @@ npx newman run docs/postman/parcial-1.postman_collection.json -e <entorno>.json 
 
 | ID | Cómo |
 |---|---|
-| T01 | `docker compose -f deploy/docker-compose.yml stop stego`: el análisis da 503 y `auth` sigue respondiendo. Lo mismo al revés con `auth` |
+| T01 | `docker compose -f deploy/docker-compose.yml stop stego`: el análisis da 503 y `auth` sigue respondiendo. Lo mismo al revés con `auth`. Después, `start stego` (o `start auth`) |
 | T02–T07, T09–T11 | Colección de Postman, carpetas 1 y 2 |
-| T08 | `docker compose -f deploy/docker-compose.yml stop auth` y la carpeta 3: 503, y ningún `stego.analyzed` en los registros |
+| T08 | `docker compose -f deploy/docker-compose.yml stop auth` y la carpeta 3: 503, y ningún `stego.analyzed` en los registros. Después, `start auth` |
 | T12 | `docker compose -f deploy/docker-compose.yml logs gateway auth stego`: eventos JSON con `request_id`, sin JWT ni contraseñas |
+
+`zip-al-final.png` se ve como una imagen normal, pero lleva un ZIP pegado. Para mostrar el archivo oculto:
+
+```bash
+python -I -c "import zipfile; print(zipfile.ZipFile('docs/demo-imagenes/zip-al-final.png').read('mensaje.txt').decode())"
+```
 
 La evidencia de una corrida completa está en `docs/evidencias/`.
 
 ## Pruebas
 
+Con el entorno del paso 1 activo:
+
 ```bash
-py -3.13 -m venv .venv                      # macOS/Linux: python3.13 -m venv .venv
-.venv\Scripts\activate                      # macOS/Linux: source .venv/bin/activate
-pip install -e "services/shared[dev]" -e services/auth -e services/stego
 docker compose -f deploy/docker-compose.test.yml up -d   # PostgreSQL de pruebas en 127.0.0.1:5433
 pytest services/shared services/auth services/stego
 ruff check services deploy && ruff format --check services deploy
